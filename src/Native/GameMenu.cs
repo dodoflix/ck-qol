@@ -194,6 +194,18 @@ namespace CkQol.Native
             return null;
         }
 
+        /// A volume row, the only stock row whose valueText renders the diamond bar
+        /// glyphs. The on/off rows only ever draw letters, so a bar cloned from one
+        /// comes out as question marks.
+        public static RadicalMenuOption FindBarDonor(RadicalMenu menu)
+        {
+            foreach (var option in RowsOf(menu))
+            {
+                if (option is RadicalOptionsMenuOption_Volume) return option;
+            }
+            return null;
+        }
+
         /// Any plain row, used as the shape for submenu and back entries.
         ///
         /// Prefers a row with no value column. Rows that have one (Language, showing

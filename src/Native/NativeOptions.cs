@@ -45,11 +45,14 @@ namespace CkQol.Native
                 var toggleDonor = FirstToggle(Manager.menu.uiOptionsMenu,
                                               Manager.menu.gameplayOptionsMenu,
                                               Manager.menu.videoOptionsMenu);
+                var barDonor = FirstBar(Manager.menu.audioOptionsMenu,
+                                        Manager.menu.uiOptionsMenu,
+                                        Manager.menu.gameplayOptionsMenu);
 
                 if (plainDonor != null || _attempts == MaxAttempts)
                 {
                     Debug.Log($"[CkQol] donors: plain={(plainDonor != null)} " +
-                              $"toggle={(toggleDonor != null)}");
+                              $"toggle={(toggleDonor != null)} bar={(barDonor != null)}");
                 }
 
                 if (plainDonor == null)
@@ -66,7 +69,7 @@ namespace CkQol.Native
 
                 foreach (var handle in mod.Features)
                 {
-                    var page = BuildFeaturePage(handle, plainDonor, toggleDonor);
+                    var page = BuildFeaturePage(handle, plainDonor, toggleDonor, barDonor);
                     if (page == null) continue;
 
                     var row = GameMenu.CloneAndSwap<QolSubmenuOption>(plainDonor, RowParent(rootMenu), "Submenu");
@@ -159,7 +162,8 @@ namespace CkQol.Native
 
         private static RadicalMenu BuildFeaturePage(FeatureHandle handle,
                                                     RadicalMenuOption plainDonor,
-                                                    RadicalMenuOption toggleDonor)
+                                                    RadicalMenuOption toggleDonor,
+                                                    RadicalMenuOption barDonor)
         {
             var page = BuildMenu(Manager.menu.uiOptionsMenu, "CkQolPage_" + handle.Name, handle.Name);
             if (page == null) return null;
@@ -176,7 +180,7 @@ namespace CkQol.Native
 
             foreach (var setting in handle.Settings)
             {
-                AddSettingRow(page, setting, toggleDonor);
+                AddSettingRow(page, setting, toggleDonor, barDonor);
             }
 
             AddBack(plainDonor, page);
@@ -186,7 +190,8 @@ namespace CkQol.Native
         }
 
         private static void AddSettingRow(RadicalMenu page, ModSetting setting,
-                                          RadicalMenuOption toggleDonor)
+                                          RadicalMenuOption toggleDonor,
+                                          RadicalMenuOption barDonor)
         {
             // Every row shape is cloned from the on/off donor: it is the only stock
             // row that carries a value column, which is where the value is shown.
@@ -199,8 +204,14 @@ namespace CkQol.Native
                 return;
             }
 
-            var number = GameMenu.CloneAndSwap<QolNumberOption>(toggleDonor, RowParent(page), "Number");
+            // Prefer a volume row for ranged settings: its valueText is the only one
+            // that can render the diamond bar.
+            bool ranged = setting is IntSetting || setting is FloatSetting;
+            var donor = ranged && barDonor != null ? barDonor : toggleDonor;
+
+            var number = GameMenu.CloneAndSwap<QolNumberOption>(donor, RowParent(page), "Number");
             if (number == null) return;
+            number.CanDrawBar = donor == barDonor;
 
             if (setting is IntSetting i) { number.Label = i.Label; number.Int = i; }
             else if (setting is FloatSetting f) { number.Label = f.Label; number.Float = f; }
@@ -227,6 +238,16 @@ namespace CkQol.Native
             foreach (var menu in menus)
             {
                 var found = GameMenu.FindPlainDonor(menu);
+                if (found != null) return found;
+            }
+            return null;
+        }
+
+        private static RadicalMenuOption FirstBar(params RadicalMenu[] menus)
+        {
+            foreach (var menu in menus)
+            {
+                var found = GameMenu.FindBarDonor(menu);
                 if (found != null) return found;
             }
             return null;

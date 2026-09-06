@@ -115,6 +115,10 @@ namespace CkQol.Native
         public ChoiceSetting Choice;
         public string Label;
 
+        /// Only rows cloned from a volume row can draw the diamond bar; the on/off
+        /// rows' valueText has no glyph for those characters and renders '?'.
+        public bool CanDrawBar;
+
         private void Start() => Refresh();
 
         public override void OnActivated()
@@ -174,16 +178,23 @@ namespace CkQol.Native
             string value;
             if (Float != null)
             {
-                float span = Float.Max - Float.Min;
-                float filled = span > 0f ? (Float.Value - Float.Min) / span : 0f;
-                value = Bar(Mathf.RoundToInt(filled * BarSegments));
+                if (CanDrawBar)
+                {
+                    float span = Float.Max - Float.Min;
+                    float filled = span > 0f ? (Float.Value - Float.Min) / span : 0f;
+                    value = Bar(Mathf.RoundToInt(filled * BarSegments));
+                }
+                else
+                {
+                    value = Float.Value.ToString("0.00");
+                }
             }
             else if (Int != null)
             {
-                // A bar cannot show which of 20 values is selected, so counts stay
-                // numeric. Ranges small enough to map cleanly get the bar.
+                // A bar cannot show which of twenty values is selected, so wide
+                // ranges stay numeric even when a bar could be drawn.
                 int span = Int.Max - Int.Min;
-                value = span > 0 && span <= BarSegments
+                value = CanDrawBar && span > 0 && span <= BarSegments
                     ? Bar(Int.Value - Int.Min)
                     : Int.Value.ToString();
             }
