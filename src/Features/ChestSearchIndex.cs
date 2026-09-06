@@ -15,6 +15,7 @@ namespace CkQol.Features
     {
         internal ObjectID Id;
         internal string Name;
+        internal bool Nearby;
     }
 
     /// One container holding what was searched for.
@@ -59,8 +60,12 @@ namespace CkQol.Features
             foreach (var info in PugDatabase.objectsByType.Values)
             {
                 if (info == null || info.variation != 0) continue;
-                if (info.objectType == ObjectType.NonUsable ||
-                    info.objectType == ObjectType.NonObtainable) continue;
+
+                // Only NonObtainable is dropped. NonUsable is not junk: it is where
+                // every plain crafting material lives, ore and bars and wood, which
+                // is most of what anyone searches a chest for. The icon and name
+                // tests below are what actually rule things out.
+                if (info.objectType == ObjectType.NonObtainable) continue;
                 if (info.smallIcon == null && info.icon == null) continue;
                 if (!seen.Add(info.objectID)) continue;
 
@@ -95,22 +100,76 @@ namespace CkQol.Features
             return name;
         }
 
-        /// Items whose name contains the query, the ones that start with it first.
-        internal static void Match(string query, List<ItemEntry> into, int limit)
+        /// Items whose name contains the query.
+        ///
+        /// Four passes, best first: what is nearby and starts with the query, what is
+        /// nearby and merely contains it, then the same two for what is not. `stock`
+        /// may be null, which collapses this to the two name passes.
+        internal static void Match(string query, HashSet<ObjectID> stock,
+                                   List<ItemEntry> into, int limit)
         {
             into.Clear();
             if (!Build() || string.IsNullOrEmpty(query)) return;
 
-            for (int pass = 0; pass < 2; pass++)
+            for (int pass = 0; pass < 4; pass++)
             {
+                bool wantNear = pass < 2;
+                bool wantStart = pass % 2 == 0;
+
+                if (wantNear && stock == null) continue;
+
                 for (int i = 0; i < _items.Count && into.Count < limit; i++)
                 {
                     int at = _items[i].Name.IndexOf(query, System.StringComparison.OrdinalIgnoreCase);
-                    bool starts = at == 0;
+                    if (at < 0) continue;
+                    if (wantStart != (at == 0)) continue;
 
-                    if (pass == 0 ? !starts : at <= 0) continue;
-                    into.Add(_items[i]);
+                    bool near = stock != null && stock.Contains(_items[i].Id);
+                    if (near != wantNear) continue;
+
+                    var entry = _items[i];
+                    entry.Nearby = near;
+                    into.Add(entry);
                 }
+            }
+        }
+
+        /// Every item id held by a container in range, for ordering the suggestions.
+        internal static void Stock(float radius, bool includeSelf, HashSet<ObjectID> into)
+        {
+            into.Clear();
+
+            var player = Manager.main != null ? Manager.main.player : null;
+            if (player == null || !player.entityExist) return;
+
+            var world = player.world;
+            if (world == null || !world.IsCreated) return;
+
+            var em = world.EntityManager;
+            float3 here = em.GetComponentData<LocalTransform>(player.entity).Position;
+
+            if (includeSelf) Collect(em, player.entity, into);
+
+            var entities = Containers(world).ToEntityArray(Allocator.Temp);
+            for (int i = 0; i < entities.Length; i++)
+            {
+                float3 at = em.GetComponentData<LocalTransform>(entities[i]).Position;
+                if (math.distance(here.xz, at.xz) > radius) continue;
+
+                Collect(em, entities[i], into);
+            }
+            entities.Dispose();
+        }
+
+        private static void Collect(EntityManager em, Entity container, HashSet<ObjectID> into)
+        {
+            if (!em.HasBuffer<ContainedObjectsBuffer>(container)) return;
+
+            var contained = em.GetBuffer<ContainedObjectsBuffer>(container, true);
+            for (int i = 0; i < contained.Length; i++)
+            {
+                var data = contained[i].objectData;
+                if (data.objectID != ObjectID.None && data.amount > 0) into.Add(data.objectID);
             }
         }
 

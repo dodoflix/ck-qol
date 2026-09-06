@@ -70,6 +70,7 @@ namespace CkQol.Features
 
         private CkQolSearchPanel _panel;
 
+        private readonly HashSet<ObjectID> _stock = new HashSet<ObjectID>();
         private readonly List<ItemEntry> _matches = new List<ItemEntry>();
         private readonly List<SearchRow> _names = new List<SearchRow>();
         private readonly List<ContainerHit> _hits = new List<ContainerHit>();
@@ -134,13 +135,19 @@ namespace CkQol.Features
                 return _names;
             }
 
-            ChestSearchIndex.Match(query, _matches, MaxSuggestions);
+            // Refreshed per keystroke rather than per suggestion: one walk of the
+            // containers answers "is this nearby" for the whole list.
+            ChestSearchIndex.Stock(ChestSearchState.Radius, ChestSearchState.SearchSelf,
+                                   _stock);
+
+            ChestSearchIndex.Match(query, _stock, _matches, MaxSuggestions);
             for (int i = 0; i < _matches.Count; i++)
             {
                 _names.Add(new SearchRow
                 {
                     Icon = IconFor(_matches[i].Id),
                     Text = _matches[i].Name,
+                    Dim = !_matches[i].Nearby,
                 });
             }
             return _names;

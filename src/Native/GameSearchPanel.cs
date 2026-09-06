@@ -10,6 +10,9 @@ namespace CkQol.Native
         public Sprite Icon;
         public string Text;
         public string Amount;
+
+        /// Greyed: a suggestion for something no container in range holds.
+        public bool Dim;
     }
 
     /// A search box with name suggestions and a result list, drawn beside the
@@ -43,9 +46,21 @@ namespace CkQol.Native
         /// What fits a row before it runs past the backing panel.
         private const int RowCharacters = 20;
 
+        /// The box is narrower than a row: it has the icon and the clear button
+        /// beside it.
+        private const int InputCharacters = 15;
+
+        /// Characters a second the highlighted row scrolls by when its name is too
+        /// long to show at once.
+        private const float MarqueeRate = 3.5f;
+
         /// Wide enough for RowCharacters plus an icon, and no wider - the panel sits
         /// against the right of the screen.
         internal const float PanelWidth = 6f;
+
+        /// How far the box sits above the first row. Tight, so the two read as one
+        /// panel rather than as two.
+        internal const float BoxRow = 1.15f;
 
         private class Row
         {
@@ -262,7 +277,17 @@ namespace CkQol.Native
 
         private void DrawQuery()
         {
-            string shown = _typed + (_focused ? "_" : string.Empty);
+            // A window onto the text that follows the caret, rather than the whole
+            // of it: a long name would otherwise run straight out of the box.
+            string typed = _typed;
+            if (typed.Length > InputCharacters)
+            {
+                int start = Mathf.Clamp(_caret - InputCharacters, 0,
+                                        typed.Length - InputCharacters);
+                typed = typed.Substring(start, InputCharacters);
+            }
+
+            string shown = typed + (_focused ? "_" : string.Empty);
             if (shown != _shownQuery)
             {
                 GameMenu.SetLiteral(_query, shown);
@@ -288,7 +313,8 @@ namespace CkQol.Native
 
                     row.Index = i;
                     Draw(row, used, _suggestions[i].Icon, _suggestions[i].Text,
-                         string.Empty, i == _highlight || i == _hovered);
+                         string.Empty, i == _highlight || i == _hovered,
+                         _suggestions[i].Dim);
                 }
                 return used;
             }
@@ -339,11 +365,13 @@ namespace CkQol.Native
         }
 
         private void Draw(Row row, int index, Sprite icon, string text, string amount,
-                          bool highlighted)
+                          bool highlighted, bool dim = false)
         {
             row.Root.transform.localPosition = new Vector3(0f, -RowStep * index, 0f);
 
-            text = Clip(text);
+            // The one row being looked at scrolls its name if it does not fit, so a
+            // long name is readable without widening the panel for every row.
+            text = highlighted ? Marquee(text) : Clip(text);
 
             string shown = text + " " + amount;
             if (row.Shown != shown)
@@ -359,9 +387,9 @@ namespace CkQol.Native
 
             // Recoloured every frame: Render rebuilds the glyphs from the style and
             // loses any colour put on them.
-            Recolour(row.Text, highlighted
-                ? PugTextEffectMenuOption.SELECTED_VALUE_COLOR
-                : Color.white);
+            Recolour(row.Text, highlighted ? PugTextEffectMenuOption.SELECTED_VALUE_COLOR
+                   : dim ? PugTextEffectMenuOption.UNSELECTED_TEXT_COLOR
+                   : Color.white);
 
             // Sized from the text actually drawn, the way QolStepStrip places its
             // boxes: a guessed collider misses the row at some UI scales.
@@ -607,6 +635,26 @@ namespace CkQol.Native
             if (string.IsNullOrEmpty(text) || text.Length <= RowCharacters) return text;
             return text.Substring(0, RowCharacters - 1) + ".";
         }
+
+        /// A window that walks to the end of the name and back, pausing at each. In
+        /// whole characters, because the glyphs are on a pixel grid and a smooth
+        /// slide would land them between columns.
+        private static string Marquee(string text)
+        {
+            if (string.IsNullOrEmpty(text) || text.Length <= RowCharacters) return text;
+
+            int over = text.Length - RowCharacters;
+            float span = over / MarqueeRate;
+            float pause = 1.2f;
+            float cycle = (span + pause) * 2f;
+
+            float at = Mathf.Repeat(Time.unscaledTime, cycle);
+            float travel = at < span + pause
+                ? Mathf.Min(at, span)
+                : Mathf.Max(0f, span - (at - span - pause));
+
+            return text.Substring(Mathf.RoundToInt(travel * MarqueeRate), RowCharacters);
+        }
     }
 
     public static class GameSearchPanel
@@ -644,13 +692,9 @@ namespace CkQol.Native
 
                 var panel = root.AddComponent<CkQolSearchPanel>();
 
-                // Behind everything else, so these are added first.
                 float width = CkQolSearchPanel.PanelWidth;
                 float middle = width * 0.5f;
-                var listPanel = Backing(root.transform, ui,
-                                        new Vector3(middle, 0f, 0.2f), width, 1f);
-                Backing(root.transform, ui,
-                        new Vector3(middle, 1.6f, 0.2f), width, 1.3f);
+                float boxRow = CkQolSearchPanel.BoxRow;
 
                 // The donor's own script implements this same interface and would
                 // fight for the active field. Destroying it also takes
@@ -706,14 +750,23 @@ namespace CkQol.Native
 
                 // Room on the left for the picked item's icon.
                 box.transform.SetParent(root.transform, false);
-                box.transform.localPosition = new Vector3(1.1f, 1.6f, 0f);
+                box.transform.localPosition = new Vector3(1.2f, boxRow, 0f);
                 box.SetActive(true);
 
-                var picked = Icon(root.transform, donor, new Vector3(0.4f, 1.6f, 0f));
+                var picked = Icon(root.transform, donor, new Vector3(0.55f, boxRow, 0f));
 
                 var clear = Clear(root.transform, query,
-                                  new Vector3(width - 0.7f, 1.6f, 0f),
+                                  new Vector3(width - 0.9f, boxRow, 0f),
                                   out BoxCollider clearHit);
+
+                // Ordered by sortingOrder rather than by sibling index, so these can
+                // be built last and still sit behind.
+                var listPanel = Backing(root.transform, ui,
+                                        new Vector3(middle, 0f, 0.2f), width, 1f, query);
+                Backing(root.transform, ui,
+                        new Vector3(middle, boxRow, 0.2f), width, 1.2f, query);
+                Backing(root.transform, ui,
+                        new Vector3(width - 0.75f, boxRow, 0.1f), 1.1f, 1f, query);
 
                 panel.Bind(donor, anchor, query, hint, clear, listPanel,
                            ui.playerInventoryUI.backgroundSR, picked, collider, clearHit);
@@ -732,7 +785,8 @@ namespace CkQol.Native
         /// A backing panel cloned from the inventory window's own, which is a sliced
         /// sprite and so takes any size.
         private static SpriteRenderer Backing(Transform parent, UIManager ui,
-                                              Vector3 at, float width, float height)
+                                              Vector3 at, float width, float height,
+                                              PugText over)
         {
             var donor = ui.playerInventoryUI.backgroundSR;
             if (donor == null) return null;
@@ -749,6 +803,15 @@ namespace CkQol.Native
 
             sr.color = donor.color;
             sr.size = new Vector2(width, height);
+
+            // Lifted to just under our own text. The donor's order is the inventory
+            // window's, which leaves every other UI element drawing between this and
+            // the text on top of it.
+            if (over != null)
+            {
+                sr.sortingLayerID = over.style.sortingLayer;
+                sr.sortingOrder = over.style.orderInLayer - 2;
+            }
 
             clone.transform.SetParent(parent, false);
             clone.transform.localPosition = at;
