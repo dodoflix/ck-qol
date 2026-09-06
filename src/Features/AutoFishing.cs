@@ -101,13 +101,13 @@ namespace CkQol.Features
         internal static volatile float PullDelaySeconds;
 
         /// How long the player's last manual reel lasted, or -1 if they have not
-        /// reeled by hand yet.
+        /// reeled by hand this fishing session.
         ///
         /// Deliberately not persisted and never written back into the Reel hold
         /// setting: that row stays whatever the player chose, and this shadows it only
-        /// while Learn reel hold is on. Every manual reel replaces it, so it tracks
-        /// current timing rather than freezing the first one, and a restart goes back
-        /// to the configured value until the next hand reel.
+        /// while Learn reel hold is on. Every manual reel replaces it, and putting the
+        /// rod away clears it - so it is the timing of the session you are in, not a
+        /// number picked up once and kept forever.
         private static volatile float _learnedHold = -1f;
 
         private static volatile bool _shoalCheckPending;
@@ -117,6 +117,10 @@ namespace CkQol.Features
         /// jams fishing.
         internal static void ReportLearnedHold(float seconds) =>
             _learnedHold = UnityEngine.Mathf.Clamp(seconds, 0.05f, 1.5f);
+
+        /// Called when the player stops fishing, so the next session starts from the
+        /// configured Reel hold again rather than inheriting the last one's timing.
+        internal static void ClearLearnedHold() => _learnedHold = -1f;
 
         /// What the reeler actually holds for.
         internal static float EffectiveReelHold

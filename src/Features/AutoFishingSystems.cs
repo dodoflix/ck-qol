@@ -75,11 +75,22 @@ namespace CkQol.Features
             _pressedLastFrame = false;
         }
 
+        /// The player has stopped fishing, so the learned timing goes with it.
+        ///
+        /// Safe to key off the Fishing state: the game does not leave it between
+        /// casts - a catch sets queueThrowAgain and throws again from inside the
+        /// state, and PopState only runs in Fishing.OnExitFishing.
+        private void EndSession()
+        {
+            Forget();
+            AutoFishingState.ClearLearnedHold();
+        }
+
         protected override void OnUpdate()
         {
             if (!AutoFishingState.ReelEnabled || _playerQuery.IsEmpty)
             {
-                Forget();
+                EndSession();
                 base.OnUpdate();
                 return;
             }
@@ -87,9 +98,16 @@ namespace CkQol.Features
             Entity player = _playerQuery.GetSingletonEntity();
 
             var slot = EntityManager.GetComponentData<EquipmentSlotCD>(player);
-            if (slot.slotType != EquipmentSlotType.FishingRodSlot ||
-                Manager.ui.isAnyInventoryShowing ||
-                Manager.menu.IsAnyMenuActive())
+            if (slot.slotType != EquipmentSlotType.FishingRodSlot)
+            {
+                EndSession();
+                base.OnUpdate();
+                return;
+            }
+
+            // A menu or inventory pauses the mod but the rod is still out, so the
+            // learned timing survives - unlike putting the rod away.
+            if (Manager.ui.isAnyInventoryShowing || Manager.menu.IsAnyMenuActive())
             {
                 Forget();
                 base.OnUpdate();
@@ -99,7 +117,7 @@ namespace CkQol.Features
             var playerState = EntityManager.GetComponentData<PlayerStateCD>(player);
             if (!playerState.HasAnyState(PlayerStateEnum.Fishing))
             {
-                Forget();
+                EndSession();
                 base.OnUpdate();
                 return;
             }
