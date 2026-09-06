@@ -22,7 +22,7 @@ API="https://g-$GAME_ID.modapi.io/v1/games/$GAME_ID/mods"
 # that is already published every time the copy is edited.
 VISIBLE="${MODIO_VISIBLE:-}"
 
-SUMMARY="Client-side quality of life: auto fishing, auto eat, auto summon and a DPS tracker. All optional and configurable from the game's own settings menu. Client-side only, so other players do not need it."
+SUMMARY="Client-side quality of life: auto fishing, auto eat, auto summon, a DPS tracker and chest search. All optional and configurable from the game's own settings menu. Client-side only, so other players do not need it."
 
 # Must be tags the game defines - GET /games/5289 lists them under tag_options.
 # Bump the version tag when the mod is verified against a newer build.

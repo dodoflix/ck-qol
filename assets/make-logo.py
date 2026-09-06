@@ -257,6 +257,21 @@ DEMON_ART = ([
     "y": (250, 214, 120),
 })
 
+CHEST = ([
+    ".dddddd.",
+    "dlllllld",
+    "dlllllld",
+    "dddggddd",
+    "dwwggwwd",
+    "dwwwwwwd",
+    ".dddddd.",
+], {
+    "l": (176, 124, 72),
+    "w": (140, 96, 56),
+    "d": (84, 54, 34),
+    "g": (242, 206, 122),
+})
+
 SWORD = ([
     "..s..",
     ".sls.",
@@ -299,7 +314,7 @@ def divider(d, cx, y, half=44):
 
 
 def main():
-    glyphs = (FISH, BERRY, DEMON_ART, SWORD)
+    glyphs = (FISH, BERRY, DEMON_ART, SWORD, CHEST)
     size = TILE + 1
     gap = 8
 
