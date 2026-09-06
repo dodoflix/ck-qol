@@ -287,8 +287,15 @@ namespace CkQol.Features
             var buffer = em.GetBuffer<DescriptionBuffer>(container, true);
             if (buffer.Length == 0) return null;
 
-            var bytes = new byte[buffer.Length];
-            for (int i = 0; i < buffer.Length; i++) bytes[i] = buffer[i].Value;
+            // Stops at the first zero: the buffer is a fixed size and whatever the
+            // name does not fill is padding, which decodes into control characters
+            // and renders as junk.
+            int used = 0;
+            while (used < buffer.Length && buffer[used].Value != 0) used++;
+            if (used == 0) return null;
+
+            var bytes = new byte[used];
+            for (int i = 0; i < used; i++) bytes[i] = buffer[i].Value;
 
             string label = Encoding.UTF8.GetString(bytes).Trim();
             return label.Length == 0 ? null : label;

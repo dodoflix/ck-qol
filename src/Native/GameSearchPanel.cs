@@ -70,7 +70,6 @@ namespace CkQol.Native
             public SpriteRenderer Icon;
             public PugText Text;
             public PugText Amount;
-            public PugText[] AmountShadows;
             public BoxCollider Box;
             public int Index;
         }
@@ -426,7 +425,6 @@ namespace CkQol.Native
 
             Write(row.Text, text);
             Write(row.Amount, amount);
-            foreach (var shadow in row.AmountShadows) Write(shadow, amount);
 
             row.Icon.sprite = icon;
             row.Icon.enabled = icon != null;
@@ -476,7 +474,6 @@ namespace CkQol.Native
 
             Write(row.Text, string.Empty);
             Write(row.Amount, string.Empty);
-            foreach (var shadow in row.AmountShadows) Write(shadow, string.Empty);
 
             row.Icon.enabled = false;
             row.Index = -1;
@@ -494,10 +491,6 @@ namespace CkQol.Native
                 {
                     GameMenu.SetLiteral(row.Text, string.Empty);
                     GameMenu.SetLiteral(row.Amount, string.Empty);
-                    foreach (var shadow in row.AmountShadows)
-                    {
-                        GameMenu.SetLiteral(shadow, string.Empty);
-                    }
                 }
                 GameMenu.SetLiteral(_query, string.Empty);
             }
@@ -545,10 +538,11 @@ namespace CkQol.Native
                 text.maxWidth = 0f;
             }
 
-            var amountShadows = new List<PugText>();
-            if (element.amountNumberShadow != null) amountShadows.Add(element.amountNumberShadow);
-            if (element.amountNumberShadow2 != null) amountShadows.Add(element.amountNumberShadow2);
-
+            // The count's two shadow copies are left blank for good. Three texts
+            // rendering the same number is what the hover window wants; here the
+            // count changes while the name beside it scrolls, and keeping them in
+            // step is not worth the rebuild it costs. It reads like every other row
+            // without them.
             if (element.chestIcon != null) element.chestIcon.enabled = false;
 
             if (element.container != null)
@@ -579,18 +573,10 @@ namespace CkQol.Native
             {
                 Vector3 was = element.amountNumber.transform.localPosition;
                 var moved = new Vector3(PanelWidth - CountGap, line, was.z);
-                Vector3 shift = moved - was;
 
                 element.amountNumber.transform.localPosition = moved;
                 element.amountNumber.style.horizontalAlignment =
                     PugTextStyle.HorizontalAlignment.right;
-
-                foreach (var shadow in amountShadows)
-                {
-                    shadow.transform.localPosition += shift;
-                    shadow.style.horizontalAlignment =
-                        PugTextStyle.HorizontalAlignment.right;
-                }
             }
 
             // A collider with no UIelement on it: UIMouse takes GetComponent<UIelement>
@@ -624,7 +610,6 @@ namespace CkQol.Native
                 Icon = element.SR,
                 Text = element.text,
                 Amount = element.amountNumber,
-                AmountShadows = amountShadows.ToArray(),
                 Box = box,
                 Index = -1,
             };
