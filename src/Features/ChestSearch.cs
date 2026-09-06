@@ -22,10 +22,6 @@ namespace CkQol.Features
                            "Tiles to search. The game only keeps containers near you " +
                            "loaded, so past about 14 there is nothing left to find.");
 
-        private readonly IntSetting _minimum =
-            new IntSetting("MinimumCharacters", "Minimum characters", 3, 2, 5,
-                           "How much to type before the name suggestions appear.");
-
         private readonly BoolSetting _self =
             new BoolSetting("SearchSelf", "Search my inventory", true,
                             "Also report what you are already carrying.");
@@ -38,7 +34,6 @@ namespace CkQol.Features
         public override IEnumerable<ModSetting> GetSettings()
         {
             yield return _radius;
-            yield return _minimum;
             yield return _self;
             yield return _point;
         }
@@ -46,8 +41,8 @@ namespace CkQol.Features
         public override void Init()
         {
             base.Init();
-            Log($"started (radius={_radius.Value}, minChars={_minimum.Value}, " +
-                $"self={_self.Value})");
+            Log($"started (radius={_radius.Value}, self={_self.Value}, " +
+                $"point={_point.Value})");
         }
 
         public override void Shutdown()
@@ -67,7 +62,6 @@ namespace CkQol.Features
         {
             ChestSearchState.Enabled = Running;
             ChestSearchState.Radius = _radius.Value;
-            ChestSearchState.MinimumCharacters = _minimum.Value;
             ChestSearchState.SearchSelf = _self.Value;
             ChestSearchState.Point = _point.Value;
 
@@ -88,6 +82,9 @@ namespace CkQol.Features
         /// Beyond this the panel would run past the inventory it sits beside.
         private const int MaxRows = 8;
         private const int MaxSuggestions = 8;
+
+        /// Two letters match most of the item table, which is a list nobody reads.
+        private const int MinimumCharacters = 3;
 
         /// Containers do not move, but their contents change, so the answer is
         /// refreshed while the panel is open rather than frozen at the pick.
@@ -130,7 +127,7 @@ namespace CkQol.Features
             _names.Clear();
             _matches.Clear();
 
-            if (query == null || query.Length < ChestSearchState.MinimumCharacters)
+            if (query == null || query.Length < MinimumCharacters)
             {
                 return _names;
             }
@@ -269,7 +266,6 @@ namespace CkQol.Features
     {
         internal static volatile bool Enabled;
         internal static volatile int Radius = 10;
-        internal static volatile int MinimumCharacters = 3;
         internal static volatile bool SearchSelf = true;
         internal static volatile bool Point = true;
     }
