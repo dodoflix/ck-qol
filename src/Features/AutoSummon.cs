@@ -90,7 +90,7 @@ namespace CkQol.Features
             string key = AutoSummonState.ToggleModifier == Modifier.None
                 ? _toggleKey.Name
                 : $"{AutoSummonState.ToggleModifier}+{_toggleKey.Name}";
-            return $"{key}  Auto summon: {(AutoSummonState.Armed ? "on" : "off")}";
+            return $"{key} Summon {(AutoSummonState.Armed ? "on" : "off")}";
         }
 
         /// Only with a summoning weapon in hand, which is also when the binding works.

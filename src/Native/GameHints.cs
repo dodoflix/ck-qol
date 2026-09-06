@@ -172,6 +172,11 @@ namespace CkQol.Native
                 var others = new PugText[texts.Length - 1];
                 for (int i = 1; i < texts.Length; i++) others[i - 1] = texts[i];
 
+                // The donor's width is sized for labels like "Tab", and PugFont only
+                // wraps when maxWidth is above zero (PugFont.cs:141).
+                texts[0].maxWidth = 0f;
+                foreach (var other in others) other.maxWidth = 0f;
+
                 var hint = clone.AddComponent<CkQolHint>();
                 hint.Bind(texts[0], others, sprites, donor);
                 hint.Label = label;
