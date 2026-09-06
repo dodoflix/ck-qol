@@ -124,7 +124,58 @@ namespace CkQol.Native
         public override void OnActivated()
         {
             base.OnActivated();
-            Step(1);
+
+            // Clicking a specific diamond sets that level, as the volume rows do.
+            // There are no per-glyph colliders - the whole row is one collider - so
+            // the segment is worked out from the pointer against the glyph positions.
+            if (CanDrawBar && TryGetClickedSegment(out int segment)) SetSegment(segment);
+            else Step(1);
+        }
+
+        private bool TryGetClickedSegment(out int segment)
+        {
+            segment = 0;
+            if (valueText == null || valueText.glyphs == null || valueText.glyphs.Count == 0) return false;
+            if (Manager.ui == null || Manager.ui.mouse == null || Manager.ui.mouse.pointer == null) return false;
+            if (!Manager.input.SystemIsUsingMouse()) return false;
+
+            float pointerX = Manager.ui.mouse.pointer.position.x;
+            int nearest = -1;
+            float nearestDistance = float.MaxValue;
+
+            for (int i = 0; i < valueText.glyphs.Count; i++)
+            {
+                var glyph = valueText.glyphs[i];
+                if (glyph == null) continue;
+                float distance = Mathf.Abs(glyph.transform.position.x - pointerX);
+                if (distance < nearestDistance)
+                {
+                    nearestDistance = distance;
+                    nearest = i;
+                }
+            }
+
+            if (nearest < 0) return false;
+            segment = nearest + 1;
+            return true;
+        }
+
+        /// segment is 1..BarSegments, so clicking the first diamond is the lowest
+        /// setting a click can reach - matching the volume rows, where zero is only
+        /// reachable by muting.
+        private void SetSegment(int segment)
+        {
+            if (Float != null)
+            {
+                float span = Float.Max - Float.Min;
+                Float.Value = Float.Min + span * segment / BarSegments;
+            }
+            else if (Int != null)
+            {
+                Int.Value = Mathf.Clamp(Int.Min + segment, Int.Min, Int.Max);
+            }
+
+            Refresh();
         }
 
         public override bool OnSkimRight()
