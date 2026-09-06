@@ -195,7 +195,7 @@ def plate(glyph):
 # Every sprite is exactly ART on its long axis. Left to themselves they came out
 # between 16 and 22, which reads as four icons at four sizes however well each
 # one is centred.
-ART = 10
+ART = 11
 ART_SCALE = 2
 
 
@@ -214,13 +214,14 @@ def sprite(rows, palette):
 
 
 FISH = ([
-    "...bbb....",
-    "..bbbbbb.d",
-    ".bbbbbbbdd",
-    "bkbbbbbbdd",
-    ".bbbbbbbdd",
-    "..bbbbbb.d",
-    "...bbb....",
+    "......bb...",
+    "...bbbbbb.d",
+    ".bbbbbbbbdd",
+    "bkbbbbbbbdd",
+    "bbbbbbbbbdd",
+    ".bbbbbbbbdd",
+    "...bbbbbb.d",
+    "......bb...",
 ], {
     "b": (110, 180, 226),
     "d": (74, 140, 196),
@@ -228,44 +229,46 @@ FISH = ([
 })
 
 BERRY = ([
-    ".....s....",
-    "...ggs....",
-    "..rrrrrr..",
-    ".rrrrrrrr.",
-    "rhrrrrrrrr",
-    "rhrrrrrrrr",
-    "rrrrrrrrrr",
-    ".rrrrrrrr.",
-    "..rrrrrr..",
-    "...rr.rr..",
+    ".....s.....",
+    ".....sgg...",
+    "..rrr.rrr..",
+    ".rhrrrrrrr.",
+    "rhrrrrrrrrr",
+    "rrrrrrrrrrd",
+    "rrrrrrrrrdd",
+    ".rrrrrrrdd.",
+    "..rrrrrdd..",
+    "....rrrr...",
 ], {
     "r": (206, 84, 92),
     "h": (240, 150, 150),
+    "d": (150, 46, 60),
     "s": (120, 92, 60),
     "g": (110, 176, 96),
 })
 
 DEMON_ART = ([
-    "d........d",
-    "dd......dd",
-    ".dmmmmmmd.",
-    ".mmmmmmmm.",
-    "mmyymmyymm",
-    "mmmmmmmmmm",
-    ".mmmmmmmm.",
-    ".mwmmmmwm.",
-    "..mmmmmm..",
-    "...mmmm...",
+    "dd.......dd",
+    ".dd.....dd.",
+    "..mmmmmmm..",
+    ".mmmmmmmmm.",
+    "mddmmmmmddm",
+    "myymmmmmyym",
+    "mmmmmmmmmmm",
+    "mmmmmmmmmmm",
+    ".mmmmmmmmm.",
+    "..mmmmmmm..",
+    "...mmmmm...",
 ], {
     "m": (188, 78, 96),
     "d": (120, 44, 60),
     "y": (250, 214, 120),
-    "w": (250, 244, 236),
 })
 
 SWORD = ([
     "..s..",
     "..s..",
+    ".sls.",
     ".sls.",
     ".sls.",
     ".sls.",
