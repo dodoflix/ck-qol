@@ -97,10 +97,17 @@ Every one of these produced an invisible hint:
   hint at zero size forever.
 - Never deactivate a sprite's GameObject to hide it — the donor's sprites can be
   the label's own parent. Disable the renderer.
-- **Blank a clone's leftover text after activating it, not in staging.** A render
-  made while the object is disabled is dropped, so the donor's own words come back
-  the moment the row is switched on — as a stuck ingredient list in two panels
-  before this was understood. `SetLiteral` forces, which a fresh clone needs once;
+- **Set `renderOnStart`, `keepEnabledOnStart` and `freeResourcesOnDisable` on every
+  cloned `PugText`** — `GameMenu.KeepRendered`. The prefabs ship all three off, and
+  together they make a toggled clone keep the donor's words for good: hiding it
+  leaves the glyphs on screen instead of returning them to the pool (`:305`),
+  `OnEnable` never redraws because `startCalled` was never set (`:287`, `:273`), and
+  a blank written meanwhile still records `textString` — so `HasCorrectGlyphs`
+  matches against glyphs nobody drew (`:666`) and every later write early-outs. This
+  is the stuck ingredient row, and it took three attempts to find because blanking
+  after activation fixes the first open and nothing after it.
+- Blank a clone **after** activating it either way: a render made while the object is
+  disabled is dropped. `SetLiteral` forces, which a fresh clone needs once;
   everything after should render unforced and let `PugText` early-out, or a count
   rebuilds its glyphs every time the name beside it changes and flickers.
 
