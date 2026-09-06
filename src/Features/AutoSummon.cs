@@ -106,7 +106,9 @@ namespace CkQol.Features
 
             if (_hint != null || Manager.main == null || Manager.main.player == null) return;
             _hint = GameHints.Install(HintLabel, HintVisible);
-            if (_hint != null) _hint.Icon = HintIcon;
+            if (_hint == null) return;
+            _hint.Icon = HintIcon;
+            _hint.Tint = HintTint;
         }
 
         /// Just the binding: the icon says which weapon it is about, and the row has
@@ -136,6 +138,11 @@ namespace CkQol.Features
 
             renderer.sprite = _iconSprite;
         }
+
+        /// Lit when armed, greyed when not - the game's own colour for an inactive
+        /// menu row, so it reads the same way the settings do.
+        private Color HintTint() =>
+            AutoSummonState.Armed ? Color.white : PugTextEffectMenuOption.UNSELECTED_TEXT_COLOR;
 
         /// Only with a summoning weapon in hand, which is also when the binding works.
         private bool HintVisible()

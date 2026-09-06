@@ -18,6 +18,9 @@ namespace CkQol.Native
         /// update while visible, so an implementation that costs anything should cache.
         public Action<SpriteRenderer> Icon;
 
+        /// Colour for the icon and the label, for showing state without wording.
+        public Func<Color> Tint;
+
         private PugText _text;
 
         /// The donor's outline copies of the label, drawn behind it as a shadow. They
@@ -33,6 +36,7 @@ namespace CkQol.Native
         private bool _active;
         private bool _initialized;
         private string _shown;
+        private Color _tint = Color.white;
 
         /// Where the donor put the icon, and whether it has been moved for the current
         /// label width.
@@ -65,6 +69,12 @@ namespace CkQol.Native
 
             if (visible)
             {
+                // Re-applied rather than set on change: rendering the label rebuilds its
+                // glyphs from the style, losing any colour put on them.
+                Color tint = Tint != null ? Tint() : Color.white;
+                bool retint = tint != _tint;
+                _tint = tint;
+
                 if (_text != null)
                 {
                     string label = Label != null ? Label() : string.Empty;
@@ -81,13 +91,17 @@ namespace CkQol.Native
                         }
                         _shown = label;
                         _placed = false;
+                        retint = true;
                     }
+
+                    if (retint) Recolour(_text, tint);
                 }
 
                 if (_icon != null)
                 {
                     Icon?.Invoke(_icon);
                     _icon.enabled = _icon.sprite != null;
+                    _icon.color = tint;
 
                     // Sits left of the label rather than at the donor's position, which
                     // assumed the donor's own text width.
@@ -102,6 +116,15 @@ namespace CkQol.Native
             }
 
             base.LateUpdate();
+        }
+
+        private static void Recolour(PugText text, Color tint)
+        {
+            var glyphs = text.glyphs;
+            for (int i = 0; i < glyphs.Count; i++)
+            {
+                if (glyphs[i] != null) glyphs[i].color = tint;
+            }
         }
 
         private void Show(bool visible)
@@ -130,6 +153,7 @@ namespace CkQol.Native
             // disabled (PugText.cs:307-308), so the old ones are gone.
             _shown = null;
             _placed = false;
+            _tint = Color.clear;
             _active = visible;
             _initialized = true;
         }
