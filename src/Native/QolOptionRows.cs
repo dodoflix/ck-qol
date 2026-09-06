@@ -119,15 +119,43 @@ namespace CkQol.Native
         /// rows' valueText has no glyph for those characters and renders '?'.
         public bool CanDrawBar;
 
+        /// Covers the bar so clicks land on it.
+        ///
+        /// The row's own collider is sized by RadicalMenuOption from the label and
+        /// value text, but in practice it does not reach the diamonds - clicking
+        /// them did nothing at all. A second collider on the same GameObject is
+        /// enough: UIMouse resolves a hit by calling GetComponent<UIelement>() on
+        /// the collider's object, which is this row either way.
+        private BoxCollider _barCollider;
+
         private void Start() => Refresh();
+
+        protected override void Update()
+        {
+            base.Update();
+            if (!CanDrawBar || valueText == null) return;
+
+            if (_barCollider == null)
+            {
+                _barCollider = gameObject.AddComponent<BoxCollider>();
+                _barCollider.isTrigger = true;
+            }
+
+            Rect bounds = valueText.dimensions;
+            Vector2 centre = (Vector2)valueText.transform.position + bounds.center;
+            _barCollider.size = new Vector3(Mathf.Max(bounds.size.x, 0.1f),
+                                            Mathf.Max(bounds.size.y, 0.1f), 0.5f);
+            _barCollider.center = centre - (Vector2)transform.position;
+            _barCollider.enabled = GetActiveStateInCurrentScene() == OptionActiveState.ACTIVE;
+        }
 
         public override void OnActivated()
         {
             base.OnActivated();
 
             // Clicking a specific diamond sets that level, as the volume rows do.
-            // There are no per-glyph colliders - the whole row is one collider - so
-            // the segment is worked out from the pointer against the glyph positions.
+            // There are no per-glyph colliders, so the segment comes from the pointer
+            // position against the glyph positions.
             if (CanDrawBar && TryGetClickedSegment(out int segment)) SetSegment(segment);
             else Step(1);
         }
@@ -140,10 +168,28 @@ namespace CkQol.Native
             if (!Manager.input.SystemIsUsingMouse()) return false;
 
             float pointerX = Manager.ui.mouse.pointer.position.x;
+
+            float first = float.MaxValue;
+            float last = float.MinValue;
+            foreach (var glyph in valueText.glyphs)
+            {
+                if (glyph == null) continue;
+                float x = glyph.transform.position.x;
+                if (x < first) first = x;
+                if (x > last) last = x;
+            }
+            if (first > last) return false;
+
+            // Only a click on the bar itself selects a level. Without this the
+            // nearest glyph to a click on the label is always the first one, so
+            // clicking the label jumped the value to its minimum.
+            int count = valueText.glyphs.Count;
+            float pitch = count > 1 ? (last - first) / (count - 1) : 1f;
+            if (pointerX < first - pitch * 0.5f || pointerX > last + pitch * 0.5f) return false;
+
             int nearest = -1;
             float nearestDistance = float.MaxValue;
-
-            for (int i = 0; i < valueText.glyphs.Count; i++)
+            for (int i = 0; i < count; i++)
             {
                 var glyph = valueText.glyphs[i];
                 if (glyph == null) continue;
