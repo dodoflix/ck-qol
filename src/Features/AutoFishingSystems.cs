@@ -144,7 +144,7 @@ namespace CkQol.Features
             if (!state.ReelTimer.isRunning && !_pressedLastFrame &&
                 input.IsButtonStateSet(CommandInputButtonStateNames.SecondInteract_HeldDown))
             {
-                // Time it, so Learn pull can throw for as long as the player does.
+                // Time it, so Learn throw can throw for as long as the player does.
                 if (_holdStart < 0d && AutoFishingState.LearnEnabled) _holdStart = now;
 
                 // They beat us to it - drop any pending hook press so we do not yank

@@ -31,8 +31,8 @@ namespace CkQol.Features
                              "charged, so this is how far the line lands. Held past " +
                              "the game's own cast timer it simply throws at maximum.");
 
-        private readonly BoolSetting _learnPull =
-            new BoolSetting("LearnPull", "Learn pull", false,
+        private readonly BoolSetting _learnThrow =
+            new BoolSetting("LearnThrow", "Learn throw", false,
                             "Use your own throw instead of the setting above: hold the " +
                             "button as long as you like on a cast by hand and every " +
                             "automatic throw copies it. Not saved.");
@@ -52,7 +52,7 @@ namespace CkQol.Features
         {
             yield return _autoReel;
             yield return _throwDelay;
-            yield return _learnPull;
+            yield return _learnThrow;
             yield return _pullDelay;
             yield return _infiniteShoal;
         }
@@ -79,7 +79,7 @@ namespace CkQol.Features
             _running = true;
             Push();
             Log($"started (reel={_autoReel.Value}, throw={_throwDelay.Value:0.00}s, " +
-                $"learn={_learnPull.Value}, pull={_pullDelay.Value:0.00}s, " +
+                $"learn={_learnThrow.Value}, pull={_pullDelay.Value:0.00}s, " +
                 $"shoal={_infiniteShoal.Value})");
         }
 
@@ -95,7 +95,7 @@ namespace CkQol.Features
             AutoFishingState.ReelEnabled = _running && _autoReel.Value;
             AutoFishingState.ShoalEnabled = _running && _infiniteShoal.Value;
             AutoFishingState.ThrowDelaySeconds = _throwDelay.Value;
-            AutoFishingState.LearnEnabled = _learnPull.Value;
+            AutoFishingState.LearnEnabled = _learnThrow.Value;
             AutoFishingState.PullDelaySeconds = _pullDelay.Value;
         }
     }
@@ -133,7 +133,7 @@ namespace CkQol.Features
             _lastThrowHold = UnityEngine.Mathf.Clamp(seconds, 0f, 2f);
 
         /// How long to charge a throw for: the player's own last throw while Learn
-        /// pull is on, otherwise the configured value.
+        /// throw is on, otherwise the configured value.
         internal static float EffectiveThrowDelay
         {
             get
