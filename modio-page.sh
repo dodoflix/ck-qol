@@ -70,8 +70,11 @@ else
     -o "$WORK/mod.json"
   check "update" "$WORK/mod.json"
 
+  # Retried: this one answered curl 56 mid-release once, which under set -e took
+  # the file upload down with it and left the page on the previous version.
   echo "uploading the logo"
-  curl -sS -X POST "$API/$MODIO_MOD_ID/media" "${auth[@]}" \
+  curl -sS --retry 3 --retry-all-errors --retry-delay 2 \
+    -X POST "$API/$MODIO_MOD_ID/media" "${auth[@]}" \
     -F "logo=@$REPO/assets/logo.png" \
     -o "$WORK/media.json"
   check "logo" "$WORK/media.json"
