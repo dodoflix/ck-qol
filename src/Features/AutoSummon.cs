@@ -55,6 +55,13 @@ namespace CkQol.Features
                               new[] { Ctrl, Shift, Alt, NoModifier }, Ctrl,
                               "Held alongside the toggle key.");
 
+        /// The session toggle, persisted but deliberately not a menu row: it would sit
+        /// next to Enabled meaning almost the same thing. Bound by hand in Init, since
+        /// only settings returned below get a row and a binding.
+        private readonly BoolSetting _armed =
+            new BoolSetting("Armed", "Armed", true,
+                            "Whether the toggle key has auto summon switched on.");
+
         public override IEnumerable<ModSetting> GetSettings()
         {
             yield return _mode;
@@ -67,9 +74,11 @@ namespace CkQol.Features
         {
             base.Init();
 
-            // Here rather than in Apply, which also runs on every setting change - so
-            // editing any row would switch the session toggle back on.
-            AutoSummonState.Armed = true;
+            // Restored rather than forced on: quitting with it off and rejoining would
+            // otherwise summon at once, which in Split hotbar mode needs nothing
+            // learned to act on.
+            _armed.Bind(CkQolMod.ModName, Name);
+            AutoSummonState.Armed = _armed.Value;
 
             Log($"started (mode={_mode.Value}, at={_summonAt.Value}, toggle={_toggleModifier.Value}+{_toggleKey.Name})");
         }
@@ -82,10 +91,19 @@ namespace CkQol.Features
 
         private CkQolHint _hint;
 
+        /// The toggle is flipped by the summoning system, which has no business writing
+        /// config, so the change is picked up here.
+        private void SaveArmed()
+        {
+            if (_armed.Value != AutoSummonState.Armed) _armed.Value = AutoSummonState.Armed;
+        }
+
         /// The HUD only exists in game, and not on the first frame of it, so the hint
         /// is added on the first update that finds it.
         public override void Update()
         {
+            SaveArmed();
+
             if (_hint != null || Manager.main == null || Manager.main.player == null) return;
             _hint = GameHints.Install(HintLabel, HintVisible);
             if (_hint != null) _hint.Icon = HintIcon;
