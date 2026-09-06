@@ -205,6 +205,10 @@ namespace CkQol.Features
         /// potions and everything inedible are rejected.
         private static int HungerValue(ObjectDataCD objectData, bool cooked)
         {
+            // PugDatabase.GetBuffer does not check the prefab actually has the buffer
+            // (PugDatabase.cs:545), unlike TryGetComponent - so anything inedible throws.
+            if (!PugDatabase.HasComponent<GivesConditionsWhenConsumedBuffer>(objectData)) return 0;
+
             var conditions = PugDatabase.GetBuffer<GivesConditionsWhenConsumedBuffer>(objectData);
             for (int i = 0; i < conditions.Length; i++)
             {
