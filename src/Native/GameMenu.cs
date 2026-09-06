@@ -205,17 +205,23 @@ namespace CkQol.Native
         }
 
         /// Any plain row, used as the shape for submenu and back entries.
+        ///
+        /// Prefers a row with no value column. Rows that have one (Language, showing
+        /// "English") offset their label to the left to make room for it, so cloning
+        /// one leaves our entry visibly misaligned against the other submenu rows.
         public static RadicalMenuOption FindPlainDonor(RadicalMenu menu)
         {
+            RadicalMenuOption fallback = null;
             foreach (var option in RowsOf(menu))
             {
-                if (option != null && !option.isOnOffToggle &&
-                    !(option is RadicalOptionsMenuOption_Slider) && option.labelText != null)
-                {
-                    return option;
-                }
+                if (option == null || option.isOnOffToggle) continue;
+                if (option is RadicalOptionsMenuOption_Slider) continue;
+                if (option.labelText == null) continue;
+
+                if (option.valueText == null) return option;
+                if (fallback == null) fallback = option;
             }
-            return null;
+            return fallback;
         }
 
         /// Re-scans children into menuOptions.
@@ -232,6 +238,18 @@ namespace CkQol.Native
             foreach (var option in menu.menuOptions)
             {
                 if (option != null) option.SetParentMenu(menu);
+            }
+
+            // When a menu has autoPositioningOverride populated, the layout pass uses
+            // that curated list and ignores menuOptions entirely - so a row missing
+            // from it renders but never gets a slot, and sits wherever the donor was.
+            var order = menu.autoPositioningOverride;
+            if (order != null && order.Count > 0)
+            {
+                foreach (var option in menu.menuOptions)
+                {
+                    if (option != null && !order.Contains(option)) order.Add(option);
+                }
             }
         }
 
