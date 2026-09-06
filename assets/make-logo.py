@@ -41,7 +41,14 @@ STEEL = (196, 202, 220)
 STEEL_LIT = (238, 242, 252)
 GRIP = (120, 92, 60)
 
-TILE = 26
+SLOT_EDGE = (13, 12, 18)
+SLOT_FRAME = (74, 67, 94)
+SLOT_FRAME_LIT = (104, 95, 130)
+SLOT_SHADOW = (30, 27, 39)
+SLOT_FILL = (43, 39, 56)
+GOLD_DIM = (148, 122, 66)
+
+TILE = 29
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -128,12 +135,35 @@ def ground():
 
 
 def plate(glyph):
-    """One stone tile with a glyph on it, at pixel scale."""
-    img = Image.new("RGB", (TILE + 1, TILE + 1), STONE)
+    """One framed slot with a glyph in it, the way an inventory holds an item.
+
+    Four rings, outside in: a hard outline with the corner pixels cut so it reads
+    as rounded, a lit stone frame, a shadow where the frame meets the recess, and
+    the recess itself.
+    """
+    size = TILE + 1
+    last = TILE
+    img = Image.new("RGB", (size, size), SLOT_FILL)
     d = ImageDraw.Draw(img)
-    d.rectangle([(0, 0), (TILE, 0)], fill=STONE_LIT)
-    d.rectangle([(0, 0), (0, TILE)], fill=STONE_LIT)
-    glyph(d, 0, 0)
+
+    d.rectangle([(0, 0), (last, last)], outline=SLOT_EDGE)
+    for x, y in ((0, 0), (last, 0), (0, last), (last, last)):
+        d.point((x, y), fill=STONE)
+
+    d.rectangle([(1, 1), (last - 1, last - 1)], outline=SLOT_FRAME)
+    for x, y in ((1, 1), (last - 1, 1), (1, last - 1), (last - 1, last - 1)):
+        d.point((x, y), fill=SLOT_EDGE)
+
+    # Lit from above: the frame catches light on top, the recess is shadowed
+    # under it.
+    d.line([(2, 1), (last - 2, 1)], fill=SLOT_FRAME_LIT)
+    d.rectangle([(2, 2), (last - 2, last - 2)], outline=SLOT_SHADOW)
+    d.line([(2, last - 2), (last - 2, last - 2)], fill=SLOT_FRAME)
+
+    for x, y in ((2, 2), (last - 2, 2)):
+        d.point((x, y), fill=GOLD_DIM)
+
+    glyph(d, 2, 2)
     return img
 
 
@@ -203,10 +233,10 @@ def main():
 
     glyphs = (fish, food, demon, sword)
     size = TILE + 1
-    gap = 8
+    gap = 7
     left = (SW - (len(glyphs) * size + (len(glyphs) - 1) * gap)) // 2
     for i, glyph in enumerate(glyphs):
-        img.paste(plate(glyph), (left + i * (size + gap), 110))
+        img.paste(plate(glyph), (left + i * (size + gap), 109))
 
     d = ImageDraw.Draw(img)
 
