@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using CkQol.Config;
 using CkQol.Native;
 using Outlines.Components;
-using Unity.Mathematics;
 using UnityEngine;
 
 namespace CkQol.Features
@@ -186,23 +185,16 @@ namespace CkQol.Features
             ChestSearchIndex.Find(_wanted, ChestSearchState.Radius,
                                   ChestSearchState.SearchSelf, _hits);
 
-            var player = Manager.main != null ? Manager.main.player : null;
-            Vector3 here = player != null ? player.RenderPosition : Vector3.zero;
-
             _rows.Clear();
             for (int i = 0; i < _hits.Count && i < MaxRows; i++)
             {
                 var hit = _hits[i];
-                float dx = hit.Position.x - here.x;
-                float dz = hit.Position.z - here.z;
-                float away = Mathf.Sqrt(dx * dx + dz * dz);
-
                 bool carried = hit.ContainerId == ObjectID.None;
 
                 _rows.Add(new SearchRow
                 {
                     Icon = IconFor(carried ? CarriedIcon : hit.ContainerId),
-                    Text = carried ? "Inventory" : hit.Label ?? Compass(dx, dz),
+                    Text = carried ? "Inventory" : hit.Label ?? NameOf(hit.ContainerId),
                     Amount = "x" + Compact(hit.Count),
                 });
             }
@@ -273,26 +265,17 @@ namespace CkQol.Features
             _lit.Clear();
         }
 
-        /// Letters rather than arrow glyphs: the game's font is a sprite sheet and
-        /// carries no arrows to draw.
-        private static string Compass(float dx, float dz)
+        private readonly Dictionary<ObjectID, string> _containerNames = new Dictionary<ObjectID, string>();
+
+        /// What the container itself is called, for a chest nobody has named. Cached:
+        /// this runs for every row of every rescan.
+        private string NameOf(ObjectID id)
         {
-            if (math.abs(dx) < 0.5f && math.abs(dz) < 0.5f) return "here";
+            if (_containerNames.TryGetValue(id, out var cached)) return cached;
 
-            float angle = Mathf.Atan2(dz, dx) * Mathf.Rad2Deg;
-            int step = (int)Mathf.Round((angle + 360f) / 45f) % 8;
-
-            switch (step)
-            {
-                case 0: return "E";
-                case 1: return "NE";
-                case 2: return "N";
-                case 3: return "NW";
-                case 4: return "W";
-                case 5: return "SW";
-                case 6: return "S";
-                default: return "SE";
-            }
+            string name = ChestSearchIndex.NameOf(id) ?? "Container";
+            _containerNames[id] = name;
+            return name;
         }
 
         private readonly Dictionary<ObjectID, Sprite> _icons = new Dictionary<ObjectID, Sprite>();
