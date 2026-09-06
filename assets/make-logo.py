@@ -129,13 +129,12 @@ def main():
     gap = 32
     left = (W - (len(glyphs) * size + (len(glyphs) - 1) * gap)) // 2
     for i, glyph in enumerate(glyphs):
-        img.paste(plate(glyph), (left + i * (size + gap), 404))
+        img.paste(plate(glyph), (left + i * (size + gap), 437))
 
     d = ImageDraw.Draw(img)
-    centre(d, "CORE KEEPER", font(36, False), 132, DIM, spacing=11)
-    centre(d, "QUALITY OF LIFE", font(104, True), 190, TEXT)
-    d.rectangle([(W / 2 - 160, 350), (W / 2 + 160, 355)], fill=GOLD)
-    centre(d, "fishing    eating    summons    dps", font(34, False), 570, DIM)
+    centre(d, "CORE KEEPER", font(36, False), 165, DIM, spacing=11)
+    centre(d, "QUALITY OF LIFE", font(104, True), 223, TEXT)
+    d.rectangle([(W / 2 - 160, 383), (W / 2 + 160, 388)], fill=GOLD)
 
     img.save(os.path.join(HERE, "logo.png"))
     print(f"wrote logo.png at {W}x{H}")
