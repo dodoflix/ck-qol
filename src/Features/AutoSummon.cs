@@ -66,6 +66,11 @@ namespace CkQol.Features
         public override void Init()
         {
             base.Init();
+
+            // Here rather than in Apply, which also runs on every setting change - so
+            // editing any row would switch the session toggle back on.
+            AutoSummonState.Armed = true;
+
             Log($"started (mode={_mode.Value}, at={_summonAt.Value}, toggle={_toggleModifier.Value}+{_toggleKey.Name})");
         }
 
@@ -159,7 +164,6 @@ namespace CkQol.Features
                 _toggleModifier.Value == NoModifier ? Modifier.None : Modifier.Ctrl;
 
             if (!Running) AutoSummonState.Forget();
-            else AutoSummonState.Armed = true;
         }
     }
 

@@ -68,7 +68,11 @@ namespace CkQol.Native
                 if (_text != null)
                 {
                     string label = Label != null ? Label() : string.Empty;
-                    if (label != _shown)
+
+                    // Compared against what is actually on screen, not just against the
+                    // last value set: the donor's own components re-render this text on
+                    // menu transitions, and the label has to win that back.
+                    if (label != _shown || _text.GetText() != label)
                     {
                         GameMenu.SetLiteral(_text, label);
                         foreach (var shadow in _shadows)
