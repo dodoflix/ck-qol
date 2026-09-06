@@ -30,7 +30,7 @@ namespace CkQol.Features
                             "Not saved.");
 
         private readonly FloatSetting _reelHold =
-            new FloatSetting("ReelHoldSeconds", "Reel hold", 0.2f, 0f, 2f,
+            new FloatSetting("ReelHoldSeconds", "Reel hold", 0.2f, 0.2f, 2f,
                              "How long the hook press is held. Too short and bites are " +
                              "missed; too long and the press outlives the catch and " +
                              "pulls the next cast up empty.");
