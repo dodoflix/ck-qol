@@ -88,6 +88,74 @@ namespace CkQol.UI
             }
         }
 
+        private static Sprite _cursor;
+
+        /// A pointer drawn on our own canvas.
+        ///
+        /// The game renders its cursor as UI on its own canvas, so once the menu
+        /// sorts above it the real cursor disappears behind the window. Raising the
+        /// game's cursor instead would put it above everything, which is worse.
+        /// Generated rather than borrowed: the game's cursor is not reliably findable
+        /// as a Sprite, and a wrong guess is a visibly wrong pointer.
+        public static Sprite CursorSprite
+        {
+            get
+            {
+                if (_cursor != null) return _cursor;
+
+                const int w = 12, h = 19;
+                // 0 = transparent, 1 = outline, 2 = fill.
+                string[] rows =
+                {
+                    "1...........",
+                    "11..........",
+                    "121.........",
+                    "1221........",
+                    "12221.......",
+                    "122221......",
+                    "1222221.....",
+                    "12222221....",
+                    "122222221...",
+                    "1222222221..",
+                    "12222222221.",
+                    "122222111111",
+                    "12221221....",
+                    "1221.1221...",
+                    "121..1221...",
+                    "11....1221..",
+                    "1......1221.",
+                    "........121.",
+                    ".........11.",
+                };
+
+                var tex = new Texture2D(w, h, TextureFormat.RGBA32, false)
+                {
+                    filterMode = FilterMode.Point,
+                    wrapMode = TextureWrapMode.Clamp,
+                    hideFlags = HideFlags.HideAndDontSave,
+                };
+
+                for (int y = 0; y < h; y++)
+                {
+                    string row = rows[y];
+                    for (int x = 0; x < w; x++)
+                    {
+                        char c = x < row.Length ? row[x] : '.';
+                        Color color = c == '1' ? new Color(0.05f, 0.04f, 0.07f, 1f)
+                                    : c == '2' ? new Color(0.95f, 0.93f, 0.85f, 1f)
+                                    : Color.clear;
+                        // Texture origin is bottom-left, the art above reads top-down.
+                        tex.SetPixel(x, h - 1 - y, color);
+                    }
+                }
+                tex.Apply();
+
+                _cursor = Sprite.Create(tex, new Rect(0f, 0f, w, h), new Vector2(0f, 1f), 1f);
+                _cursor.hideFlags = HideFlags.HideAndDontSave;
+                return _cursor;
+            }
+        }
+
         public static Texture2D White
         {
             get

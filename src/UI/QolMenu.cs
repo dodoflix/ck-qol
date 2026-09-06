@@ -20,6 +20,8 @@ namespace CkQol.UI
         private GameObject _root;
         private RectTransform _tabList;
         private RectTransform _pageHost;
+        private RectTransform _canvasRect;
+        private RectTransform _cursorRect;
 
         private readonly List<Button> _tabButtons = new List<Button>();
         private readonly List<GameObject> _pages = new List<GameObject>();
@@ -118,6 +120,7 @@ namespace CkQol.UI
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ConstantPixelSize;
             scaler.scaleFactor = _mod.UiScaleFactor;
             canvasGo.AddComponent<GraphicRaycaster>();
+            _canvasRect = canvasGo.GetComponent<RectTransform>();
 
             // Everything lives under one root so showing/hiding is a single SetActive.
             var rootGo = UiFactory.Node("Root", canvasGo.transform, out RectTransform rootRect);
@@ -201,6 +204,37 @@ namespace CkQol.UI
 
             BuildTabs();
             if (_tabButtons.Count > 0) Select(0);
+
+            BuildCursor(rootGo.transform);
+        }
+
+        /// Our own pointer, kept as the last child so it draws over the window.
+        private void BuildCursor(Transform parent)
+        {
+            var go = UiFactory.Node("Cursor", parent, out _cursorRect);
+            var image = go.AddComponent<Image>();
+            image.sprite = GameTheme.CursorSprite;
+            image.raycastTarget = false;
+            image.SetNativeSize();
+
+            // Anchored to the canvas centre so ScreenPointToLocalPointInRectangle's
+            // result can be used as anchoredPosition directly. Pivot at the top-left
+            // puts the sprite's tip on the actual pointer position.
+            _cursorRect.anchorMin = new Vector2(0.5f, 0.5f);
+            _cursorRect.anchorMax = new Vector2(0.5f, 0.5f);
+            _cursorRect.pivot = new Vector2(0f, 1f);
+            _cursorRect.SetAsLastSibling();
+        }
+
+        private void Update()
+        {
+            if (!IsOpen || _cursorRect == null || _canvasRect == null) return;
+
+            if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                    _canvasRect, Input.mousePosition, null, out Vector2 local))
+            {
+                _cursorRect.anchoredPosition = local;
+            }
         }
 
         private static ScrollRect MakeScroll(Transform parent, out RectTransform content)
