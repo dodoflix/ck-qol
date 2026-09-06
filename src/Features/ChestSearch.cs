@@ -31,24 +31,11 @@ namespace CkQol.Features
                             "Outline each container that has it and float the count " +
                             "over it, so you can see which one is which.");
 
-        private const string Gold = "Gold";
-        private const string Teal = "Teal";
-        private const string Green = "Green";
-        private const string Pink = "Pink";
-        private const string White = "White";
-
-        private readonly ChoiceSetting _tint =
-            new ChoiceSetting("HighlightColour", "Highlight colour",
-                              new[] { Gold, Teal, Green, Pink, White }, Gold,
-                              "The outline drawn around a container that has what you " +
-                              "searched for.");
-
         public override IEnumerable<ModSetting> GetSettings()
         {
             yield return _radius;
             yield return _self;
             yield return _point;
-            yield return _tint;
         }
 
         public override void Init()
@@ -77,13 +64,6 @@ namespace CkQol.Features
             ChestSearchState.Radius = _radius.Value;
             ChestSearchState.SearchSelf = _self.Value;
             ChestSearchState.Point = _point.Value;
-            ChestSearchState.Tint =
-                _tint.Value == Teal ? new Color(0.45f, 0.85f, 0.80f) :
-                _tint.Value == Green ? new Color(0.45f, 0.85f, 0.40f) :
-                _tint.Value == Pink ? new Color(0.95f, 0.45f, 0.70f) :
-                _tint.Value == White ? Color.white :
-                                       new Color(0.95f, 0.80f, 0.35f);
-
             if (!Running) Clear();
         }
 
@@ -228,8 +208,34 @@ namespace CkQol.Features
 
         private double _nextPoint;
 
+        private struct Lit
+        {
+            internal EntityMonoBehaviour Mono;
+            internal Color Tint;
+        }
+
         /// What is outlined right now, so it can be put back when it stops matching.
-        private readonly List<EntityMonoBehaviour> _lit = new List<EntityMonoBehaviour>();
+        private readonly List<Lit> _lit = new List<Lit>();
+
+        /// How much counts as a lot. A container with four of something and one with
+        /// four thousand should not look the same across a room.
+        private const int Some = 10;
+        private const int Many = 100;
+        private const int Lots = 1000;
+
+        private static Color TintFor(int count) =>
+            count >= Lots ? new Color(0.95f, 0.35f, 0.35f) :
+            count >= Many ? new Color(0.95f, 0.80f, 0.35f) :
+            count >= Some ? new Color(0.45f, 0.85f, 0.40f) :
+                            Color.white;
+
+        /// The floating count takes one of five the game defines rather than a
+        /// colour, so it gets the nearest to the outline.
+        private static CombatText.NumberColor SayFor(int count) =>
+            count >= Lots ? CombatText.NumberColor.Red :
+            count >= Many ? CombatText.NumberColor.Yellow :
+            count >= Some ? CombatText.NumberColor.Green :
+                            CombatText.NumberColor.White;
 
         /// Outlines each container that has it, with the same call the game uses to
         /// ring the interactable you are standing next to, and floats the count over
@@ -252,12 +258,12 @@ namespace CkQol.Features
                     : null;
                 if (mono == null) continue;
 
-                _lit.Add(mono);
+                _lit.Add(new Lit { Mono = mono, Tint = TintFor(_hits[i].Count) });
 
                 if (!say) continue;
 
                 CombatText.SpawnCombatText("x" + Compact(_hits[i].Count),
-                                           CombatText.NumberColor.Yellow,
+                                           SayFor(_hits[i].Count),
                                            mono.RenderPosition + Vector3.up * 0.8f,
                                            isDamageNumber: false,
                                            isCrit: false,
@@ -271,10 +277,9 @@ namespace CkQol.Features
         {
             if (!ChestSearchState.Point) return;
 
-            Color tint = ChestSearchState.Tint;
             for (int i = 0; i < _lit.Count; i++)
             {
-                if (_lit[i] != null) Outline(_lit[i], tint);
+                if (_lit[i].Mono != null) Outline(_lit[i].Mono, _lit[i].Tint);
             }
         }
 
@@ -329,7 +334,7 @@ namespace CkQol.Features
         {
             for (int i = 0; i < _lit.Count; i++)
             {
-                if (_lit[i] != null) _lit[i].UpdateOutline(OutlineType.None);
+                if (_lit[i].Mono != null) _lit[i].Mono.UpdateOutline(OutlineType.None);
             }
             _lit.Clear();
         }
@@ -370,8 +375,5 @@ namespace CkQol.Features
         internal static volatile bool SearchSelf = true;
         internal static volatile bool Point = true;
 
-        /// Not volatile: a Color is a struct, and the field is written from the menu
-        /// and read on the same thread a frame later.
-        internal static Color Tint = new Color(0.95f, 0.80f, 0.35f);
     }
 }
