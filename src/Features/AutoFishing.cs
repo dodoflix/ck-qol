@@ -30,10 +30,10 @@ namespace CkQol.Features
                             "Not saved.");
 
         private readonly FloatSetting _reelHold =
-            new FloatSetting("ReelHoldSeconds", "Reel hold", 0f, 0f, 2f,
-                             "How long the hook press is held. Zero is one press, " +
-                             "which is enough. Raise only if bites are missed on a " +
-                             "laggy server.");
+            new FloatSetting("ReelHoldSeconds", "Reel hold", 0.2f, 0f, 2f,
+                             "How long the hook press is held. Too short and bites are " +
+                             "missed; too long and the press outlives the catch and " +
+                             "pulls the next cast up empty.");
 
         private readonly BoolSetting _infiniteShoal =
             new BoolSetting("InfiniteShoal", "Infinite fish shoal", true,
@@ -99,9 +99,11 @@ namespace CkQol.Features
         internal static volatile bool LearnEnabled;
         internal static volatile float CastingTimeSeconds = 2f;
 
-        /// Zero is one frame, which is enough. Longer is a risk: a press still held
-        /// once the line is back out with no bite pulls it up empty (Fishing.cs:272).
-        internal static volatile float ReelHoldSeconds;
+        /// 0.2 is the value the reference mod shipped. A single frame is not enough:
+        /// this runs in the prediction loop, so one frame of input does not reliably
+        /// reach the server. Too long is the other failure - a press still held once
+        /// the line is back out pulls it up empty (Fishing.cs:272).
+        internal static volatile float ReelHoldSeconds = 0.2f;
 
         /// The player's last own charge, or -1. Not persisted.
         private static volatile float _lastCastHold = -1f;
