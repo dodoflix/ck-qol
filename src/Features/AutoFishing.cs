@@ -19,13 +19,13 @@ namespace CkQol.Features
                             "Turn off if another fishing mod does the same job.");
 
         private readonly FloatSetting _castingTime =
-            new FloatSetting("CastingTimeSeconds", "Casting time", 2f, 0f, 2f,
+            new FloatSetting("CastingTimeSeconds", "Casting time", 0f, 0f, 2f,
                              "How long the throw is charged, which is how far the " +
                              "line lands. Past the game's cast timer it throws at " +
                              "maximum range.");
 
         private readonly BoolSetting _learnCasting =
-            new BoolSetting("LearnCasting", "Learn casting", false,
+            new BoolSetting("LearnCasting", "Learn casting", true,
                             "Copy your own charge instead of Casting time above. " +
                             "Not saved.");
 
@@ -97,7 +97,7 @@ namespace CkQol.Features
         internal static volatile bool ReelEnabled;
         internal static volatile bool ShoalEnabled;
         internal static volatile bool LearnEnabled;
-        internal static volatile float CastingTimeSeconds = 2f;
+        internal static volatile float CastingTimeSeconds;
 
         /// 0.2 is the value the reference mod shipped. A single frame is not enough:
         /// this runs in the prediction loop, so one frame of input does not reliably
