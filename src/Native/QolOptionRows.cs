@@ -103,10 +103,11 @@ namespace CkQol.Native
 
     /// Numeric or multiple-choice row, stepped with left/right.
     ///
-    /// Not built on RadicalOptionsMenuOption_Slider: nothing in the stock menus uses
-    /// that class, so there is no instance to clone. The game's own numeric rows
-    /// (volume, vibration) are plain RadicalPauseMenuOption subclasses that step a
-    /// value and write it to valueText, which is what this does.
+    /// Not built on RadicalOptionsMenuOption_Slider - that class is unused in the
+    /// shipped game, so there is no instance to clone. What looks like a slider in
+    /// Audio settings is text: RadicalOptionsMenuOption_Volume renders eight filled
+    /// or hollow diamonds into valueText and steps the value in eighths. Ranged
+    /// settings here draw the same bar the same way.
     public class QolNumberOption : RadicalPauseMenuOption
     {
         public IntSetting Int;
@@ -147,8 +148,8 @@ namespace CkQol.Native
             }
             else if (Float != null)
             {
-                // Twenty steps across the range keeps a fine setting usable.
-                float step = (Float.Max - Float.Min) / 20f;
+                // One diamond per press, matching the bar drawn below.
+                float step = (Float.Max - Float.Min) / BarSegments;
                 float next = Float.Value + step * direction;
                 if (next > Float.Max + 0.0001f) next = Float.Min;
                 else if (next < Float.Min - 0.0001f) next = Float.Max;
@@ -163,15 +164,42 @@ namespace CkQol.Native
             Refresh();
         }
 
+        /// Matches the eight steps the game's volume rows use.
+        private const int BarSegments = 8;
+
         private void Refresh()
         {
             GameMenu.SetLabel(this, Label);
 
-            string value = Int != null ? Int.Value.ToString()
-                : Float != null ? Float.Value.ToString("0.00")
-                : Choice != null ? Choice.Value
-                : string.Empty;
+            string value;
+            if (Float != null)
+            {
+                float span = Float.Max - Float.Min;
+                float filled = span > 0f ? (Float.Value - Float.Min) / span : 0f;
+                value = Bar(Mathf.RoundToInt(filled * BarSegments));
+            }
+            else if (Int != null)
+            {
+                // A bar cannot show which of 20 values is selected, so counts stay
+                // numeric. Ranges small enough to map cleanly get the bar.
+                int span = Int.Max - Int.Min;
+                value = span > 0 && span <= BarSegments
+                    ? Bar(Int.Value - Int.Min)
+                    : Int.Value.ToString();
+            }
+            else
+            {
+                value = Choice != null ? Choice.Value : string.Empty;
+            }
+
             GameMenu.SetValue(this, value);
+        }
+
+        private static string Bar(int filled)
+        {
+            var bar = new System.Text.StringBuilder(BarSegments);
+            for (int i = 0; i < BarSegments; i++) bar.Append(i < filled ? '\u2666' : '\u2662');
+            return bar.ToString();
         }
     }
 
