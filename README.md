@@ -49,10 +49,17 @@ git tag -a v1.0.0 -m "what changed"
 git push origin v1.0.0
 ```
 
-That packages `ModManifest.json` + `src/` into a zip, attaches it to a GitHub
-release, and uploads it to mod.io as the active version. An annotated tag's
+That packages `ModManifest.json` + `src/` into a zip (manifest at the **root** —
+the game unpacks a download flat), attaches it to a GitHub release, syncs the
+mod.io page, and uploads the zip there as the active version. An annotated tag's
 message becomes the changelog; a lightweight tag falls back to the commit
 subjects since the previous tag.
+
+`modio-page.sh` owns the page — summary, description, logo and tags — so the
+store copy is generated from `assets/` rather than edited in a web form and then
+left to drift. Tags must be ones the game defines (`GET /games/5289` lists them
+under `tag_options`); the game-version tag is a constant in that script and needs
+bumping when the mod is verified against a newer build.
 
 The mod.io step needs two repository secrets, and skips itself with a warning if
 either is missing:
@@ -62,9 +69,8 @@ either is missing:
 | `MODIO_TOKEN` | a **write**-scoped access token from <https://mod.io/me/access> |
 | `MODIO_MOD_ID` | printed by `modio-page.sh` when the page is created |
 
-`modio-page.sh` owns the mod.io page itself, so the store copy lives in
-`assets/` rather than only in a web form. Core Keeper is game `5289`, and
-`api.mod.io` is retired — everything uses `g-5289.modapi.io`.
+Core Keeper is game `5289` and the mod is `6363554`. `api.mod.io` is retired —
+everything uses `g-5289.modapi.io`.
 
 Config is one JSON per setting under
 `…/Pugstorm/Core Keeper/Steam/<id>/mods/CkQol/`. Deleting that directory resets

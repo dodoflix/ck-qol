@@ -71,6 +71,19 @@ jobs:
             || gh release upload "${{ steps.tag.outputs.tag }}" \
                  "dist/CkQol-${{ steps.tag.outputs.version }}.zip" --clobber
 
+      # Copy, logo and tags, so the store page tracks the repo instead of being
+      # edited in a web form once and then drifting.
+      - name: Sync the mod.io page
+        env:
+          MODIO_TOKEN: ${{ secrets.MODIO_TOKEN }}
+          MODIO_MOD_ID: ${{ secrets.MODIO_MOD_ID }}
+        run: |
+          if [ -z "$MODIO_TOKEN" ] || [ -z "$MODIO_MOD_ID" ]; then
+            echo "MODIO_TOKEN or MODIO_MOD_ID is not set - skipping the page sync." >&2
+            exit 0
+          fi
+          ./modio-page.sh
+
       - name: Upload to mod.io
         env:
           MODIO_TOKEN: ${{ secrets.MODIO_TOKEN }}
