@@ -14,6 +14,7 @@ No font could be taken from the game itself - its UI font is a sprite atlas
 inside the packed Unity assets, and no TTF ships with it.
 """
 
+import math
 import os
 import random
 
@@ -64,27 +65,64 @@ def centre(d, text, f, y, fill, spacing=0, width=SW):
     d.text(((width - (box[2] - box[0])) / 2 - box[0], y), text, font=f, fill=fill)
 
 
+# Five steps rather than a smooth ramp: a continuous gradient at this size bands
+# into visible stripes once it is scaled up, and banding that was not chosen
+# looks like a compression artefact.
+BG_RAMP = [(21, 19, 28), (25, 22, 33), (29, 26, 38), (33, 30, 44), (37, 34, 50)]
+
+# Ordered dither, so the steps break up into a pixel texture instead of meeting
+# along hard contour lines.
+BAYER = [
+    [0, 8, 2, 10],
+    [12, 4, 14, 6],
+    [3, 11, 1, 9],
+    [15, 7, 13, 5],
+]
+
+
 def ground():
-    """The pixel layer: a lit cave wall with ore in it."""
-    img = Image.new("RGB", (SW, SH), DEEP)
-    d = ImageDraw.Draw(img)
+    """The pixel layer: a cave wall lit from where the title sits, with ore in it."""
+    img = Image.new("RGB", (SW, SH))
+    px = img.load()
+
+    cx, cy = SW / 2, SH * 0.42
+    far = math.hypot(SW / 2, SH / 2)
+    top = len(BG_RAMP) - 1
 
     for y in range(SH):
-        t = y / SH
-        d.line([(0, y), (SW, y)], fill=tuple(
-            int(DEEP[i] + (MID[i] - DEEP[i]) * (1 - abs(t - 0.42) * 1.7))
-            for i in range(3)))
+        for x in range(SW):
+            # Squashed vertically so the pool of light is wider than it is tall,
+            # following the shape of the wordmark rather than a circle.
+            fall = math.hypot(x - cx, (y - cy) * 1.4) / far
+            level = (1.0 - min(fall, 1.0)) * top
+            step = int(level)
+            if level - step > BAYER[y % 4][x % 4] / 16:
+                step += 1
+            px[x, y] = BG_RAMP[min(step, top)]
 
-    # Seeded, so the file does not churn between runs. Kept clear of the type,
-    # where a speck reads as dirt on the image rather than as ore in the wall.
-    rng = random.Random(7)
-    for _ in range(90):
-        x, y = rng.randrange(SW), rng.randrange(SH)
-        if 28 < y < 160 and 20 < x < 300:
+    d = ImageDraw.Draw(img)
+
+    # Clusters rather than lone pixels: a single speck reads as dirt on the
+    # image, a clump reads as ore in the wall. Seeded so the file does not churn
+    # between runs, and kept off the type.
+    rng = random.Random(11)
+    for _ in range(48):
+        x, y = rng.randrange(4, SW - 6), rng.randrange(4, SH - 6)
+
+        on_type = 34 < y < 100
+        on_tiles = 104 < y < 142 and 88 < x < 232
+        if on_type or on_tiles:
             continue
-        size = rng.choice([1, 1, 1, 2])
-        d.rectangle([(x, y), (x + size - 1, y + size - 1)],
-                    fill=rng.choice([STONE, STONE, STONE_LIT, GOLD, TEAL]))
+
+        seam = rng.random() < 0.65
+        body, glint = (STONE, STONE_LIT) if seam else (
+            (rng.choice([GOLD, TEAL]), (238, 234, 246)))
+
+        cells = [(0, 0)] + rng.sample(
+            [(1, 0), (0, 1), (1, 1), (-1, 0), (0, -1)], rng.randint(1, 3))
+        for dx, dy in cells:
+            d.point((x + dx, y + dy), fill=body)
+        d.point((x, y), fill=glint)
 
     return img
 
@@ -136,6 +174,30 @@ def sword(d, x, y):
     d.rectangle([(x + 11, y + 23), (x + 15, y + 24)], fill=GOLD)
 
 
+def divider(d, cx, y, half=44):
+    """A rule with a cut gemstone in the middle and a pip at each end, the way a
+    game menu separates a title from what it belongs to."""
+    dim = (148, 122, 66)
+
+    for dx in range(5, half):
+        near = dx < half - 12
+        for side in (-1, 1):
+            d.point((cx + side * dx, y), fill=GOLD if near else dim)
+
+    for dy in range(-3, 4):
+        for dx in range(-3, 4):
+            reach = abs(dx) + abs(dy)
+            if reach <= 3:
+                d.point((cx + dx, y + dy), fill=GOLD if reach < 3 else dim)
+    d.point((cx - 1, y - 1), fill=(252, 240, 200))
+
+    for side in (-1, 1):
+        for dy in range(-1, 2):
+            for dx in range(-1, 2):
+                if abs(dx) + abs(dy) <= 1:
+                    d.point((cx + side * (half + 3) + dx, y + dy), fill=dim)
+
+
 def main():
     img = ground()
 
@@ -154,7 +216,7 @@ def main():
     d.fontmode = "1"
     centre(d, "CORE KEEPER", font(8, False), 44, DIM, spacing=3)
     centre(d, "QUALITY OF LIFE", font(24, True), 60, TEXT)
-    d.rectangle([(SW / 2 - 40, 94), (SW / 2 + 40, 95)], fill=GOLD)
+    divider(d, SW // 2, 95)
 
     img.resize((W, H), Image.NEAREST).save(os.path.join(HERE, "logo.png"))
     print(f"wrote logo.png at {W}x{H}")
