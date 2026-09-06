@@ -34,7 +34,7 @@ EOF
              Unity.Entities Unity.Mathematics Unity.Collections Unity.NetCode \
              Unity.Burst Unity.Transforms Unity.Networking.Transport \
              Pug.ECS.Components Pug.ECS.Extensions Pug.Objects PugProperties \
-             Interaction Interaction.Components; do
+             Outlines.Components Interaction Interaction.Components; do
     [ -f "$MANAGED/$dll.dll" ] &&
       echo "    <Reference Include=\"$dll\"><HintPath>$MANAGED/$dll.dll</HintPath><Private>false</Private></Reference>"
   done

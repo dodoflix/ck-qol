@@ -79,6 +79,13 @@ namespace CkQol.Native
         private HoverRequiredMaterialUIElement _donor;
         private Transform _anchor;
 
+        /// Where the whole panel draws, taken from the search box's own text. Its
+        /// donor sits under the item tooltip; the rows come from the hover window,
+        /// whose donor sits over it, so they have to be brought down to match or the
+        /// tooltip covers half the panel.
+        private int _sortLayer;
+        private int _sortOrder;
+
         private PugText _query;
         private PugText _hint;
         private PugText _clear;
@@ -115,6 +122,32 @@ namespace CkQol.Native
             _picked = picked;
             _boxHit = boxHit;
             _clearHit = clearHit;
+
+            if (query != null)
+            {
+                _sortLayer = query.style.sortingLayer;
+                _sortOrder = query.style.orderInLayer;
+            }
+
+            Sort(picked);
+            Sort(clear);
+        }
+
+        /// Brings a part onto the panel's own draw order.
+        private void Sort(PugText text)
+        {
+            if (text == null) return;
+
+            text.style.sortingLayer = _sortLayer;
+            text.style.orderInLayer = _sortOrder;
+        }
+
+        private void Sort(SpriteRenderer sprite)
+        {
+            if (sprite == null) return;
+
+            sprite.sortingLayerID = _sortLayer;
+            sprite.sortingOrder = _sortOrder;
         }
 
         /// Handed the current results by the feature.
@@ -208,6 +241,14 @@ namespace CkQol.Native
             return -1;
         }
 
+        private bool OverClear()
+        {
+            var pointer = Manager.ui.mouse != null ? Manager.ui.mouse.pointer : null;
+            if (pointer == null || _clear == null || !_clear.gameObject.activeSelf) return false;
+
+            return Covers(_clearHit, pointer.position);
+        }
+
         /// Acts on whichever of our own parts the pointer is over, and says whether
         /// it found one.
         private bool Hit()
@@ -217,8 +258,7 @@ namespace CkQol.Native
 
             Vector3 at = pointer.position;
 
-            if (_clearHit != null && _clear != null && _clear.gameObject.activeSelf &&
-                Covers(_clearHit, at))
+            if (OverClear())
             {
                 ClearQuery();
                 return true;
@@ -279,14 +319,22 @@ namespace CkQol.Native
 
         private void DrawQuery()
         {
-            // A window onto the text that follows the caret, rather than the whole
-            // of it: a long name would otherwise run straight out of the box.
+            // Focused, the window follows the caret, so typing always shows what is
+            // being typed. Left alone it scrolls, the same as a row, because then the
+            // whole name is worth reading rather than the end of it.
             string typed = _typed;
             if (typed.Length > InputCharacters)
             {
-                int start = Mathf.Clamp(_caret - InputCharacters, 0,
-                                        typed.Length - InputCharacters);
-                typed = typed.Substring(start, InputCharacters);
+                if (_focused)
+                {
+                    int start = Mathf.Clamp(_caret - InputCharacters, 0,
+                                            typed.Length - InputCharacters);
+                    typed = typed.Substring(start, InputCharacters);
+                }
+                else
+                {
+                    typed = Marquee(typed, 0, InputCharacters);
+                }
             }
 
             string shown = typed + (_focused ? "_" : string.Empty);
@@ -299,7 +347,14 @@ namespace CkQol.Native
             // The donor's hint reads "Label...", and nothing hides it any more: the
             // script that did was destroyed with the rest of the chest field.
             if (_hint != null) _hint.gameObject.SetActive(_typed.Length == 0);
-            if (_clear != null) _clear.gameObject.SetActive(_typed.Length > 0);
+
+            if (_clear != null)
+            {
+                _clear.gameObject.SetActive(_typed.Length > 0);
+                Recolour(_clear, OverClear()
+                    ? PugTextEffectMenuOption.SELECTED_VALUE_COLOR
+                    : Color.white);
+            }
         }
 
         private int DrawRows()
@@ -541,7 +596,12 @@ namespace CkQol.Native
             // refills the two that carry anything.
             foreach (var text in clone.GetComponentsInChildren<PugText>(true))
             {
+                Sort(text);
                 GameMenu.SetLiteral(text, string.Empty);
+            }
+            foreach (var sprite in clone.GetComponentsInChildren<SpriteRenderer>(true))
+            {
+                Sort(sprite);
             }
 
             return new Row
@@ -675,11 +735,11 @@ namespace CkQol.Native
         /// A window that walks to the end of the name and back, pausing at each. In
         /// whole characters, because the glyphs are on a pixel grid and a smooth
         /// slide would land them between columns.
-        private static string Marquee(string text, int row)
+        private static string Marquee(string text, int row, int width = RowCharacters)
         {
-            if (string.IsNullOrEmpty(text) || text.Length <= RowCharacters) return text;
+            if (string.IsNullOrEmpty(text) || text.Length <= width) return text;
 
-            int over = text.Length - RowCharacters;
+            int over = text.Length - width;
             float span = over / MarqueeRate;
             float pause = 1.2f;
             float cycle = (span + pause) * 2f;
@@ -689,7 +749,7 @@ namespace CkQol.Native
                 ? Mathf.Min(at, span)
                 : Mathf.Max(0f, span - (at - span - pause));
 
-            return text.Substring(Mathf.RoundToInt(travel * MarqueeRate), RowCharacters);
+            return text.Substring(Mathf.RoundToInt(travel * MarqueeRate), width);
         }
     }
 

@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using CkQol.Config;
 using CkQol.Native;
+using Outlines.Components;
 using Unity.Mathematics;
 using UnityEngine;
 
@@ -170,6 +171,7 @@ namespace CkQol.Features
             _wanted = ObjectID.None;
             _rows.Clear();
             _hits.Clear();
+            Douse();
             if (_panel != null) _panel.SetRows(_rows);
         }
 
@@ -194,8 +196,7 @@ namespace CkQol.Features
                 _rows.Add(new SearchRow
                 {
                     Icon = IconFor(carried ? CarriedIcon : hit.ContainerId),
-                    Text = carried ? "Inventory"
-                         : hit.Label ?? $"{Compass(dx, dz)} {away:0.#}m",
+                    Text = carried ? "Inventory" : hit.Label ?? Compass(dx, dz),
                     Amount = "x" + hit.Count,
                 });
             }
@@ -206,16 +207,20 @@ namespace CkQol.Features
 
         private double _nextPoint;
 
-        /// Floats the count over each container that has it, the way the game
-        /// acknowledges anything else worth noticing. Slower than the rescan: the
-        /// text drifts and fades, so re-spawning it every scan would smear.
+        /// What is outlined right now, so it can be put back when it stops matching.
+        private readonly List<EntityMonoBehaviour> _lit = new List<EntityMonoBehaviour>();
+
+        /// Outlines each container that has it, with the same call the game uses to
+        /// ring the interactable you are standing next to, and floats the count over
+        /// it. The number is slower than the rescan: it drifts and fades, so
+        /// re-spawning it every scan would smear.
         private void Point()
         {
+            Douse();
             if (!ChestSearchState.Point || _hits.Count == 0) return;
 
-            double now = Time.timeAsDouble;
-            if (now < _nextPoint) return;
-            _nextPoint = now + 1.6;
+            bool say = Time.timeAsDouble >= _nextPoint;
+            if (say) _nextPoint = Time.timeAsDouble + 1.6;
 
             for (int i = 0; i < _hits.Count && i < MaxRows; i++)
             {
@@ -226,6 +231,11 @@ namespace CkQol.Features
                     : null;
                 if (mono == null) continue;
 
+                mono.UpdateOutline(OutlineType.ClosestInteractable);
+                _lit.Add(mono);
+
+                if (!say) continue;
+
                 CombatText.SpawnCombatText("x" + _hits[i].Count,
                                            CombatText.NumberColor.Yellow,
                                            mono.RenderPosition + Vector3.up * 0.8f,
@@ -233,6 +243,17 @@ namespace CkQol.Features
                                            isCrit: false,
                                            localize: false);
             }
+        }
+
+        /// The game only drives the outline of whatever is closest to the player, so
+        /// anything else this lit stays lit until it is put back.
+        private void Douse()
+        {
+            for (int i = 0; i < _lit.Count; i++)
+            {
+                if (_lit[i] != null) _lit[i].UpdateOutline(OutlineType.None);
+            }
+            _lit.Clear();
         }
 
         /// Letters rather than arrow glyphs: the game's font is a sprite sheet and
