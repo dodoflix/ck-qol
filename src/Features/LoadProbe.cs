@@ -30,23 +30,17 @@ namespace CkQol.Features
                               new[] { "Off", "Low", "High" }, "Low",
                               "Demonstrates the choice buttons.");
 
-        private readonly StringSetting _note =
-            new StringSetting("SampleNote", "Sample text", "hello",
-                              "Demonstrates the text field.");
-
         public override IEnumerable<ModSetting> GetSettings()
         {
             yield return _verbose;
             yield return _count;
             yield return _scale;
             yield return _mode;
-            yield return _note;
         }
 
         public override void Init()
         {
-            Log($"started (count={_count.Value}, scale={_scale.Value:0.00}, " +
-                $"mode={_mode.Value}, note='{_note.Value}')");
+            Log($"started (count={_count.Value}, scale={_scale.Value:0.00}, mode={_mode.Value})");
         }
 
         public override void OnWorldCreated() => Log("client world created");

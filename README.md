@@ -42,19 +42,24 @@ game launch. Run it before every install.
 
 ## The config menu
 
-Press **F1** in game (rebindable on the General tab). Feature tabs run down the
-left, that feature's settings on the right. Every change applies immediately and
-is saved — there is no apply button and no restart.
+**Main Menu / Pause → Options → Core Keeper QoL.** No hotkey, no separate window.
 
-Built with uGUI + TextMeshPro rather than IMGUI, specifically so it can use the
-game's own font: Core Keeper's UI is TMP-based, and IMGUI cannot render TMP font
-assets, so an IMGUI menu could never match the game's look.
+Each feature gets a page with an Enabled toggle and its settings. Changes apply
+immediately and are saved — there is no apply button and no restart.
 
-`GameTheme` finds the font and 9-sliced panel sprites at runtime from assets the
-game has already loaded — PugMod script mods ship source only, so nothing can be
-bundled. Every lookup falls back to a plain colour if the asset is missing.
-Turn on *Log UI assets on open* in the General tab to dump the available fonts
-and sprite names, which is how to retune the styling for a new game version.
+The menu is built from Core Keeper's own option rows rather than reimplemented.
+The game's menus are **SpriteRenderer-based world-space UI** driven by
+`RadicalMenu`, not uGUI, so a parallel Canvas UI can never quite match: it fights
+canvas scaling, sort order, and the game's custom cursor, and a pixel font
+renders wrong at any fractional scale. Cloning the real rows sidesteps all of
+that and inherits the game's fonts, sounds, controller navigation and pause
+behaviour for free.
+
+`GameMenu` clones a donor row, strips its script, and swaps in ours while keeping
+every serialized reference. Donors are picked by type-name shape (something
+"Toggle"-ish, something "Slider"-ish) rather than by a specific game class, so a
+renamed or reordered option does not break it. If no donor is found the mod logs
+and carries on without the menu instead of failing to load.
 
 ## Adding a feature
 
@@ -91,9 +96,14 @@ yield return new Features.MyTweak();
 That is all that is needed. The feature gets its own tab, an Enabled toggle, a
 config section named after `Name`, and a widget per setting.
 
-Setting types: `BoolSetting`, `IntSetting` and `FloatSetting` (sliders, with
-min/max), `StringSetting`, `ChoiceSetting` (a fixed option list, stored by name
-so reordering options later cannot change anyone's setting), and `KeySetting`.
+Setting types and how they appear:
+
+| type | native row |
+|---|---|
+| `BoolSetting` | toggle |
+| `IntSetting`, `FloatSetting` | slider, using min/max |
+| `ChoiceSetting` | slider across the options, stored by name so reordering them later cannot change anyone's setting |
+| `StringSetting`, `KeySetting` | no native row yet — config file only |
 
 Two things worth knowing:
 

@@ -36,7 +36,7 @@ EOF
              UnityEngine.TextRenderingModule UnityEngine.InputLegacyModule \
              UnityEngine.IMGUIModule Unity.TextMeshPro \
              UnityEngine.TextCoreFontEngineModule UnityEngine.TextCoreTextEngineModule \
-             PugMod.SDK.Runtime PugMod.SDK \
+             PugMod.SDK.Runtime PugMod.SDK Pug.Other Pug.Base \
              Unity.Entities Unity.Mathematics Unity.Collections; do
     [ -f "$MANAGED/$dll.dll" ] &&
       echo "    <Reference Include=\"$dll\"><HintPath>$MANAGED/$dll.dll</HintPath><Private>false</Private></Reference>"
