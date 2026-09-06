@@ -225,19 +225,19 @@ FISH = ([
     "k": (22, 46, 74),
 })
 
+# Seven wide, not eight: an even sprite has no centre column, so the dip in the
+# crown and the stem above it can never sit on the body's axis.
 BERRY = ([
-    "...sg...",
-    "..rr.rr.",
-    ".rrrrrr.",
-    "rrrrrrrr",
-    "rrrrrrrd",
-    "rrrrrrdd",
-    ".rrrrdd.",
-    "..rrrr..",
+    "...sgg.",
+    ".rr.rr.",
+    "rrrrrrr",
+    "rrrrrrr",
+    "rrrrrrr",
+    "rrrrrrr",
+    ".rrrrr.",
+    "..rrr..",
 ], {
     "r": (206, 84, 92),
-    "h": (240, 150, 150),
-    "d": (150, 46, 60),
     "s": (120, 92, 60),
     "g": (110, 176, 96),
 })
