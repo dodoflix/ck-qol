@@ -21,7 +21,6 @@ namespace CkQol
         private static IEnumerable<IQolFeature> BuildFeatures()
         {
             yield return new Features.AutoFishing();
-            yield return new Features.LoadProbe();
         }
 
         public void EarlyInit() { }

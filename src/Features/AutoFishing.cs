@@ -12,7 +12,7 @@ namespace CkQol.Features
     /// has to care whether the feature is loaded, enabled or being torn down.
     public class AutoFishing : QolFeatureBase
     {
-        public override string Name => "AutoFishing";
+        public override string Name => "Auto Fishing";
 
         public override string Description =>
             "Reels in every bite for you and stops baited fishing spots from running " +
