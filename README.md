@@ -27,6 +27,11 @@ summoning weapon in hand toggles it for the session.
 dealing any. Detailed mode breaks it down by source, each with its icon. Burning and
 acid get a row of their own, because the game does not record who applied a condition.
 
+**Chest Search** — find an item in the containers around you without opening each
+one. Click the box beside the inventory, type three characters, pick a name from the
+suggestions, and every nearby chest, station and pouch holding it is listed with a
+count, a distance and a compass direction.
+
 ## Install
 
 ```sh
@@ -213,6 +218,51 @@ Three things it cannot see:
   no weapon and is left out rather than credited to whatever happens to be in hand.
 - **More than three effects on one entity between snapshots.** The replicated ring
   overwrites, and damage numbers share it with unrelated effects, so wide AoE reads low.
+
+## Searching what is in a container
+
+Chest contents are already on the client: `ContainedObjectsBuffer` is
+`PrefabType = All`, `SendMask = AllClients`, `SendToOwner = All`. Nothing has to be
+opened and no request is sent. The vanilla client does a superset of this every
+frame — `CraftingHandler` reads every nearby chest to grey out recipes, and records
+which one holds a material.
+
+Containers are found with a plain entity query over `ContainedObjectsBuffer` +
+`InventoryBuffer` + `LocalTransform`, excluding `PlayerGhost`. Not the physics
+helper the game's own quick stack uses: that matches on
+`InventoryAutoTransferEnabledCD`, which marks chests but not every crafting station.
+`InventoryBuffer` is what separates a container from anything else carrying an
+object, such as an item lying on the ground.
+
+Two things bound it:
+
+- **Ghost relevancy, about ±22 by ±14 tiles.** Outside that rect the container
+  entity does not exist on the client at all, so no radius setting can reach it.
+- Counts come from `ContainedObjectsBuffer` only. `ObjectDataCD.amount` on a
+  container is the world-label visibility state, not a count.
+
+Item names go through `PugText.ProcessText("Items/" + property, …)` rather than
+I2.Loc directly, which is not among the assemblies the mod compiles against. A
+missing term comes back as `missing: …` rather than null, and that is the test for
+whether an `ObjectID` is a real named item.
+
+## Typing in the world
+
+Registering as `Manager.input.activeInputField` is enough to receive keystrokes
+anywhere: `MenuManager.HandleTypingInput` feeds it `Input.inputString` and runs
+before any menu check. `QolTextOption` already implements that interface for the
+settings menu and the search box reuses it.
+
+Two things differ outside a menu:
+
+- Pair it with `Manager.input.DisableInput()` / `EnableInput()`, or the player walks
+  while typing. The pause menu has already frozen them, so the settings row skips it.
+- `DisableInput` stops **every** player key, including the one that closes the
+  inventory, so focus is taken by clicking the box rather than automatically — a
+  panel that grabs input on open would trap the player in it.
+
+Up and down arrows are polled directly. `MenuManager` only forwards left and right
+to an input field, as caret movement.
 
 ## PugMod quirks worked around
 

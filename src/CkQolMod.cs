@@ -24,6 +24,7 @@ namespace CkQol
             yield return new Features.AutoEat();
             yield return new Features.AutoSummon();
             yield return new Features.DpsTracker();
+            yield return new Features.ChestSearch();
         }
 
         public void EarlyInit() { }
