@@ -71,8 +71,15 @@ namespace CkQol.Features
             // Mid-press: keep the food equipped and the button down until it elapses.
             if (_slot >= 0)
             {
-                if (now < _pressUntil) PlayerSlots.Press(EntityManager, player, _slot);
-                else Release();
+                if (now < _pressUntil)
+                {
+                    PlayerSlots.Press(EntityManager, player, _slot);
+                }
+                else
+                {
+                    PlayerSlots.EndPress(EntityManager, player, _slot);
+                    Release();
+                }
                 return;
             }
 

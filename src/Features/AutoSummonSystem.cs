@@ -96,7 +96,11 @@ namespace CkQol.Features
                     PlayerSlots.Press(EntityManager, player, _slot,
                                       aimAtSelf: AutoSummonState.AimAtSelf);
                 }
-                else _slot = -1;
+                else
+                {
+                    PlayerSlots.EndPress(EntityManager, player, _slot);
+                    _slot = -1;
+                }
                 return;
             }
 

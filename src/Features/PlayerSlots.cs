@@ -44,6 +44,26 @@ namespace CkQol.Features
             entityManager.SetComponentData(player, inputData);
         }
 
+        /// Ends a press with the slot still overridden.
+        ///
+        /// EquipmentUpdateSystem latches a pending second interact (:148, :184, :196).
+        /// Dropping the button and the slot override in the same frame lets that latch
+        /// be consumed a frame later against whatever the player actually holds, which
+        /// fires their weapon. Releasing against our own slot consumes it harmlessly.
+        internal static void EndPress(EntityManager entityManager, Entity player, int slot)
+        {
+            var inputData = entityManager.GetComponentData<ClientInputData>(player);
+            ClientInput input = UnsafeUtility.As<ClientInputData, ClientInput>(ref inputData);
+
+            input.equippedSlotIndex = (byte)slot;
+            input.SetButtonState(CommandInputButtonStateNames.SecondInteract_HeldDown, false);
+            input.SetButtonState(CommandInputButtonStateNames.SecondInteract_Pressed, false);
+            input.SetButtonState(CommandInputButtonStateNames.SecondInteract_Released, true);
+
+            inputData = UnsafeUtility.As<ClientInput, ClientInputData>(ref input);
+            entityManager.SetComponentData(player, inputData);
+        }
+
         /// True while an item is held on the cursor.
         ///
         /// The game refuses to eat or summon then anyway (EatableSlot.cs:19,
