@@ -169,7 +169,7 @@ namespace CkQol.Native
         }
 
         /// Matches the eight steps the game's volume rows use.
-        private const int BarSegments = 8;
+        public const int BarSegments = 8;
 
         private void Refresh()
         {

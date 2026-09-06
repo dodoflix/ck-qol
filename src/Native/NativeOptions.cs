@@ -204,10 +204,14 @@ namespace CkQol.Native
                 return;
             }
 
-            // Prefer a volume row for ranged settings: its valueText is the only one
-            // that can render the diamond bar.
-            bool ranged = setting is IntSetting || setting is FloatSetting;
-            var donor = ranged && barDonor != null ? barDonor : toggleDonor;
+            // Clone the volume row only when a bar will actually be drawn. Its
+            // valueText is the only one with the diamond glyphs, but it is also
+            // styled differently - a number rendered in it comes out bold and unlike
+            // every other row.
+            bool drawsBar = setting is FloatSetting ||
+                            (setting is IntSetting i2 && i2.Max - i2.Min > 0 &&
+                             i2.Max - i2.Min <= QolNumberOption.BarSegments);
+            var donor = drawsBar && barDonor != null ? barDonor : toggleDonor;
 
             var number = GameMenu.CloneAndSwap<QolNumberOption>(donor, RowParent(page), "Number");
             if (number == null) return;
