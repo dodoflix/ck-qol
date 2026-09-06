@@ -29,6 +29,16 @@ namespace CkQol.Features
                               "divides your cap between the summoning weapons on your " +
                               "hotbar.");
 
+        private const string AtPlayer = "At player";
+        private const string AtCursor = "At cursor";
+
+        private readonly ChoiceSetting _summonAt =
+            new ChoiceSetting("SummonAt", "Summon position",
+                              new[] { AtPlayer, AtCursor }, AtPlayer,
+                              "At player keeps minions at your feet. At cursor uses " +
+                              "your aim, which for command weapons can be up to twelve " +
+                              "tiles away.");
+
         private const string Ctrl = "Ctrl";
         private const string Shift = "Shift";
         private const string Alt = "Alt";
@@ -48,6 +58,7 @@ namespace CkQol.Features
         public override IEnumerable<ModSetting> GetSettings()
         {
             yield return _mode;
+            yield return _summonAt;
             yield return _toggleKey;
             yield return _toggleModifier;
         }
@@ -55,7 +66,7 @@ namespace CkQol.Features
         public override void Init()
         {
             base.Init();
-            Log($"started (mode={_mode.Value}, toggle={_toggleModifier.Value}+{_toggleKey.Name})");
+            Log($"started (mode={_mode.Value}, at={_summonAt.Value}, toggle={_toggleModifier.Value}+{_toggleKey.Name})");
         }
 
         public override void Shutdown()
@@ -102,6 +113,7 @@ namespace CkQol.Features
                                  : _mode.Value == Split ? SummonMode.SplitHotbar
                                                         : SummonMode.Learned;
 
+            AutoSummonState.AimAtSelf = _summonAt.Value != AtCursor;
             AutoSummonState.ToggleKey = (int)_toggleKey.Value;
             AutoSummonState.ToggleModifier =
                 _toggleModifier.Value == Shift ? Modifier.Shift :
@@ -123,6 +135,10 @@ namespace CkQol.Features
     {
         internal static volatile bool Enabled;
         internal static volatile SummonMode Mode = SummonMode.Learned;
+        /// Aim is pinned to the player while pressing, so summons land at their
+        /// feet rather than wherever the cursor is.
+        internal static volatile bool AimAtSelf = true;
+
         internal static volatile int ToggleKey;
         internal static volatile Modifier ToggleModifier = Modifier.Ctrl;
 
