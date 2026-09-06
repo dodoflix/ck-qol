@@ -107,7 +107,10 @@ namespace CkQol.Features
                 _panel.Cleared = Clear;
             }
 
-            if (_wanted == ObjectID.None || !PanelVisible()) return;
+            // Not gated on the panel being up: a search stays live once picked, so
+            // the containers keep being pointed at while the player walks to them
+            // with the inventory closed. Clearing the search stops it.
+            if (_wanted == ObjectID.None || !ChestSearchState.Enabled) return;
 
             double now = Time.timeAsDouble;
             if (now < _nextScan) return;

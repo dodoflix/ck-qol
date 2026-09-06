@@ -30,7 +30,7 @@ namespace CkQol.Native
         private const float RowStep = 0.9375f;
 
         /// Clear of the inventory window's own frame.
-        private const float FromInventory = 11.5f;
+        private const float FromInventory = 0.6f;
 
         private const int MaxRows = 10;
         private const int MaxLength = 32;
@@ -58,6 +58,7 @@ namespace CkQol.Native
         private PugText _hint;
         private PugText _clear;
         private SpriteRenderer _listPanel;
+        private SpriteRenderer _window;
 
         private readonly List<Row> _pool = new List<Row>();
         private readonly List<SearchRow> _suggestions = new List<SearchRow>();
@@ -77,7 +78,7 @@ namespace CkQol.Native
 
         internal void Bind(HoverRequiredMaterialUIElement donor, Transform anchor,
                            PugText query, PugText hint, PugText clear,
-                           SpriteRenderer listPanel)
+                           SpriteRenderer listPanel, SpriteRenderer window)
         {
             _donor = donor;
             _anchor = anchor;
@@ -85,6 +86,7 @@ namespace CkQol.Native
             _hint = hint;
             _clear = clear;
             _listPanel = listPanel;
+            _window = window;
         }
 
         /// Handed the current results by the feature.
@@ -95,9 +97,13 @@ namespace CkQol.Native
             if (rows != null) _results.AddRange(rows);
         }
 
-        /// Takes the keyboard. Deliberately not automatic on opening the inventory:
-        /// DisableInput stops every player key, the close key included, so the player
-        /// has to ask for the box before it can trap them in it.
+        /// Takes the keyboard, and only that.
+        ///
+        /// No DisableInput, which the chat and sign fields pair with this: it stops
+        /// every player key and with them all UI hovering and clicking, so slots and
+        /// suggestions go dead while typing. It is not needed here either, because
+        /// PlayerController.isMovingBlocked (:735-743) already returns true whenever
+        /// an inventory is showing, and this panel only exists then.
         internal void Focus()
         {
             if (_focused) return;
@@ -105,7 +111,6 @@ namespace CkQol.Native
             _focused = true;
             _caret = _typed.Length;
             Manager.input.SetActiveInputField(this);
-            Manager.input.DisableInput();
         }
 
         private void Blur()
@@ -117,7 +122,6 @@ namespace CkQol.Native
             {
                 Manager.input.SetActiveInputField(null);
             }
-            Manager.input.EnableInput();
         }
 
         internal void ClearQuery()
@@ -237,13 +241,19 @@ namespace CkQol.Native
 
         /// Beside the inventory, following it rather than a screen corner - the HUD
         /// has no anchoring of its own, every widget carries a position.
+        ///
+        /// Measured off the window's own background in world space rather than in
+        /// its local units: that renderer already carries the window's width and the
+        /// UI scale, and a bag upgrade widens it.
         private void Place()
         {
             if (_anchor == null) return;
 
             Vector3 at = _anchor.position;
-            float scale = transform.localScale.x;
-            transform.position = new Vector3(at.x + FromInventory * scale, at.y, at.z);
+            float edge = _window != null ? _window.bounds.max.x : at.x;
+
+            transform.position = new Vector3(edge + FromInventory * transform.localScale.x,
+                                             at.y, at.z);
         }
 
         /// The backing panel, grown to whatever is showing.
@@ -429,6 +439,12 @@ namespace CkQol.Native
             if (_suggestions.Count == 0) return;
 
             int index = Mathf.Clamp(_highlight, 0, _suggestions.Count - 1);
+
+            // The box shows what was picked rather than the fragment that found it,
+            // so it is clear afterwards what is being listed.
+            _typed = Trim(_suggestions[index].Text);
+            _caret = _typed.Length;
+
             _suggestions.Clear();
             Picked?.Invoke(index);
         }
@@ -604,6 +620,21 @@ namespace CkQol.Native
                 // chest the player has open.
                 var box = UnityEngine.Object.Instantiate(field.gameObject, GameMenu.Staging);
                 box.name = "CkQolSearchBox";
+
+                // Read off the clone's own script before destroying it: it names the
+                // two texts and the caret, which are otherwise indistinguishable
+                // among the children.
+                var wiring = box.GetComponent<TextInputField>();
+                PugText query = wiring != null ? wiring.pugText : null;
+                PugText hint = wiring != null ? wiring.hintText : null;
+                GameObject marker = wiring != null ? wiring.selectedMarker : null;
+                var blinker = wiring != null ? wiring.characterMarkBlinker : null;
+
+                // The caret is a sprite the blinker drove. Destroying only the script
+                // leaves it lit and parked over the text.
+                if (marker != null) marker.SetActive(false);
+                if (blinker != null) blinker.gameObject.SetActive(false);
+
                 foreach (var stale in box.GetComponentsInChildren<TextInputField>(true))
                 {
                     UnityEngine.Object.DestroyImmediate(stale);
@@ -617,19 +648,13 @@ namespace CkQol.Native
                     text.maxWidth = 0f;
                 }
 
-                PugText query = field.pugText != null
-                    ? box.GetComponentInChildren<PugText>(true)
-                    : null;
-
-                // Whatever is not the value text is the donor's hint, which still
-                // reads "Label...".
-                PugText hint = null;
-                foreach (var text in box.GetComponentsInChildren<PugText>(true))
+                if (query == null)
                 {
-                    if (text == query) continue;
-                    hint = text;
-                    break;
+                    UnityEngine.Object.DestroyImmediate(box);
+                    Debug.LogError("[CkQol] search box donor has no text to type into");
+                    return null;
                 }
+
                 if (hint != null)
                 {
                     hint.localize = false;
@@ -653,7 +678,8 @@ namespace CkQol.Native
                 var clear = Clear(root.transform, layer, panel, query,
                                   new Vector3(7.4f, 1.6f, 0f));
 
-                panel.Bind(donor, anchor, query, hint, clear, listPanel);
+                panel.Bind(donor, anchor, query, hint, clear, listPanel,
+                           ui.playerInventoryUI.backgroundSR);
 
                 Debug.Log("[CkQol] added the search panel to the HUD");
                 return panel;
