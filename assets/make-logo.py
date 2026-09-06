@@ -188,15 +188,15 @@ def plate(glyph):
     return img
 
 
-# Sprites are hand placed on a 10px grid and doubled, not drawn with ellipses
-# and polygons at 20px. Those calls decide their own edges, and at this size
-# their idea of a curve is a few stray pixels rather than a shape.
+# Sprites are hand placed on an 8px grid, not drawn with ellipses and polygons.
+# Those calls decide their own edges, and at this size their idea of a curve is
+# a few stray pixels rather than a shape.
 #
-# Every sprite is exactly ART on its long axis. Left to themselves they came out
-# between 16 and 22, which reads as four icons at four sizes however well each
-# one is centred.
-ART = 11
-ART_SCALE = 2
+# 8 tripled is 24, which is exactly the recess inside a slot's three ring frame.
+# Every sprite is ART on its long axis, so no icon reads bigger than its
+# neighbour however well each one is centred.
+ART = 8
+ART_SCALE = 3
 
 
 def sprite(rows, palette):
@@ -214,14 +214,12 @@ def sprite(rows, palette):
 
 
 FISH = ([
-    "......bb...",
-    "...bbbbbb.d",
-    ".bbbbbbbbdd",
-    "bkbbbbbbbdd",
-    "bbbbbbbbbdd",
-    ".bbbbbbbbdd",
-    "...bbbbbb.d",
-    "......bb...",
+    "...bb..d",
+    ".bbbbbdd",
+    "bkbbbbdd",
+    "bbbbbbdd",
+    ".bbbbbdd",
+    "...bb..d",
 ], {
     "b": (110, 180, 226),
     "d": (74, 140, 196),
@@ -229,16 +227,14 @@ FISH = ([
 })
 
 BERRY = ([
-    ".....s.....",
-    ".....sgg...",
-    "..rrr.rrr..",
-    ".rhrrrrrrr.",
-    "rhrrrrrrrrr",
-    "rrrrrrrrrrd",
-    "rrrrrrrrrdd",
-    ".rrrrrrrdd.",
-    "..rrrrrdd..",
-    "....rrrr...",
+    "...sg...",
+    "..rr.rr.",
+    ".rrrrrr.",
+    "rrrrrrrr",
+    "rrrrrrrd",
+    "rrrrrrdd",
+    ".rrrrdd.",
+    "..rrrr..",
 ], {
     "r": (206, 84, 92),
     "h": (240, 150, 150),
@@ -248,17 +244,14 @@ BERRY = ([
 })
 
 DEMON_ART = ([
-    "dd.......dd",
-    ".dd.....dd.",
-    "..mmmmmmm..",
-    ".mmmmmmmmm.",
-    "mddmmmmmddm",
-    "myymmmmmyym",
-    "mmmmmmmmmmm",
-    "mmmmmmmmmmm",
-    ".mmmmmmmmm.",
-    "..mmmmmmm..",
-    "...mmmmm...",
+    "d......d",
+    "dmmmmmmd",
+    "mmmmmmmm",
+    "myymmyym",
+    "mmmmmmmm",
+    "mmmmmmmm",
+    ".mmmmmm.",
+    "..mmmm..",
 ], {
     "m": (188, 78, 96),
     "d": (120, 44, 60),
@@ -267,14 +260,11 @@ DEMON_ART = ([
 
 SWORD = ([
     "..s..",
-    "..s..",
-    ".sls.",
     ".sls.",
     ".sls.",
     ".sls.",
     ".sls.",
     "ggggg",
-    "..b..",
     "..b..",
     ".ggg.",
 ], {
