@@ -63,19 +63,39 @@ namespace CkQol.UI
         {
             if (_canvas == null) return;
 
+            // Count every live canvas, not just root ones: game UI is usually built
+            // from nested canvases with overrideSorting, and those carry the high
+            // sorting orders. Filtering to isRootCanvas measured the wrong ones and
+            // left the menu underneath the HUD and the game's custom cursor.
             int highest = 0;
+            string top = "(none)";
             foreach (var other in Resources.FindObjectsOfTypeAll<Canvas>())
             {
                 if (other == null || other == _canvas) continue;
-                if (!other.isRootCanvas) continue;
-                if (other.sortingOrder > highest) highest = other.sortingOrder;
+                // Skip prefab assets - only things actually in a scene can draw over us.
+                if (!other.gameObject.scene.IsValid()) continue;
+                if (other.sortingOrder > highest)
+                {
+                    highest = other.sortingOrder;
+                    top = other.name;
+                }
             }
 
             int wanted = Mathf.Min(highest + 100, short.MaxValue);
+            _canvas.overrideSorting = true;
             if (_canvas.sortingOrder != wanted)
             {
                 _canvas.sortingOrder = wanted;
-                Debug.Log($"[CkQol] menu canvas sortingOrder={wanted} (highest game canvas={highest})");
+                Debug.Log($"[CkQol] menu sortingOrder={wanted} (highest game canvas '{top}'={highest})");
+            }
+
+            if (highest >= short.MaxValue)
+            {
+                // Nothing left to outrank it with; ties fall back to hierarchy order,
+                // which we do not control. Worth saying out loud rather than silently
+                // rendering underneath.
+                Debug.LogWarning($"[CkQol] game canvas '{top}' is already at the maximum " +
+                                 "sorting order, the menu may draw underneath it");
             }
         }
 
@@ -201,6 +221,11 @@ namespace CkQol.UI
             content.anchorMin = new Vector2(0f, 1f);
             content.anchorMax = new Vector2(1f, 1f);
             content.pivot = new Vector2(0.5f, 1f);
+            // A new RectTransform starts at sizeDelta (100,100). Changing the anchors
+            // does not reset it, so a top-stretched content ends up parent-width +100,
+            // overhanging 50px each side and getting clipped by the mask.
+            content.sizeDelta = Vector2.zero;
+            content.anchoredPosition = Vector2.zero;
             scroll.content = content;
 
             var layout = content.gameObject.AddComponent<VerticalLayoutGroup>();
