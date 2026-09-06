@@ -157,12 +157,13 @@ namespace CkQol.Features
             base.OnUpdate();
         }
 
-        /// The smallest edible thing the player is carrying, so a big dish is not spent
-        /// on a small gap. Returns -1 when there is nothing to eat.
+        /// The smallest edible thing in scope, so a big dish is not spent on a small
+        /// gap. Returns -1 when there is nothing to eat.
         ///
-        /// Index 0 is the main inventory and 1..4 are the pouches, all sub-ranges of the
-        /// same buffer. The game equips out of pouches too - a non-empty one is a hotbar
-        /// row (ItemSlotsBarUI.cs:264-289).
+        /// The two settings are independent scopes. Index 0 of InventoryBuffer is the
+        /// main inventory and 1.. are the pouches, all sub-ranges of one buffer, and the
+        /// game equips out of pouches too - a non-empty one is a hotbar row
+        /// (ItemSlotsBarUI.cs:264-289).
         private int FindFood(Entity player, out int restores, out ObjectID picked)
         {
             restores = 0;
@@ -173,56 +174,69 @@ namespace CkQol.Features
 
             int best = -1;
 
-            // With the inventory off, only the hotbar row currently open. That row is a
-            // moving window over these same buffers rather than a fixed range, so the
-            // bounds come from the player rather than being derived here.
-            bool hotbarOnly = !AutoEatState.UseInventory;
-            var local = Manager.main != null ? Manager.main.player : null;
-            if (hotbarOnly && local == null) return -1;
-
-            int count = hotbarOnly ? 1
-                      : AutoEatState.UsePouches ? inventories.Length : 1;
-
-            for (int inv = 0; inv < count; inv++)
+            if (inventories.Length > 0)
             {
-                int first, last;
-                if (hotbarOnly)
+                if (AutoEatState.UseInventory)
                 {
-                    first = local.hotbarStartIndex;
-                    last = local.hotbarEndIndex;
+                    int first = inventories[0].startIndex;
+                    Scan(contained, first, first + inventories[0].size,
+                         ref best, ref restores, ref picked);
                 }
                 else
                 {
-                    first = inventories[inv].startIndex;
-                    last = first + inventories[inv].size;
-                }
-                if (last > contained.Length) last = contained.Length;
-
-                for (int i = first; i < last; i++)
-                {
-                    // equippedSlotIndex is a byte, and SelectedEquipmentChangeSystem
-                    // indexes the buffer with it and no bounds check.
-                    if (i < 0 || i > byte.MaxValue) continue;
-
-                    var objectData = contained[i].objectData;
-                    if (objectData.objectID == ObjectID.None || objectData.amount <= 0) continue;
-
-                    bool cooked = PugDatabase.HasComponent<CookedFoodCD>(objectData);
-                    if (cooked && !AutoEatState.AllowCooked) continue;
-
-                    int value = HungerValue(objectData, cooked);
-                    if (value <= 0) continue;
-
-                    if (best < 0 || value < restores)
+                    // Narrowed to the hotbar row that is open. It is a moving window
+                    // over these same buffers, so its bounds come from the player.
+                    var local = Manager.main != null ? Manager.main.player : null;
+                    if (local != null)
                     {
-                        best = i;
-                        restores = value;
-                        picked = objectData.objectID;
+                        Scan(contained, local.hotbarStartIndex, local.hotbarEndIndex,
+                             ref best, ref restores, ref picked);
                     }
                 }
             }
 
+            if (AutoEatState.UsePouches)
+            {
+                for (int inv = 1; inv < inventories.Length; inv++)
+                {
+                    int first = inventories[inv].startIndex;
+                    Scan(contained, first, first + inventories[inv].size,
+                         ref best, ref restores, ref picked);
+                }
+            }
+
             return best;
+        }
+
+        /// Keeps the smallest edible slot in [first, last).
+        private static void Scan(DynamicBuffer<ContainedObjectsBuffer> contained,
+                                 int first, int last,
+                                 ref int best, ref int restores, ref ObjectID picked)
+        {
+            if (last > contained.Length) last = contained.Length;
+
+            for (int i = first; i < last; i++)
+            {
+                // equippedSlotIndex is a byte, and SelectedEquipmentChangeSystem indexes
+                // the buffer with it and no bounds check.
+                if (i < 0 || i > byte.MaxValue) continue;
+
+                var objectData = contained[i].objectData;
+                if (objectData.objectID == ObjectID.None || objectData.amount <= 0) continue;
+
+                bool cooked = PugDatabase.HasComponent<CookedFoodCD>(objectData);
+                if (cooked && !AutoEatState.AllowCooked) continue;
+
+                int value = HungerValue(objectData, cooked);
+                if (value <= 0) continue;
+
+                if (best < 0 || value < restores)
+                {
+                    best = i;
+                    restores = value;
+                    picked = objectData.objectID;
+                }
+            }
         }
 
         /// Hunger an item restores, or 0 if it restores none - which is also how
