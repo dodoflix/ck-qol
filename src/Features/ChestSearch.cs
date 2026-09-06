@@ -28,14 +28,27 @@ namespace CkQol.Features
 
         private readonly BoolSetting _point =
             new BoolSetting("PointAtChests", "Point at chests", true,
-                            "Float the count over each container that has it, so you " +
-                            "can see which one is which.");
+                            "Outline each container that has it and float the count " +
+                            "over it, so you can see which one is which.");
+
+        private const string Gold = "Gold";
+        private const string Teal = "Teal";
+        private const string Green = "Green";
+        private const string Pink = "Pink";
+        private const string White = "White";
+
+        private readonly ChoiceSetting _tint =
+            new ChoiceSetting("HighlightColour", "Highlight colour",
+                              new[] { Gold, Teal, Green, Pink, White }, Gold,
+                              "The outline drawn around a container that has what you " +
+                              "searched for.");
 
         public override IEnumerable<ModSetting> GetSettings()
         {
             yield return _radius;
             yield return _self;
             yield return _point;
+            yield return _tint;
         }
 
         public override void Init()
@@ -64,6 +77,12 @@ namespace CkQol.Features
             ChestSearchState.Radius = _radius.Value;
             ChestSearchState.SearchSelf = _self.Value;
             ChestSearchState.Point = _point.Value;
+            ChestSearchState.Tint =
+                _tint.Value == Teal ? new Color(0.45f, 0.85f, 0.80f) :
+                _tint.Value == Green ? new Color(0.45f, 0.85f, 0.40f) :
+                _tint.Value == Pink ? new Color(0.95f, 0.45f, 0.70f) :
+                _tint.Value == White ? Color.white :
+                                       new Color(0.95f, 0.80f, 0.35f);
 
             if (!Running) Clear();
         }
@@ -252,10 +271,56 @@ namespace CkQol.Features
         {
             if (!ChestSearchState.Point) return;
 
+            Color tint = ChestSearchState.Tint;
             for (int i = 0; i < _lit.Count; i++)
             {
-                if (_lit[i] != null) _lit[i].UpdateOutline(OutlineType.ClosestInteractable);
+                if (_lit[i] != null) Outline(_lit[i], tint);
             }
+        }
+
+        /// What EntityMonoBehaviour.UpdateOutline does, with a colour of our own
+        /// rather than the one the game keeps for whatever you are standing next to.
+        /// Putting an outline back is still left to the game's own call.
+        private static void Outline(EntityMonoBehaviour mono, Color tint)
+        {
+            var interactable = mono.interactable;
+            if (interactable != null)
+            {
+                Paint(interactable.optionalOutlineController, tint);
+                if (interactable.additionalOutlineControllers != null)
+                {
+                    foreach (var extra in interactable.additionalOutlineControllers)
+                    {
+                        Paint(extra, tint);
+                    }
+                }
+
+                if (interactable.spriteObjects == null) return;
+                foreach (var sprite in interactable.spriteObjects)
+                {
+                    if (sprite != null) sprite.outlineColor = tint;
+                }
+                return;
+            }
+
+            if (mono.outlineControllers != null)
+            {
+                foreach (var controller in mono.outlineControllers) Paint(controller, tint);
+            }
+
+            if (mono.spriteObjects != null && mono.spriteObjects.Count > 0 &&
+                mono.spriteObjects[0] != null)
+            {
+                mono.spriteObjects[0].outlineColor = tint;
+            }
+        }
+
+        private static void Paint(OutlineController controller, Color tint)
+        {
+            if (controller == null) return;
+
+            controller.showOutline = true;
+            controller.SetColor(tint);
         }
 
         /// The game only drives the outline of whatever is closest to the player, so
@@ -304,5 +369,9 @@ namespace CkQol.Features
         internal static volatile int Radius = 10;
         internal static volatile bool SearchSelf = true;
         internal static volatile bool Point = true;
+
+        /// Not volatile: a Color is a struct, and the field is written from the menu
+        /// and read on the same thread a frame later.
+        internal static Color Tint = new Color(0.95f, 0.80f, 0.35f);
     }
 }
