@@ -256,7 +256,7 @@ namespace CkQol.Features
 
                 if (!say) continue;
 
-                CombatText.SpawnCombatText("x" + _hits[i].Count,
+                CombatText.SpawnCombatText("x" + Compact(_hits[i].Count),
                                            CombatText.NumberColor.Yellow,
                                            mono.RenderPosition + Vector3.up * 0.8f,
                                            isDamageNumber: false,
