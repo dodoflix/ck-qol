@@ -51,8 +51,7 @@ namespace CkQol.Features
                 ComponentType.ReadWrite<ClientInputData>(),
                 ComponentType.ReadOnly<EquipmentSlotCD>(),
                 ComponentType.ReadOnly<PlayerStateCD>(),
-                ComponentType.ReadOnly<GhostOwnerIsLocal>(),
-                ComponentType.ReadOnly<MinionCountTrackerCD>());
+                ComponentType.ReadOnly<GhostOwnerIsLocal>());
 
             // None on an enableable component excludes the entities where it is on, so
             // dying minions drop out.
@@ -154,13 +153,13 @@ namespace CkQol.Features
             int slot = FindWeapon(player, missing);
             if (slot < 0) return;
 
+            UnityEngine.Debug.Log(
+                $"[CkQol/Auto Summon] summoning {missing} ({Alive()}/{cap} alive)");
+
             _slot = slot;
             _pressUntil = now + PressSeconds;
             _justSummoned = missing;
             PlayerSlots.Press(EntityManager, player, slot, aimAtSelf: AutoSummonState.AimAtSelf);
-
-            UnityEngine.Debug.Log(
-                $"[CkQol/Auto Summon] summoning {missing} ({Alive()}/{cap} alive)");
         }
 
         /// Switches the feature on and off for this session, without touching the
@@ -265,11 +264,7 @@ namespace CkQol.Features
             }
 
             _justSummoned = ObjectID.None;
-            Remember();
-        }
 
-        private void Remember()
-        {
             _previous.Clear();
             foreach (var entry in _census) _previous[entry.Key] = entry.Value;
         }

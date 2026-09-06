@@ -86,13 +86,12 @@ namespace CkQol.Features
             if (_hint != null) _hint.Icon = HintIcon;
         }
 
-        private string HintLabel()
-        {
-            string key = AutoSummonState.ToggleModifier == Modifier.None
+        /// Just the binding: the icon says which weapon it is about, and the row has
+        /// only room for labels the size of the game's own.
+        private string HintLabel() =>
+            AutoSummonState.ToggleModifier == Modifier.None
                 ? _toggleKey.Name
                 : $"{AutoSummonState.ToggleModifier}+{_toggleKey.Name}";
-            return $"{key} Summon {(AutoSummonState.Armed ? "on" : "off")}";
-        }
 
         private ObjectID _iconFor = ObjectID.None;
         private int _iconVariation;

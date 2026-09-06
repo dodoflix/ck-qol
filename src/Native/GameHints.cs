@@ -31,6 +31,11 @@ namespace CkQol.Native
         private bool _initialized;
         private string _shown;
 
+        /// Where the donor put the icon, and whether it has been moved for the current
+        /// label width.
+        private float _iconRestX;
+        private bool _placed;
+
         public override bool isButtonActive => _active;
 
         internal void Bind(PugText text, PugText[] otherTexts, SpriteRenderer[] otherSprites,
@@ -41,6 +46,7 @@ namespace CkQol.Native
             _otherSprites = otherSprites;
             _sibling = sibling;
             _icon = icon;
+            if (icon != null) _iconRestX = icon.transform.localPosition.x;
         }
 
         public override void UpdateVisuals()
@@ -56,12 +62,6 @@ namespace CkQol.Native
 
             if (visible)
             {
-                if (_icon != null)
-                {
-                    Icon?.Invoke(_icon);
-                    _icon.enabled = _icon.sprite != null;
-                }
-
                 if (_text != null)
                 {
                     string label = Label != null ? Label() : string.Empty;
@@ -69,6 +69,23 @@ namespace CkQol.Native
                     {
                         GameMenu.SetLiteral(_text, label);
                         _shown = label;
+                        _placed = false;
+                    }
+                }
+
+                if (_icon != null)
+                {
+                    Icon?.Invoke(_icon);
+                    _icon.enabled = _icon.sprite != null;
+
+                    // Sits left of the label rather than at the donor's position, which
+                    // assumed the donor's own text width.
+                    if (!_placed && _icon.enabled && _text != null)
+                    {
+                        _placed = true;
+                        var at = _icon.transform.localPosition;
+                        at.x = _iconRestX - _text.dimensions.width;
+                        _icon.transform.localPosition = at;
                     }
                 }
             }
@@ -107,6 +124,7 @@ namespace CkQol.Native
             // Re-render on the way back in: PugText releases its glyphs to the pool when
             // disabled (PugText.cs:307-308), so the old ones are gone.
             _shown = null;
+            _placed = false;
             _active = visible;
             _initialized = true;
         }
