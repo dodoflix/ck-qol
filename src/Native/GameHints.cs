@@ -92,7 +92,7 @@ namespace CkQol.Native
                         _placed = false;
                     }
 
-                    Recolour(_text, tint);
+                    GameMenu.Tint(_text, tint);
                 }
 
                 if (_icon != null)
@@ -114,15 +114,6 @@ namespace CkQol.Native
             }
 
             base.LateUpdate();
-        }
-
-        private static void Recolour(PugText text, Color tint)
-        {
-            var glyphs = text.glyphs;
-            for (int i = 0; i < glyphs.Count; i++)
-            {
-                if (glyphs[i] != null) glyphs[i].color = tint;
-            }
         }
 
         private void Show(bool visible)

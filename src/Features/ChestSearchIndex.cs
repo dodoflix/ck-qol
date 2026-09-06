@@ -242,9 +242,10 @@ namespace CkQol.Features
                         .CompareTo(math.distance(here.xz, b.Position.xz)));
         }
 
-        /// InventoryBuffer as well as the contents: it is what separates a container
-        /// from anything else that happens to carry an object, such as an item lying
-        /// on the ground.
+        /// InventoryBuffer as well as the contents: without it the query also matches
+        /// things that carry an object without being a container at all. A stack lying
+        /// on the floor does have one, and is wanted - Find labels those from
+        /// PickUpItemCD rather than excluding them.
         private static EntityQuery Containers(World world)
         {
             if (_queryWorld == world) return _containers;

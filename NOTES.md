@@ -158,8 +158,8 @@ Containers are found with a plain entity query over `ContainedObjectsBuffer` +
 `InventoryBuffer` + `LocalTransform`, excluding `PlayerGhost`. Not the physics
 helper the game's own quick stack uses: that matches on
 `InventoryAutoTransferEnabledCD`, which marks chests but not every crafting station.
-`InventoryBuffer` is what separates a container from anything else carrying an
-object, such as an item lying on the ground.
+`InventoryBuffer` is what keeps out everything else that carries an object without
+being a container.
 
 Two things bound it:
 

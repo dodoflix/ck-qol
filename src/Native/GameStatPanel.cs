@@ -111,22 +111,9 @@ namespace CkQol.Native
             row.Icon.sprite = data.Icon;
             row.Icon.enabled = data.Icon != null;
 
-            // Every frame, not once at build: the donor is the crafting hover's
-            // ingredient count, which the game tints for whether you have enough of a
-            // material, and Render rebuilds the glyphs from the style and loses
-            // whatever was put on them.
-            Recolour(row.Text, Color.white);
-        }
-
-        private static void Recolour(PugText text, Color tint)
-        {
-            if (text == null) return;
-
-            var glyphs = text.glyphs;
-            for (int i = 0; i < glyphs.Count; i++)
-            {
-                if (glyphs[i] != null) glyphs[i].color = tint;
-            }
+            // The donor is the crafting hover's ingredient count, which the game tints
+            // for whether you have enough of a material.
+            GameMenu.Tint(row.Text, Color.white);
         }
 
         private void Blank(PanelRow row)

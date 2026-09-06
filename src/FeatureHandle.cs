@@ -34,7 +34,7 @@ namespace CkQol
             Enabled = new BoolSetting("Enabled", "Enabled", feature.EnabledByDefault,
                                       feature.Description);
 
-            var settings = new List<ModSetting> { };
+            var settings = new List<ModSetting>();
             foreach (var setting in feature.GetSettings())
             {
                 settings.Add(setting);

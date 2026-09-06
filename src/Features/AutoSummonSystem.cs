@@ -81,7 +81,7 @@ namespace CkQol.Features
         {
             if (!AutoSummonState.Enabled || _playerQuery.IsEmpty)
             {
-                _slot = -1;
+                Release();
                 return;
             }
 
@@ -100,8 +100,7 @@ namespace CkQol.Features
                 else
                 {
                     PlayerSlots.EndPress(EntityManager, player, _slot);
-                    _slot = -1;
-                    UseButton.Release(this);
+                    Release();
                 }
                 return;
             }
@@ -161,6 +160,12 @@ namespace CkQol.Features
             _pressUntil = now + PressSeconds;
             _justSummoned = missing;
             PlayerSlots.Press(EntityManager, player, slot, aimAtSelf: AutoSummonState.AimAtSelf);
+        }
+
+        private void Release()
+        {
+            _slot = -1;
+            UseButton.Release(this);
         }
 
         /// Switches the feature on and off for this session, without touching the

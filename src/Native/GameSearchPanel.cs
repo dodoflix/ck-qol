@@ -343,7 +343,7 @@ namespace CkQol.Native
             if (_clear != null)
             {
                 _clear.gameObject.SetActive(_typed.Length > 0);
-                Recolour(_clear, OverClear()
+                GameMenu.Tint(_clear, OverClear()
                     ? PugTextEffectMenuOption.SELECTED_VALUE_COLOR
                     : Color.white);
             }
@@ -429,9 +429,7 @@ namespace CkQol.Native
             row.Icon.sprite = icon;
             row.Icon.enabled = icon != null;
 
-            // Recoloured every frame: Render rebuilds the glyphs from the style and
-            // loses any colour put on them.
-            Recolour(row.Text, highlighted ? PugTextEffectMenuOption.SELECTED_VALUE_COLOR
+            GameMenu.Tint(row.Text, highlighted ? PugTextEffectMenuOption.SELECTED_VALUE_COLOR
                    : dim ? PugTextEffectMenuOption.UNSELECTED_TEXT_COLOR
                    : Color.white);
 
@@ -455,17 +453,6 @@ namespace CkQol.Native
 
             text.localize = false;
             text.Render(value ?? string.Empty, rewindEffectAnims: false, force: false);
-        }
-
-        private static void Recolour(PugText text, Color tint)
-        {
-            if (text == null) return;
-
-            var glyphs = text.glyphs;
-            for (int i = 0; i < glyphs.Count; i++)
-            {
-                if (glyphs[i] != null) glyphs[i].color = tint;
-            }
         }
 
         private void Blank(Row row)

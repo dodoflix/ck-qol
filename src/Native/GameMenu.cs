@@ -345,6 +345,23 @@ namespace CkQol.Native
             target.Render(text ?? string.Empty, rewindEffectAnims: true, force: true);
         }
 
+        /// Colours a rendered line.
+        ///
+        /// Every caller does this every frame rather than once on change: Render
+        /// rebuilds the glyphs from the style and loses whatever was put on them, and
+        /// it does not always have them ready on the frame it is called - so a
+        /// one-shot recolour can run over an empty list and never retry.
+        public static void Tint(PugText text, Color colour)
+        {
+            if (text == null) return;
+
+            var glyphs = text.glyphs;
+            for (int i = 0; i < glyphs.Count; i++)
+            {
+                if (glyphs[i] != null) glyphs[i].color = colour;
+            }
+        }
+
         /// Hover description, or null. UIMouse.UpdateHoverText already renders these
         /// in menus; stock rows just never return one.
         public static List<TextAndFormatFields> Hover(string text)
