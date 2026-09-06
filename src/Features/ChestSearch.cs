@@ -203,7 +203,7 @@ namespace CkQol.Features
                 {
                     Icon = IconFor(carried ? CarriedIcon : hit.ContainerId),
                     Text = carried ? "Inventory" : hit.Label ?? Compass(dx, dz),
-                    Amount = "x" + hit.Count,
+                    Amount = "x" + Compact(hit.Count),
                 });
             }
 

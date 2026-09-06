@@ -118,7 +118,7 @@ namespace CkQol.Features
         }
 
         private static string Rate(int damage, int seconds) =>
-            Mathf.RoundToInt(damage / (float)seconds).ToString();
+            Compact(Mathf.RoundToInt(damage / (float)seconds));
 
         private readonly Dictionary<int, Sprite> _icons = new Dictionary<int, Sprite>();
 

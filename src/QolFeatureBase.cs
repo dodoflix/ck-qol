@@ -48,6 +48,30 @@ namespace CkQol
         public virtual void OnWorldDestroyed() { }
         public virtual void Update() { }
 
+        /// A number short enough for a HUD row: 2148 reads as 2.1K, 2148000 as 2.1M.
+        /// A panel sized for four digits has no room for a chest holding nine
+        /// thousand of something.
+        protected static string Compact(long value)
+        {
+            if (value < 1000) return value.ToString();
+
+            string[] steps = { "K", "M", "B" };
+            double left = value;
+
+            for (int i = 0; i < steps.Length; i++)
+            {
+                left /= 1000d;
+                if (left < 1000d || i == steps.Length - 1)
+                {
+                    // One decimal below ten, none above: 9.4K, then 94K.
+                    return left < 10d
+                        ? left.ToString("0.#") + steps[i]
+                        : System.Math.Floor(left) + steps[i];
+                }
+            }
+            return value.ToString();
+        }
+
         protected void Log(string message) => Debug.Log($"[CkQol/{Name}] {message}");
         protected void LogError(string message) => Debug.LogError($"[CkQol/{Name}] {message}");
     }
