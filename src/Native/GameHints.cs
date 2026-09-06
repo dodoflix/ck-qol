@@ -17,6 +17,9 @@ namespace CkQol.Native
         private PugText _text;
         private PugText[] _otherTexts;
         private SpriteRenderer[] _sprites;
+
+        /// A stock hint in the same row, whose scale is mirrored.
+        private IngameButtonHint _sibling;
         private bool _active;
         private bool _initialized;
         private bool _loggedVisible;
@@ -24,19 +27,24 @@ namespace CkQol.Native
 
         public override bool isButtonActive => _active;
 
-        internal void Bind(PugText text, PugText[] otherTexts, SpriteRenderer[] sprites)
+        internal void Bind(PugText text, PugText[] otherTexts, SpriteRenderer[] sprites,
+                           IngameButtonHint sibling)
         {
             _text = text;
             _otherTexts = otherTexts;
             _sprites = sprites;
+            _sibling = sibling;
         }
 
         public override void UpdateVisuals()
         {
-            // Assigned every update rather than cached. The multiplier is zero during
-            // a load fade, which is also the default of any cached field, so a cache
-            // cannot tell "not set yet" from "genuinely zero" and gets stuck there.
-            transform.localScale = Manager.ui.CalcGameplayUITargetScaleMultiplier();
+            // Mirrored from a stock hint rather than read from
+            // Manager.ui.CalcGameplayUITargetScaleMultiplier(): that call returns zero
+            // for this component, while the hints beside it are scaled correctly. The
+            // sibling is the value we actually want anyway.
+            transform.localScale = _sibling != null
+                ? _sibling.transform.localScale
+                : Manager.ui.CalcGameplayUITargetScaleMultiplier();
 
             bool visible = Visible != null && Visible() &&
                            !Manager.ui.isAnyInventoryShowing && !Manager.ui.isShowingMap;
@@ -56,6 +64,7 @@ namespace CkQol.Native
                 _loggedVisible = true;
                 Debug.Log($"[CkQol] hint '{name}' visible, label '{_shown}', " +
                           $"active={gameObject.activeInHierarchy} scale={transform.localScale} " +
+                          $"sibling={(_sibling != null ? _sibling.transform.localScale.ToString() : "none")} " +
                           $"local={transform.localPosition} world={transform.position}");
             }
 
@@ -148,7 +157,7 @@ namespace CkQol.Native
                 for (int i = 1; i < texts.Length; i++) others[i - 1] = texts[i];
 
                 var hint = clone.AddComponent<CkQolHint>();
-                hint.Bind(texts[0], others, sprites);
+                hint.Bind(texts[0], others, sprites, donor);
                 hint.Label = label;
                 hint.Visible = visible;
 
