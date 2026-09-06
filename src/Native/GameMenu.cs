@@ -172,12 +172,22 @@ namespace CkQol.Native
             }
         }
 
+        /// Rows are read from the menu's children, not from menuOptions.
+        ///
+        /// RadicalMenu only fills menuOptions in Awake, and MenuManager instantiates
+        /// the option menus inactive - so that list stays empty until the player
+        /// first opens the menu, and searching it finds nothing at startup.
+        private static RadicalMenuOption[] RowsOf(RadicalMenu menu)
+        {
+            if (menu == null) return new RadicalMenuOption[0];
+            return menu.GetComponentsInChildren<RadicalMenuOption>(true);
+        }
+
         /// An on/off row to clone. Chosen by the option's own isOnOffToggle flag
         /// rather than by class name, so renamed game options do not break it.
         public static RadicalMenuOption FindToggleDonor(RadicalMenu menu)
         {
-            if (menu == null || menu.menuOptions == null) return null;
-            foreach (var option in menu.menuOptions)
+            foreach (var option in RowsOf(menu))
             {
                 if (option != null && option.isOnOffToggle && option.valueText != null) return option;
             }
@@ -186,8 +196,7 @@ namespace CkQol.Native
 
         public static RadicalOptionsMenuOption_Slider FindSliderDonor(RadicalMenu menu)
         {
-            if (menu == null || menu.menuOptions == null) return null;
-            foreach (var option in menu.menuOptions)
+            foreach (var option in RowsOf(menu))
             {
                 var slider = option as RadicalOptionsMenuOption_Slider;
                 if (slider != null) return slider;
@@ -198,8 +207,7 @@ namespace CkQol.Native
         /// Any plain row, used as the shape for submenu and back entries.
         public static RadicalMenuOption FindPlainDonor(RadicalMenu menu)
         {
-            if (menu == null || menu.menuOptions == null) return null;
-            foreach (var option in menu.menuOptions)
+            foreach (var option in RowsOf(menu))
             {
                 if (option != null && !option.isOnOffToggle &&
                     !(option is RadicalOptionsMenuOption_Slider) && option.labelText != null)

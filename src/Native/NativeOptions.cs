@@ -13,8 +13,14 @@ namespace CkQol.Native
     public static class NativeOptions
     {
         private static bool _installed;
+        private static int _attempts;
 
-        public static bool Installed => _installed;
+        /// Menus can appear a frame or two before their rows do, so a single attempt
+        /// at the first opportunity is unreliable. Capped so a genuinely missing
+        /// donor does not retry forever.
+        private const int MaxAttempts = 600;
+
+        public static bool Installed => _installed || _attempts >= MaxAttempts;
 
         /// The game's menus are built by MenuManager during startup, long after mods
         /// load, so installation has to wait for them.
@@ -26,7 +32,7 @@ namespace CkQol.Native
         public static void Install(CkQolMod mod)
         {
             if (_installed) return;
-            _installed = true; // one attempt; never retry every frame
+            _attempts++;
 
             try
             {
@@ -43,13 +49,20 @@ namespace CkQol.Native
                                               Manager.menu.uiOptionsMenu,
                                               Manager.menu.videoOptionsMenu);
 
-                Debug.Log($"[CkQol] donors: plain={(plainDonor != null)} " +
-                          $"toggle={(toggleDonor != null)} slider={(sliderDonor != null)}");
+                if (plainDonor != null || _attempts == MaxAttempts)
+                {
+                    Debug.Log($"[CkQol] donors after {_attempts} attempt(s): " +
+                              $"plain={(plainDonor != null)} toggle={(toggleDonor != null)} " +
+                              $"slider={(sliderDonor != null)}");
+                }
 
                 if (plainDonor == null)
                 {
-                    Debug.LogError("[CkQol] no plain row to clone, cannot add the options entry");
-                    return;
+                    if (_attempts >= MaxAttempts)
+                    {
+                        Debug.LogError("[CkQol] no plain row to clone, cannot add the options entry");
+                    }
+                    return; // rows may not exist yet, try again next frame
                 }
 
                 var rootMenu = BuildMenu(Manager.menu.uiOptionsMenu, "CkQolRootMenu");
@@ -79,10 +92,12 @@ namespace CkQol.Native
                 entry.Target = rootMenu;
                 GameMenu.Refresh(optionsMenu);
 
-                Debug.Log("[CkQol] added to the game's Options menu");
+                _installed = true;
+                Debug.Log($"[CkQol] added to the game's Options menu after {_attempts} attempt(s)");
             }
             catch (Exception e)
             {
+                _installed = true; // a throw will not fix itself on the next frame
                 Debug.LogError("[CkQol] failed to install into the Options menu");
                 Debug.LogException(e);
             }
