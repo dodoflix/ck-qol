@@ -38,8 +38,6 @@ namespace CkQol.Features
         private readonly Dictionary<ObjectID, ObjectID> _weaponForMinion =
             new Dictionary<ObjectID, ObjectID>();
 
-        private readonly Dictionary<ObjectID, bool> _hasIcon = new Dictionary<ObjectID, bool>();
-
         protected override void OnCreate()
         {
             _playerQuery = GetEntityQuery(
@@ -166,21 +164,21 @@ namespace CkQol.Features
             return at == player ? NameOf(player, origin) : NotOurs;
         }
 
+        /// A minion or pet is its own row; everything else - the player's own swings, and
+        /// the projectiles and explosions they spawn - belongs to the weapon in hand.
+        ///
+        /// A projectile's own ObjectDataCD is not usable as a row: it names whatever
+        /// prefab the weapon spawns, which for the Grubzooka is a mining projectile that
+        /// shows up as a pickaxe.
         private int NameOf(Entity player, Entity origin)
         {
-            if (origin != player && EntityManager.HasComponent<ObjectDataCD>(origin))
+            if (origin != player &&
+                (EntityManager.HasComponent<MinionCD>(origin) ||
+                 EntityManager.HasComponent<PetCD>(origin)) &&
+                EntityManager.HasComponent<ObjectDataCD>(origin))
             {
-                ObjectID id = EntityManager.GetComponentData<ObjectDataCD>(origin).objectID;
-
-                if (EntityManager.HasComponent<MinionCD>(origin) ||
-                    EntityManager.HasComponent<PetCD>(origin))
-                {
-                    return (int)WeaponFor(player, id);
-                }
-
-                // A projectile or explosion is worth a row of its own, but only when it
-                // has an icon to put on it.
-                if (HasIcon(id)) return (int)id;
+                return (int)WeaponFor(
+                    player, EntityManager.GetComponentData<ObjectDataCD>(origin).objectID);
             }
 
             return (int)Equipped(player);
@@ -229,17 +227,6 @@ namespace CkQol.Features
 
             _weaponForMinion[minion] = found;
             return found;
-        }
-
-        private bool HasIcon(ObjectID id)
-        {
-            if (_hasIcon.TryGetValue(id, out bool known)) return known;
-
-            var info = PugDatabase.GetObjectInfo(id);
-            bool has = info != null && (info.smallIcon != null || info.icon != null);
-
-            _hasIcon[id] = has;
-            return has;
         }
     }
 }

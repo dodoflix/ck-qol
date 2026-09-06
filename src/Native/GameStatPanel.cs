@@ -27,6 +27,10 @@ namespace CkQol.Native
         /// Gap between the icon and the number it belongs to.
         private const float IconGap = 0.75f;
 
+        /// The HUD's own size for a line of stats; the donor's is sized for the hover
+        /// window and reads as oversized here.
+        private const TextManager.FontFace Font = TextManager.FontFace.thinSmall;
+
         private const int MaxRows = 8;
 
         private class PanelRow
@@ -171,11 +175,16 @@ namespace CkQol.Native
             if (element.amountNumberShadow2 != null) shadows.Add(element.amountNumberShadow2);
 
             // The donor's width is sized for the hover window, and PugFont only wraps
-            // above zero (PugFont.cs:141).
+            // above zero (PugFont.cs:141). Alignment is forced rather than inherited so
+            // the number starts on its own transform and centres on it, which is what
+            // the icon is then placed against. Render re-reads style.fontFace
+            // (PugText.cs:700), so setting it here is enough.
             foreach (var text in clone.GetComponentsInChildren<PugText>(true))
             {
                 text.maxWidth = 0f;
+                text.style.fontFace = Font;
                 text.style.horizontalAlignment = PugTextStyle.HorizontalAlignment.left;
+                text.style.verticalAlignment = PugTextStyle.VerticalAlignment.center;
             }
 
             // Everything the ingredient row draws that a stat row does not: the material

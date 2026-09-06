@@ -132,8 +132,11 @@ namespace CkQol.Features
             else if (source == DpsMeter.OtherDotSource) sprite = ConditionIcon(ConditionID.AcidDamage);
             else
             {
+                // smallIcon only, never the inventory icon: it is twice the size, and a
+                // row of mixed ones does not line up. This is what the game's own lists
+                // use (UIMouse.cs:1619).
                 var info = PugDatabase.GetObjectInfo((ObjectID)source);
-                sprite = info == null ? null : (info.smallIcon != null ? info.smallIcon : info.icon);
+                sprite = info != null ? info.smallIcon : null;
             }
 
             _icons[source] = sprite;
