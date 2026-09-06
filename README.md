@@ -103,3 +103,7 @@ world generation belongs on the server and is out of scope here.
 
 `LoadProbe` is a placeholder that only logs lifecycle events, there to confirm the
 mod loads. Delete it once real features exist.
+
+## License
+
+MIT - see [LICENSE](LICENSE).
