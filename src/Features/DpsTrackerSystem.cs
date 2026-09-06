@@ -35,8 +35,19 @@ namespace CkQol.Features
         private NetworkTick _cursor;
         private bool _seeded;
 
-        private readonly Dictionary<ObjectID, ObjectID> _weaponForMinion =
-            new Dictionary<ObjectID, ObjectID>();
+        /// A carried weapon that spawns this minion or projectile, and when the answer
+        /// was reached. Misses are kept too - this runs on every hit - but expire, so a
+        /// weapon picked back up is found again.
+        private struct Weapon
+        {
+            public ObjectID Of;
+            public double At;
+        }
+
+        private const double RescanSeconds = 5.0;
+
+        private readonly Dictionary<ObjectID, Weapon> _weaponFor =
+            new Dictionary<ObjectID, Weapon>();
 
         protected override void OnCreate()
         {
@@ -118,7 +129,7 @@ namespace CkQol.Features
 
             if (e.value1 <= 0) return;
 
-            int source = SourceOf(player, e.entity2);
+            int source = SourceOf(player, e.entity2, now);
             if (source == NotOurs) return;
 
             DpsMeter.Record(source, e.value1, now);
@@ -136,24 +147,42 @@ namespace CkQol.Features
         }
 
         /// Walks the attacker up its owner chain the way the server does
-        /// (EntityUtility.GetOwnerInfo, :1517-1540) and names what it finds. A minion or
-        /// pet anywhere in the chain wins over the projectile it fired.
-        private int SourceOf(Entity player, Entity attacker)
+        /// (EntityUtility.GetOwnerInfo, :1517-1540), naming the row from the first thing
+        /// in it that the player carries a weapon for. An explosion owned by a projectile
+        /// owned by the player therefore lands on that projectile's weapon.
+        ///
+        /// A spawned entity's own ObjectDataCD is never the row: it names the prefab the
+        /// weapon spawns, which for the Grubzooka is a mining projectile that shows up as
+        /// a pickaxe. Nothing that fails to resolve is counted - a thrown bomb has no
+        /// weapon behind it, and guessing at the item in hand is worse than a gap.
+        private int SourceOf(Entity player, Entity attacker, double now)
         {
             if (attacker == Entity.Null) return NotOurs;
 
-            Entity origin = attacker;
             Entity at = attacker;
+            ObjectID named = ObjectID.None;
+            bool direct = false;
 
             for (int hop = 0; hop < MaxOwnerHops; hop++)
             {
                 if (at == Entity.Null || !EntityManager.Exists(at)) return NotOurs;
-                if (at == player) break;
 
-                if (EntityManager.HasComponent<MinionCD>(at) ||
-                    EntityManager.HasComponent<PetCD>(at))
+                if (at == player)
                 {
-                    origin = at;
+                    direct = hop == 0;
+                    break;
+                }
+
+                if (named == ObjectID.None && EntityManager.HasComponent<ObjectDataCD>(at))
+                {
+                    bool own = EntityManager.HasComponent<MinionCD>(at) ||
+                               EntityManager.HasComponent<PetCD>(at);
+
+                    named = WeaponFor(
+                        player,
+                        EntityManager.GetComponentData<ObjectDataCD>(at).objectID,
+                        keepUnmatched: own,
+                        now: now);
                 }
 
                 at = EntityManager.HasComponent<OwnerReferenceCD>(at)
@@ -161,27 +190,11 @@ namespace CkQol.Features
                     : Entity.Null;
             }
 
-            return at == player ? NameOf(player, origin) : NotOurs;
-        }
+            if (at != player) return NotOurs;
+            if (named != ObjectID.None) return (int)named;
 
-        /// A minion or pet is its own row; everything else - the player's own swings, and
-        /// the projectiles and explosions they spawn - belongs to the weapon in hand.
-        ///
-        /// A projectile's own ObjectDataCD is not usable as a row: it names whatever
-        /// prefab the weapon spawns, which for the Grubzooka is a mining projectile that
-        /// shows up as a pickaxe.
-        private int NameOf(Entity player, Entity origin)
-        {
-            if (origin != player &&
-                (EntityManager.HasComponent<MinionCD>(origin) ||
-                 EntityManager.HasComponent<PetCD>(origin)) &&
-                EntityManager.HasComponent<ObjectDataCD>(origin))
-            {
-                return (int)WeaponFor(
-                    player, EntityManager.GetComponentData<ObjectDataCD>(origin).objectID);
-            }
-
-            return (int)Equipped(player);
+            // The player's own swing, which is whatever they are holding.
+            return direct ? (int)Equipped(player) : NotOurs;
         }
 
         private ObjectID Equipped(Entity player)
@@ -192,19 +205,30 @@ namespace CkQol.Features
                                 .containedObject.objectData.objectID;
         }
 
-        /// The weapon that summons a minion, so the row shows a staff rather than the
-        /// minion - creature prefabs often carry no icon. Cached, misses included: this
-        /// runs on every minion hit.
-        private ObjectID WeaponFor(Entity player, ObjectID minion)
+        /// The carried weapon that spawns this minion or projectile, so a row shows the
+        /// staff or the gun rather than what it put on the field.
+        ///
+        /// keepUnmatched falls back to the spawned thing itself, for minions: their staff
+        /// may have been put away, and a missing minion row is worse than one whose icon
+        /// the creature prefab does not have. A projectile with no weapon behind it is
+        /// dropped instead.
+        private ObjectID WeaponFor(Entity player, ObjectID spawned, bool keepUnmatched,
+                                   double now)
         {
-            if (_weaponForMinion.TryGetValue(minion, out var known)) return known;
+            ObjectID miss = keepUnmatched ? spawned : ObjectID.None;
 
-            ObjectID found = minion;
+            if (_weaponFor.TryGetValue(spawned, out var known) &&
+                (known.Of != miss || now - known.At < RescanSeconds))
+            {
+                return known.Of;
+            }
+
+            ObjectID found = miss;
 
             var contained = EntityManager.GetBuffer<ContainedObjectsBuffer>(player, true);
             var inventories = EntityManager.GetBuffer<InventoryBuffer>(player, true);
 
-            for (int inv = 0; inv < inventories.Length && found == minion; inv++)
+            for (int inv = 0; inv < inventories.Length && found == miss; inv++)
             {
                 int last = PlayerSlots.End(inventories[inv], contained.Length);
 
@@ -213,20 +237,43 @@ namespace CkQol.Features
                     var data = contained[i].objectData;
                     if (data.objectID == ObjectID.None || data.amount <= 0) continue;
 
-                    // Guarded: PugDatabase.GetComponent throws on a prefab without the
-                    // component, the same trap as GetBuffer (PugDatabase.cs:545).
-                    if (!PugDatabase.HasComponent<SecondaryUseCD>(data)) continue;
-
-                    var use = PugDatabase.GetComponent<SecondaryUseCD>(data);
-                    if (!use.summonsMinion || use.minionToSpawn != minion) continue;
+                    if (!Spawns(data, spawned)) continue;
 
                     found = data.objectID;
                     break;
                 }
             }
 
-            _weaponForMinion[minion] = found;
+            _weaponFor[spawned] = new Weapon { Of = found, At = now };
             return found;
+        }
+
+        /// Whether an item declares this minion or projectile as its own.
+        private static bool Spawns(ObjectDataCD item, ObjectID spawned)
+        {
+            // Guarded: PugDatabase.GetComponent throws on a prefab without the component,
+            // the same trap as GetBuffer (PugDatabase.cs:545).
+            if (PugDatabase.HasComponent<SecondaryUseCD>(item))
+            {
+                var use = PugDatabase.GetComponent<SecondaryUseCD>(item);
+                if (use.summonsMinion && use.minionToSpawn == spawned) return true;
+            }
+
+            if (!PugDatabase.HasComponent<RangeWeaponCD>(item)) return false;
+
+            var weapon = PugDatabase.GetComponent<RangeWeaponCD>(item);
+            if (weapon.projectileID == spawned || weapon.windupProjectileID == spawned)
+            {
+                return true;
+            }
+
+            if (!weapon.spawnRandomProjectile) return false;
+
+            for (int i = 0; i < weapon.randomProjectiles.Length; i++)
+            {
+                if (weapon.randomProjectiles[i] == spawned) return true;
+            }
+            return false;
         }
     }
 }

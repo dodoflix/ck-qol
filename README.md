@@ -163,14 +163,21 @@ buffer, ordered after that system, gives the de-duplicated stream for free — a
 ten deep where the replicated ring it comes from is three.
 
 An attacker is the player's if walking `OwnerReferenceCD.owner` reaches them, which is
-what the server itself does in `EntityUtility.GetOwnerInfo`. A minion or pet anywhere
-in that chain names the row, resolved to the weapon that summons it because creature
-prefabs often carry no icon; otherwise the row is the weapon in hand.
+what the server itself does in `EntityUtility.GetOwnerInfo`. The row is named by the
+first thing in that chain the player carries a weapon for — `SecondaryUseCD.minionToSpawn`
+for a staff, `RangeWeaponCD.projectileID` for a gun — so an explosion owned by a
+projectile owned by the player lands on the gun that fired it. Only the player's own
+swing, where they *are* the attacker, uses the item in hand.
 
-Two things it cannot see:
+Never the spawned entity's own `ObjectDataCD`: that names the prefab the weapon puts on
+the field, and the Grubzooka's is a mining projectile that draws as a pickaxe.
+
+Three things it cannot see:
 
 - **Who applied a condition.** Burning and acid ticks carry no attacker at all, so that
   row counts every tick on nearby enemies, other players' included. It has a setting.
+- **What threw a bomb.** Nothing links an explosive back to an item, so it resolves to
+  no weapon and is left out rather than credited to whatever happens to be in hand.
 - **More than three effects on one entity between snapshots.** The replicated ring
   overwrites, and damage numbers share it with unrelated effects, so wide AoE reads low.
 
