@@ -143,12 +143,15 @@ def plate(glyph):
     """
     size = TILE + 1
     last = TILE
-    img = Image.new("RGB", (size, size), SLOT_FILL)
+    img = Image.new("RGBA", (size, size), SLOT_FILL + (255,))
     d = ImageDraw.Draw(img)
 
     d.rectangle([(0, 0), (last, last)], outline=SLOT_EDGE)
+
+    # Cut to transparent rather than to a colour: any fixed colour is wrong
+    # against a dithered wall, and shows up as four bright specks.
     for x, y in ((0, 0), (last, 0), (0, last), (last, last)):
-        d.point((x, y), fill=STONE)
+        d.point((x, y), fill=(0, 0, 0, 0))
 
     d.rectangle([(1, 1), (last - 1, last - 1)], outline=SLOT_FRAME)
     for x, y in ((1, 1), (last - 1, 1), (1, last - 1), (last - 1, last - 1)):
@@ -236,7 +239,8 @@ def main():
     gap = 7
     left = (SW - (len(glyphs) * size + (len(glyphs) - 1) * gap)) // 2
     for i, glyph in enumerate(glyphs):
-        img.paste(plate(glyph), (left + i * (size + gap), 109))
+        slot = plate(glyph)
+        img.paste(slot, (left + i * (size + gap), 109), slot)
 
     d = ImageDraw.Draw(img)
 
