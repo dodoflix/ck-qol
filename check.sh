@@ -34,7 +34,10 @@ trap 'rm -rf "$WORK"' EXIT
 EOF
   for dll in UnityEngine.CoreModule UnityEngine.PhysicsModule UnityEngine UnityEngine.InputLegacyModule \
              PugMod.SDK.Runtime PugMod.SDK Pug.Other Pug.Base Rewired_Core \
-             Unity.Entities Unity.Mathematics Unity.Collections; do
+             Unity.Entities Unity.Mathematics Unity.Collections Unity.NetCode \
+             Unity.Burst Unity.Transforms Unity.Networking.Transport \
+             Pug.ECS.Components Pug.ECS.Extensions Pug.Objects \
+             Interaction Interaction.Components; do
     [ -f "$MANAGED/$dll.dll" ] &&
       echo "    <Reference Include=\"$dll\"><HintPath>$MANAGED/$dll.dll</HintPath><Private>false</Private></Reference>"
   done

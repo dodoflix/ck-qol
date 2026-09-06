@@ -7,9 +7,13 @@ namespace CkQol.Config
     /// One configurable value, backed by PugMod's config so it persists.
     ///
     /// Deliberately UI-agnostic: the menu inspects the concrete type and builds the
-    /// right widget. Value writes through immediately, so features should read the
-    /// property every time rather than caching it at init - that is what makes the
-    /// menu edits take effect live.
+    /// right widget.
+    ///
+    /// The live value is held here, not read back from PugMod. ModConfigEntry's
+    /// getter re-reads and re-parses the JSON file on every access, so a feature
+    /// polling a setting each frame would be reading from disk sixty times a second.
+    /// The entry is touched once at Bind and then only on write, which also keeps the
+    /// value readable from simulation code.
     public abstract class ModSetting
     {
         public string Key { get; protected set; }
@@ -54,27 +58,33 @@ namespace CkQol.Config
     {
         private readonly bool _default;
         private IConfigEntry<bool> _entry;
-        private bool _fallback;
+
+        // volatile: read from ECS simulation code, written from the menu.
+        private volatile bool _value;
 
         public BoolSetting(string key, string label, bool defaultValue, string tooltip = "")
         {
             Key = key; Label = label; Tooltip = tooltip;
-            _default = defaultValue; _fallback = defaultValue;
+            _default = defaultValue; _value = defaultValue;
         }
 
         public bool Value
         {
-            get => _entry != null ? _entry.Value : _fallback;
+            get => _value;
             set
             {
-                if (Value == value) return;
-                if (_entry != null) _entry.Value = value; else _fallback = value;
+                if (_value == value) return;
+                _value = value;
+                if (_entry != null) _entry.Value = value;
                 RaiseChanged();
             }
         }
 
-        public override void Bind(string mod, string section) =>
+        public override void Bind(string mod, string section)
+        {
             _entry = Register(mod, section, Tooltip, Key, _default);
+            _value = _entry.Value;
+        }
 
         public override void ResetToDefault() => Value = _default;
     }
@@ -83,7 +93,7 @@ namespace CkQol.Config
     {
         private readonly int _default;
         private IConfigEntry<int> _entry;
-        private int _fallback;
+        private volatile int _value;
 
         public int Min { get; }
         public int Max { get; }
@@ -91,23 +101,29 @@ namespace CkQol.Config
         public IntSetting(string key, string label, int defaultValue, int min, int max, string tooltip = "")
         {
             Key = key; Label = label; Tooltip = tooltip;
-            _default = defaultValue; _fallback = defaultValue; Min = min; Max = max;
+            Min = min; Max = max;
+            _default = Mathf.Clamp(defaultValue, min, max);
+            _value = _default;
         }
 
         public int Value
         {
-            get => Mathf.Clamp(_entry != null ? _entry.Value : _fallback, Min, Max);
+            get => _value;
             set
             {
                 int v = Mathf.Clamp(value, Min, Max);
-                if (Value == v) return;
-                if (_entry != null) _entry.Value = v; else _fallback = v;
+                if (_value == v) return;
+                _value = v;
+                if (_entry != null) _entry.Value = v;
                 RaiseChanged();
             }
         }
 
-        public override void Bind(string mod, string section) =>
+        public override void Bind(string mod, string section)
+        {
             _entry = Register(mod, section, Tooltip, Key, _default);
+            _value = Mathf.Clamp(_entry.Value, Min, Max);
+        }
 
         public override void ResetToDefault() => Value = _default;
     }
@@ -116,7 +132,7 @@ namespace CkQol.Config
     {
         private readonly float _default;
         private IConfigEntry<float> _entry;
-        private float _fallback;
+        private volatile float _value;
 
         public float Min { get; }
         public float Max { get; }
@@ -124,23 +140,29 @@ namespace CkQol.Config
         public FloatSetting(string key, string label, float defaultValue, float min, float max, string tooltip = "")
         {
             Key = key; Label = label; Tooltip = tooltip;
-            _default = defaultValue; _fallback = defaultValue; Min = min; Max = max;
+            Min = min; Max = max;
+            _default = Mathf.Clamp(defaultValue, min, max);
+            _value = _default;
         }
 
         public float Value
         {
-            get => Mathf.Clamp(_entry != null ? _entry.Value : _fallback, Min, Max);
+            get => _value;
             set
             {
                 float v = Mathf.Clamp(value, Min, Max);
-                if (Mathf.Approximately(Value, v)) return;
-                if (_entry != null) _entry.Value = v; else _fallback = v;
+                if (Mathf.Approximately(_value, v)) return;
+                _value = v;
+                if (_entry != null) _entry.Value = v;
                 RaiseChanged();
             }
         }
 
-        public override void Bind(string mod, string section) =>
+        public override void Bind(string mod, string section)
+        {
             _entry = Register(mod, section, Tooltip, Key, _default);
+            _value = Mathf.Clamp(_entry.Value, Min, Max);
+        }
 
         public override void ResetToDefault() => Value = _default;
     }
@@ -150,7 +172,7 @@ namespace CkQol.Config
     {
         private readonly string _default;
         private IConfigEntry<string> _entry;
-        private string _fallback;
+        private volatile string _value;
 
         public int MaxLength { get; }
 
@@ -158,30 +180,35 @@ namespace CkQol.Config
                              int maxLength = 32, string tooltip = "")
         {
             Key = key; Label = label; Tooltip = tooltip;
-            _default = defaultValue ?? string.Empty;
-            _fallback = _default;
             MaxLength = Mathf.Max(1, maxLength);
+            _default = Clamp(defaultValue);
+            _value = _default;
         }
 
         public string Value
         {
-            get
-            {
-                string v = (_entry != null ? _entry.Value : _fallback) ?? _default;
-                return v.Length > MaxLength ? v.Substring(0, MaxLength) : v;
-            }
+            get => _value;
             set
             {
-                string v = value ?? string.Empty;
-                if (v.Length > MaxLength) v = v.Substring(0, MaxLength);
-                if (Value == v) return;
-                if (_entry != null) _entry.Value = v; else _fallback = v;
+                string v = Clamp(value);
+                if (_value == v) return;
+                _value = v;
+                if (_entry != null) _entry.Value = v;
                 RaiseChanged();
             }
         }
 
-        public override void Bind(string mod, string section) =>
+        private string Clamp(string text)
+        {
+            text = text ?? string.Empty;
+            return text.Length > MaxLength ? text.Substring(0, MaxLength) : text;
+        }
+
+        public override void Bind(string mod, string section)
+        {
             _entry = Register(mod, section, Tooltip, Key, _default);
+            _value = Clamp(_entry.Value);
+        }
 
         public override void ResetToDefault() => Value = _default;
     }
@@ -195,21 +222,22 @@ namespace CkQol.Config
     {
         private readonly KeyCode _default;
         private IConfigEntry<int> _entry;
-        private KeyCode _fallback;
+        private volatile int _value;
 
         public KeySetting(string key, string label, KeyCode defaultValue, string tooltip = "")
         {
             Key = key; Label = label; Tooltip = tooltip;
-            _default = defaultValue; _fallback = defaultValue;
+            _default = defaultValue; _value = (int)defaultValue;
         }
 
         public KeyCode Value
         {
-            get => _entry != null ? (KeyCode)_entry.Value : _fallback;
+            get => (KeyCode)_value;
             set
             {
-                if (Value == value) return;
-                if (_entry != null) _entry.Value = (int)value; else _fallback = value;
+                if (_value == (int)value) return;
+                _value = (int)value;
+                if (_entry != null) _entry.Value = (int)value;
                 RaiseChanged();
             }
         }
@@ -218,8 +246,7 @@ namespace CkQol.Config
         public string Name =>
             Value == KeyCode.None ? "none" : Rewired.Keyboard.GetKeyName(Value);
 
-        /// True on the frame the key goes down. Features poll this each frame rather
-        /// than caching, so a rebind takes effect immediately.
+        /// True on the frame the key goes down.
         public bool WasPressed => Value != KeyCode.None && Keyboard != null &&
                                   Keyboard.GetKeyDown(Value);
 
@@ -230,8 +257,11 @@ namespace CkQol.Config
         internal static Rewired.Keyboard Keyboard =>
             Rewired.ReInput.isReady ? Rewired.ReInput.controllers.Keyboard : null;
 
-        public override void Bind(string mod, string section) =>
+        public override void Bind(string mod, string section)
+        {
             _entry = Register(mod, section, Tooltip, Key, (int)_default);
+            _value = _entry.Value;
+        }
 
         public override void ResetToDefault() => Value = _default;
     }
@@ -242,35 +272,40 @@ namespace CkQol.Config
     {
         private readonly string _default;
         private IConfigEntry<string> _entry;
-        private string _fallback;
+        private volatile string _value;
 
         public string[] Options { get; }
 
         public ChoiceSetting(string key, string label, string[] options, string defaultValue, string tooltip = "")
         {
             Key = key; Label = label; Tooltip = tooltip;
-            Options = options; _default = defaultValue; _fallback = defaultValue;
+            Options = options; _default = defaultValue; _value = defaultValue;
         }
 
         public string Value
         {
-            get
-            {
-                string v = (_entry != null ? _entry.Value : _fallback) ?? _default;
-                return Array.IndexOf(Options, v) >= 0 ? v : _default;
-            }
+            get => _value;
             set
             {
-                if (Value == value) return;
-                if (_entry != null) _entry.Value = value; else _fallback = value;
+                string v = Valid(value);
+                if (_value == v) return;
+                _value = v;
+                if (_entry != null) _entry.Value = v;
                 RaiseChanged();
             }
         }
 
+        /// Falls back to the default rather than storing something not on the list.
+        private string Valid(string v) =>
+            v != null && Array.IndexOf(Options, v) >= 0 ? v : _default;
+
         public int Index => Mathf.Max(0, Array.IndexOf(Options, Value));
 
-        public override void Bind(string mod, string section) =>
+        public override void Bind(string mod, string section)
+        {
             _entry = Register(mod, section, Tooltip, Key, _default);
+            _value = Valid(_entry.Value);
+        }
 
         public override void ResetToDefault() => Value = _default;
     }
