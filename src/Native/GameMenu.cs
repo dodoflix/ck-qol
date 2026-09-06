@@ -172,29 +172,6 @@ namespace CkQol.Native
             }
         }
 
-        /// Clones a row and keeps its script. Used for sliders, which hold private
-        /// [SerializeField] visual references that a script swap would discard.
-        public static RadicalOptionsMenuOption_Slider CloneSlider(
-            RadicalOptionsMenuOption_Slider donor, Transform parent)
-        {
-            if (donor == null) return null;
-            if (parent == null) parent = donor.transform.parent;
-
-            try
-            {
-                var clone = UnityEngine.Object.Instantiate(donor.gameObject, Staging);
-                clone.name = "CkQol_Slider";
-                clone.transform.SetParent(parent, false);
-                return clone.GetComponent<RadicalOptionsMenuOption_Slider>();
-            }
-            catch (Exception e)
-            {
-                Debug.LogError("[CkQol] failed to clone a slider row");
-                Debug.LogException(e);
-                return null;
-            }
-        }
-
         /// Rows are read from the menu's children, not from menuOptions.
         ///
         /// RadicalMenu only fills menuOptions in Awake, and MenuManager instantiates
@@ -213,16 +190,6 @@ namespace CkQol.Native
             foreach (var option in RowsOf(menu))
             {
                 if (option != null && option.isOnOffToggle && option.valueText != null) return option;
-            }
-            return null;
-        }
-
-        public static RadicalOptionsMenuOption_Slider FindSliderDonor(RadicalMenu menu)
-        {
-            foreach (var option in RowsOf(menu))
-            {
-                var slider = option as RadicalOptionsMenuOption_Slider;
-                if (slider != null) return slider;
             }
             return null;
         }

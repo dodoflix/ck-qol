@@ -45,18 +45,11 @@ namespace CkQol.Native
                 var toggleDonor = FirstToggle(Manager.menu.uiOptionsMenu,
                                               Manager.menu.gameplayOptionsMenu,
                                               Manager.menu.videoOptionsMenu);
-                var sliderDonor = FirstSlider(Manager.menu.audioOptionsMenu,
-                                              Manager.menu.uiOptionsMenu,
-                                              Manager.menu.videoOptionsMenu,
-                                              Manager.menu.gameplayOptionsMenu,
-                                              Manager.menu.graphicsOptionsMenu,
-                                              Manager.menu.performanceOptionsMenu,
-                                              Manager.menu.optionsMenu);
 
                 if (plainDonor != null || _attempts == MaxAttempts)
                 {
                     Debug.Log($"[CkQol] donors: plain={(plainDonor != null)} " +
-                              $"toggle={(toggleDonor != null)} slider={(sliderDonor != null)}");
+                              $"toggle={(toggleDonor != null)}");
                 }
 
                 if (plainDonor == null)
@@ -68,12 +61,12 @@ namespace CkQol.Native
                     return; // rows may not exist yet, try again next frame
                 }
 
-                var rootMenu = BuildMenu(Manager.menu.uiOptionsMenu, "CkQolRootMenu");
+                var rootMenu = BuildMenu(Manager.menu.uiOptionsMenu, "CkQolRootMenu", "QoL settings");
                 if (rootMenu == null) return;
 
                 foreach (var handle in mod.Features)
                 {
-                    var page = BuildFeaturePage(handle, plainDonor, toggleDonor, sliderDonor);
+                    var page = BuildFeaturePage(handle, plainDonor, toggleDonor);
                     if (page == null) continue;
 
                     var row = GameMenu.CloneAndSwap<QolSubmenuOption>(plainDonor, RowParent(rootMenu), "Submenu");
@@ -129,7 +122,7 @@ namespace CkQol.Native
                 ? parent : menu.transform;
         }
 
-        private static RadicalMenu BuildMenu(RadicalMenu template, string name)
+        private static RadicalMenu BuildMenu(RadicalMenu template, string name, string title)
         {
             if (template == null) return null;
 
@@ -147,6 +140,18 @@ namespace CkQol.Native
             var firstRow = clone.GetComponentInChildren<RadicalMenuOption>(true);
             if (firstRow != null) _rowParents[menu] = firstRow.transform.parent;
 
+            // The only PugText not belonging to a row is the page heading, which
+            // otherwise still reads whatever the cloned template was called.
+            foreach (var text in clone.GetComponentsInChildren<PugText>(true))
+            {
+                if (text.GetComponentInParent<RadicalMenuOption>() != null) continue;
+                GameMenu.SetLiteral(text, title);
+                break;
+            }
+
+            var init = clone.AddComponent<QolPageInit>();
+            init.Menu = menu;
+
             foreach (var option in clone.GetComponentsInChildren<RadicalMenuOption>(true))
             {
                 UnityEngine.Object.DestroyImmediate(option.gameObject);
@@ -157,10 +162,9 @@ namespace CkQol.Native
 
         private static RadicalMenu BuildFeaturePage(FeatureHandle handle,
                                                     RadicalMenuOption plainDonor,
-                                                    RadicalMenuOption toggleDonor,
-                                                    RadicalOptionsMenuOption_Slider sliderDonor)
+                                                    RadicalMenuOption toggleDonor)
         {
-            var page = BuildMenu(Manager.menu.uiOptionsMenu, "CkQolPage_" + handle.Name);
+            var page = BuildMenu(Manager.menu.uiOptionsMenu, "CkQolPage_" + handle.Name, handle.Name);
             if (page == null) return null;
 
             if (handle.CanBeDisabled && toggleDonor != null)
@@ -175,7 +179,7 @@ namespace CkQol.Native
 
             foreach (var setting in handle.Settings)
             {
-                AddSettingRow(page, setting, toggleDonor, sliderDonor);
+                AddSettingRow(page, setting, toggleDonor);
             }
 
             AddBack(plainDonor, page);
@@ -185,35 +189,26 @@ namespace CkQol.Native
         }
 
         private static void AddSettingRow(RadicalMenu page, ModSetting setting,
-                                          RadicalMenuOption toggleDonor,
-                                          RadicalOptionsMenuOption_Slider sliderDonor)
+                                          RadicalMenuOption toggleDonor)
         {
+            // Every row shape is cloned from the on/off donor: it is the only stock
+            // row that carries a value column, which is where the value is shown.
+            if (toggleDonor == null) return;
+
             if (setting is BoolSetting b)
             {
-                if (toggleDonor == null) return;
                 var row = GameMenu.CloneAndSwap<QolToggleOption>(toggleDonor, RowParent(page), "Toggle");
                 if (row != null) { row.Label = b.Label; row.Setting = b; }
                 return;
             }
 
-            if (sliderDonor == null) return;
+            var number = GameMenu.CloneAndSwap<QolNumberOption>(toggleDonor, RowParent(page), "Number");
+            if (number == null) return;
 
-            var slider = GameMenu.CloneSlider(sliderDonor, RowParent(page));
-            if (slider == null) return;
-
-            var binding = slider.gameObject.AddComponent<QolSliderBinding>();
-            binding.Slider = slider;
-
-            if (setting is IntSetting i) { binding.Label = i.Label; binding.Int = i; }
-            else if (setting is FloatSetting f) { binding.Label = f.Label; binding.Float = f; }
-            else if (setting is ChoiceSetting c) { binding.Label = c.Label; binding.Choice = c; }
-            else
-            {
-                // Text and key settings have no native row; they stay editable in the
-                // config file rather than being shown as something they are not.
-                UnityEngine.Object.DestroyImmediate(slider.gameObject);
-                Debug.Log($"[CkQol] '{setting.Label}' has no native row, edit it in the config file");
-            }
+            if (setting is IntSetting i) { number.Label = i.Label; number.Int = i; }
+            else if (setting is FloatSetting f) { number.Label = f.Label; number.Float = f; }
+            else if (setting is ChoiceSetting c) { number.Label = c.Label; number.Choice = c; }
+            else UnityEngine.Object.DestroyImmediate(number.gameObject);
         }
 
         private static void LayoutOwnMenu(RadicalMenu menu)
@@ -250,14 +245,5 @@ namespace CkQol.Native
             return null;
         }
 
-        private static RadicalOptionsMenuOption_Slider FirstSlider(params RadicalMenu[] menus)
-        {
-            foreach (var menu in menus)
-            {
-                var found = GameMenu.FindSliderDonor(menu);
-                if (found != null) return found;
-            }
-            return null;
-        }
     }
 }

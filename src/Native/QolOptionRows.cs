@@ -5,14 +5,16 @@ namespace CkQol.Native
 {
     /// Rows follow the shape of the game's own option scripts (see
     /// RadicalOptionsMenuOption_ScreenShake): label in labelText, current value in
-    /// valueText, OnActivated flips it, skim left/right does the same.
+    /// valueText, OnActivated changes it, skim left/right does the same.
 
     /// Opens a submenu.
     public class QolSubmenuOption : RadicalPauseMenuOption
     {
         public RadicalMenu Target;
         public string Label;
-        /// Set when this row was appended to a menu that did not have room for it.
+
+        /// Set when this row was appended to a menu that had no room for it, so the
+        /// menu needs re-laying out once it is open.
         public RadicalMenu Owner;
 
         private bool _layoutPending;
@@ -99,65 +101,94 @@ namespace CkQol.Native
         }
     }
 
-    /// Drives a cloned game slider from one of our settings.
+    /// Numeric or multiple-choice row, stepped with left/right.
     ///
-    /// A companion component rather than a subclass: the slider holds private
-    /// [SerializeField] visual references, so replacing its script would discard
-    /// them and leave a slider that cannot draw itself.
-    public class QolSliderBinding : MonoBehaviour
+    /// Not built on RadicalOptionsMenuOption_Slider: nothing in the stock menus uses
+    /// that class, so there is no instance to clone. The game's own numeric rows
+    /// (volume, vibration) are plain RadicalPauseMenuOption subclasses that step a
+    /// value and write it to valueText, which is what this does.
+    public class QolNumberOption : RadicalPauseMenuOption
     {
-        public RadicalOptionsMenuOption_Slider Slider;
-        public string Label;
         public IntSetting Int;
         public FloatSetting Float;
         public ChoiceSetting Choice;
+        public string Label;
 
-        private void Start()
+        private void Start() => Refresh();
+
+        public override void OnActivated()
         {
-            if (Slider == null) return;
-            GameMenu.SetLabel(Slider, Label);
-
-            if (Int != null)
-            {
-                Slider.SetValueRange(Int.Min, Int.Max);
-                Slider.SetValue(Int.Value);
-            }
-            else if (Float != null)
-            {
-                Slider.SetValueRange(Float.Min, Float.Max);
-                Slider.SetValue(Float.Value);
-            }
-            else if (Choice != null)
-            {
-                Slider.SetValueRange(0f, Mathf.Max(0f, Choice.Options.Length - 1));
-                Slider.SetValue(Choice.Index);
-                GameMenu.SetValue(Slider, Choice.Value);
-            }
-
-            Slider.ValueChanged += OnChanged;
+            base.OnActivated();
+            Step(1);
         }
 
-        private void OnDestroy()
+        public override bool OnSkimRight()
         {
-            if (Slider != null) Slider.ValueChanged -= OnChanged;
+            Step(1);
+            return true;
         }
 
-        private void OnChanged(float value, int step)
+        public override bool OnSkimLeft()
+        {
+            Step(-1);
+            return true;
+        }
+
+        /// Wraps at the ends, so a row can always be changed with one direction and
+        /// activating it cycles - the menu offers no drag interaction.
+        private void Step(int direction)
         {
             if (Int != null)
             {
-                Int.Value = Mathf.RoundToInt(value);
+                int next = Int.Value + direction;
+                if (next > Int.Max) next = Int.Min;
+                else if (next < Int.Min) next = Int.Max;
+                Int.Value = next;
             }
             else if (Float != null)
             {
-                Float.Value = value;
+                // Twenty steps across the range keeps a fine setting usable.
+                float step = (Float.Max - Float.Min) / 20f;
+                float next = Float.Value + step * direction;
+                if (next > Float.Max + 0.0001f) next = Float.Min;
+                else if (next < Float.Min - 0.0001f) next = Float.Max;
+                Float.Value = next;
             }
             else if (Choice != null && Choice.Options.Length > 0)
             {
-                int index = Mathf.Clamp(Mathf.RoundToInt(value), 0, Choice.Options.Length - 1);
-                Choice.Value = Choice.Options[index];
-                GameMenu.SetValue(Slider, Choice.Value);
+                int count = Choice.Options.Length;
+                Choice.Value = Choice.Options[(Choice.Index + direction + count) % count];
             }
+
+            Refresh();
+        }
+
+        private void Refresh()
+        {
+            GameMenu.SetLabel(this, Label);
+
+            string value = Int != null ? Int.Value.ToString()
+                : Float != null ? Float.Value.ToString("0.00")
+                : Choice != null ? Choice.Value
+                : string.Empty;
+            GameMenu.SetValue(this, value);
+        }
+    }
+
+    /// Re-collects a page's rows into menuOptions as it is shown.
+    ///
+    /// RadicalMenu.Activate drives selection and collider enabling from menuOptions,
+    /// and fills that list in Awake only. On a menu built by replacing the
+    /// template's rows the list can be stale, leaving rows that render but cannot be
+    /// selected or clicked. OnEnable runs before Activate's loop, so this is the
+    /// right moment to correct it.
+    public class QolPageInit : MonoBehaviour
+    {
+        public RadicalMenu Menu;
+
+        private void OnEnable()
+        {
+            if (Menu != null) GameMenu.Refresh(Menu);
         }
     }
 }
