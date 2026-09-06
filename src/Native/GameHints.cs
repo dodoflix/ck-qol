@@ -15,17 +15,20 @@ namespace CkQol.Native
         public Func<bool> Visible;
 
         private PugText _text;
-        private GameObject[] _hidden;
+        private PugText[] _otherTexts;
+        private SpriteRenderer[] _sprites;
         private bool _active;
+        private bool _initialized;
         private string _shown;
         private Vector3 _scale;
 
         public override bool isButtonActive => _active;
 
-        internal void Bind(PugText text, GameObject[] hidden)
+        internal void Bind(PugText text, PugText[] otherTexts, SpriteRenderer[] sprites)
         {
             _text = text;
-            _hidden = hidden;
+            _otherTexts = otherTexts;
+            _sprites = sprites;
         }
 
         public override void UpdateVisuals()
@@ -52,14 +55,27 @@ namespace CkQol.Native
                 }
             }
 
-            if (visible != _active)
+            if (visible != _active || !_initialized)
             {
                 if (_text != null) _text.gameObject.SetActive(visible);
-                foreach (var go in _hidden)
+
+                // Renderers are disabled rather than their GameObjects deactivated: the
+                // donor's sprites can be the label's own parent or the hint root, and
+                // deactivating those takes the label down with them.
+                foreach (var sprite in _sprites)
                 {
-                    if (go != null) go.SetActive(false);
+                    if (sprite != null) sprite.enabled = false;
                 }
+
+                // The donor's own wording, blanked rather than hidden for the same
+                // reason.
+                foreach (var text in _otherTexts)
+                {
+                    if (text != null) GameMenu.SetLiteral(text, string.Empty);
+                }
+
                 _active = visible;
+                _initialized = true;
             }
 
             base.LateUpdate();
@@ -121,16 +137,14 @@ namespace CkQol.Native
                     return null;
                 }
 
-                // Everything except the one label: the donor's own text and its key
-                // glyph, neither of which means anything here.
+                // Everything except the one label: the donor's own wording and its
+                // key glyph, neither of which means anything here.
                 var sprites = clone.GetComponentsInChildren<SpriteRenderer>(true);
-                var hidden = new GameObject[texts.Length - 1 + sprites.Length];
-                int at = 0;
-                for (int i = 1; i < texts.Length; i++) hidden[at++] = texts[i].gameObject;
-                foreach (var sprite in sprites) hidden[at++] = sprite.gameObject;
+                var others = new PugText[texts.Length - 1];
+                for (int i = 1; i < texts.Length; i++) others[i - 1] = texts[i];
 
                 var hint = clone.AddComponent<CkQolHint>();
-                hint.Bind(texts[0], hidden);
+                hint.Bind(texts[0], others, sprites);
                 hint.Label = label;
                 hint.Visible = visible;
 
