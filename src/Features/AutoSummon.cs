@@ -17,16 +17,17 @@ namespace CkQol.Features
             "so a change of plan fills in as the old ones run out rather than culling " +
             "them.";
 
-        private const string KeepMix = "Keep mix";
+        private const string Learned = "Learned set";
         private const string Latest = "Latest summon";
         private const string Split = "Split hotbar";
 
         private readonly ChoiceSetting _mode =
-            new ChoiceSetting("Mode", "Mode", new[] { KeepMix, Latest, Split }, KeepMix,
-                              "Keep mix holds the set you summoned by hand. Latest " +
-                              "summon moves everything to the type you summoned last. " +
-                              "Split hotbar divides your cap between the summoning " +
-                              "weapons on your hotbar.");
+            new ChoiceSetting("Mode", "Mode", new[] { Learned, Latest, Split }, Learned,
+                              "Learned set keeps the minions you summoned by hand, " +
+                              "each at the count you had. Latest summon moves " +
+                              "everything to the type you summoned last. Split hotbar " +
+                              "divides your cap between the summoning weapons on your " +
+                              "hotbar.");
 
         private const string Ctrl = "Ctrl";
         private const string Shift = "Shift";
@@ -99,7 +100,7 @@ namespace CkQol.Features
 
             AutoSummonState.Mode = _mode.Value == Latest ? SummonMode.Latest
                                  : _mode.Value == Split ? SummonMode.SplitHotbar
-                                                        : SummonMode.KeepMix;
+                                                        : SummonMode.Learned;
 
             AutoSummonState.ToggleKey = (int)_toggleKey.Value;
             AutoSummonState.ToggleModifier =
@@ -112,7 +113,7 @@ namespace CkQol.Features
         }
     }
 
-    internal enum SummonMode { KeepMix, Latest, SplitHotbar }
+    internal enum SummonMode { Learned, Latest, SplitHotbar }
 
     internal enum Modifier { None, Ctrl, Shift, Alt }
 
@@ -121,7 +122,7 @@ namespace CkQol.Features
     internal static class AutoSummonState
     {
         internal static volatile bool Enabled;
-        internal static volatile SummonMode Mode = SummonMode.KeepMix;
+        internal static volatile SummonMode Mode = SummonMode.Learned;
         internal static volatile int ToggleKey;
         internal static volatile Modifier ToggleModifier = Modifier.Ctrl;
 
