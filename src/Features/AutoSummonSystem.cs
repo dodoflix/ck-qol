@@ -90,6 +90,8 @@ namespace CkQol.Features
 
             if (_slot >= 0)
             {
+                UseButton.Claim(this);
+
                 if (now < _pressUntil)
                 {
                     PlayerSlots.Press(EntityManager, player, _slot,
@@ -99,6 +101,7 @@ namespace CkQol.Features
                 {
                     PlayerSlots.EndPress(EntityManager, player, _slot);
                     _slot = -1;
+                    UseButton.Release(this);
                 }
                 return;
             }
@@ -116,10 +119,6 @@ namespace CkQol.Features
             // (Fishing.cs:255-262).
             var playerState = EntityManager.GetComponentData<PlayerStateCD>(player);
             if (playerState.HasAnyState(PlayerStateEnum.Fishing)) return;
-
-            // Auto Eat drives the same button and gets it first; going hungry matters
-            // more than a minion being a second late.
-            if (AutoEatState.Busy) return;
 
             if (slotCD.secondInteractBlockedUntilRelease) return;
 
@@ -152,6 +151,8 @@ namespace CkQol.Features
 
             int slot = FindWeapon(player, missing);
             if (slot < 0) return;
+
+            if (!UseButton.Claim(this)) return;
 
             UnityEngine.Debug.Log(
                 $"[CkQol/Auto Summon] summoning {missing} ({Alive()}/{cap} alive)");

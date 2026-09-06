@@ -186,11 +186,21 @@ An ECS system reads its settings from a static mirror rather than the feature, s
 it holds no reference and costs one bool test while off. `Apply()` gates on
 `Running`, or editing a setting would restart a disabled feature.
 
-## Known debt
+## Sharing the use button
 
-**Three features drive `SecondInteract_HeldDown`.** Priority is ad-hoc: fishing wins
-by player state, eating beats summoning via `AutoEatState.Busy`. That holds for
-three. A fourth consumer should force a real arbiter.
+Every automatic feature drives the same `SecondInteract` bit, and two writing it in
+one frame is undefined. `UseButton` arbitrates: a feature calls `Claim(this)` before
+touching the input and does nothing that frame if it returns false.
+
+A claim is first come, and held only while it keeps being re-asserted. A holder that
+stops asking — feature switched off, world gone, or simply finished — loses it on the
+next frame, so a claim cannot leak and no cleanup path can forget to release one.
+Holds last as long as a press, so a waiting feature waits a fraction of a second.
+
+Separately, Auto Eat and Auto Summon refuse to act while the player is fishing. That
+is **not** contention: equipping food or a staff leaves the fishing state, because
+the game exits it as soon as the equipped item is not a rod, so the cast would be
+cancelled.
 
 ## Scope
 

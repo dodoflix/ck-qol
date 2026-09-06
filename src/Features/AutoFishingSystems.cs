@@ -146,12 +146,16 @@ namespace CkQol.Features
                 _holdStart = -1d;
             }
 
+            // Claimed even though this one never swaps slots: it still drives the same
+            // bit, and two features writing it in a frame is undefined.
+            bool mayPress = UseButton.Claim(this);
             bool pressing = false;
 
             // Cast distance is castTimer's elapsed ratio when the button comes up,
             // and the rod throws as soon as it is released - so letting go early lands
             // the line at the player's feet.
-            if (fishState.castTimer.isRunning &&
+            if (mayPress &&
+                fishState.castTimer.isRunning &&
                 !fishState.castTimer.IsTimerElapsed(tick) &&
                 fishState.castTimer.GetElapsedSeconds(tick, tps) <
                     AutoFishingState.EffectiveCastingTime)
@@ -159,7 +163,7 @@ namespace CkQol.Features
                 input.SetButtonState(CommandInputButtonStateNames.SecondInteract_HeldDown, true);
                 pressing = true;
             }
-            else if (state.ReelTimer.isRunning)
+            else if (mayPress && state.ReelTimer.isRunning)
             {
                 if (!state.ReelTimer.IsTimerElapsed(tick))
                 {
@@ -171,13 +175,14 @@ namespace CkQol.Features
                     state.ReelTimer.Stop(tick);
                 }
             }
-            else if (fishState.fishIsNibbling && !fishState.isFishingAtOctopusBoss)
+            else if (mayPress && fishState.fishIsNibbling && !fishState.isFishingAtOctopusBoss)
             {
                 StartReel(ref state, ref input, tick, tps);
                 pressing = true;
             }
 
             _pressedLastFrame = pressing;
+            if (!pressing) UseButton.Release(this);
 
             inputData = UnsafeUtility.As<ClientInput, ClientInputData>(ref input);
             EntityManager.SetComponentData(player, inputData);

@@ -71,6 +71,8 @@ namespace CkQol.Features
             // Mid-press: keep the food equipped and the button down until it elapses.
             if (_slot >= 0)
             {
+                UseButton.Claim(this);
+
                 if (now < _pressUntil)
                 {
                     PlayerSlots.Press(EntityManager, player, _slot);
@@ -119,9 +121,10 @@ namespace CkQol.Features
             int slot = FindFood(player, out int restores, out ObjectID picked);
             if (slot < 0) return;
 
+            if (!UseButton.Claim(this)) return;
+
             _slot = slot;
             _pressUntil = now + PressSeconds;
-            AutoEatState.Busy = true;
             PlayerSlots.Press(EntityManager, player, slot);
 
             UnityEngine.Debug.Log(
@@ -131,7 +134,7 @@ namespace CkQol.Features
         private void Release()
         {
             _slot = -1;
-            AutoEatState.Busy = false;
+            UseButton.Release(this);
         }
 
         /// The smallest edible thing in scope, so a big dish is not spent on a small
