@@ -1,14 +1,16 @@
 using System.Collections.Generic;
+using CkQol.Config;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
 using Unity.NetCode;
 using PlayerEquipment;
 using PlayerState;
+using UnityEngine;
 
 namespace CkQol.Features
 {
-    /// Resummons minions to match the mix the player summoned themselves.
+    /// Resummons minions towards a target set, which the mode decides.
     ///
     /// Summoning consumes the equipped slot (SummoningWeaponSlot.cs:21,
     /// MinionHandlerSystem.cs:3789), so the weapon is equipped through
@@ -33,8 +35,15 @@ namespace CkQol.Features
         private int _slot = -1;
         private double _pressUntil;
 
-        /// Live minions per type, rebuilt each scan.
         private readonly Dictionary<ObjectID, int> _census = new Dictionary<ObjectID, int>();
+        private readonly Dictionary<ObjectID, int> _previous = new Dictionary<ObjectID, int>();
+        private readonly Dictionary<ObjectID, int> _target = new Dictionary<ObjectID, int>();
+
+        /// What we summoned last, so the next census does not mistake it for the
+        /// player's own.
+        private ObjectID _justSummoned = ObjectID.None;
+
+        private bool _resetHeld;
 
         protected override void OnCreate()
         {
@@ -89,6 +98,9 @@ namespace CkQol.Features
 
             if (Manager.ui.isAnyInventoryShowing || Manager.menu.IsAnyMenuActive()) return;
 
+            var slotCD = EntityManager.GetComponentData<EquipmentSlotCD>(player);
+            CheckReset(slotCD);
+
             // Equipping a staff mid-cast would cancel the cast: the game leaves the
             // fishing state as soon as the equipped item is not a rod
             // (Fishing.cs:255-262).
@@ -99,7 +111,6 @@ namespace CkQol.Features
             // more than a minion being a second late.
             if (AutoEatState.Busy) return;
 
-            var slotCD = EntityManager.GetComponentData<EquipmentSlotCD>(player);
             if (slotCD.secondInteractBlockedUntilRelease) return;
 
             var inputData = EntityManager.GetComponentData<ClientInputData>(player);
@@ -114,7 +125,17 @@ namespace CkQol.Features
             _nextScan = now + ScanSeconds;
 
             Census(player);
-            Learn(player);
+            Learn();
+
+            int cap = MinionExtensions.GetMaxMinions(
+                EntityManager.GetBuffer<SummarizedConditionEffectsBuffer>(player, true));
+
+            // Never summon past the cap. The game would accept it and cull the minion
+            // with the least life left (MinionHandlerSystem.cs:198-220), so a change of
+            // plan would replace healthy minions instead of filling in as they expire.
+            if (Alive() >= cap) return;
+
+            BuildTarget(player, cap);
 
             ObjectID missing = FirstMissing();
             if (missing == ObjectID.None) return;
@@ -124,10 +145,50 @@ namespace CkQol.Features
 
             _slot = slot;
             _pressUntil = now + PressSeconds;
+            _justSummoned = missing;
             PlayerSlots.Press(EntityManager, player, slot);
 
             UnityEngine.Debug.Log(
-                $"[CkQol/Auto Summon] summoning {missing} ({Alive()}/{AutoSummonState.Wanted.Count} alive)");
+                $"[CkQol/Auto Summon] summoning {missing} ({Alive()}/{cap} alive)");
+        }
+
+        /// Forgets what was learned, so the player can drop a loadout or move to a
+        /// different weapon. Only with a summoning weapon in hand, so the binding does
+        /// not fire during unrelated play.
+        private void CheckReset(EquipmentSlotCD slotCD)
+        {
+            var keyboard = KeySetting.Keyboard;
+            if (keyboard == null) return;
+
+            var key = (KeyCode)AutoSummonState.ResetKey;
+            bool down = key != KeyCode.None &&
+                        slotCD.slotType == EquipmentSlotType.SummoningWeaponSlot &&
+                        ModifierHeld(keyboard) &&
+                        keyboard.GetKey(key);
+
+            // Edge-triggered: the key is held, so without this it would clear every
+            // frame and swallow a summon made straight after.
+            if (down && !_resetHeld)
+            {
+                AutoSummonState.Forget();
+                _previous.Clear();
+                UnityEngine.Debug.Log("[CkQol/Auto Summon] forgot the learned minions");
+            }
+            _resetHeld = down;
+        }
+
+        private static bool ModifierHeld(Rewired.Keyboard keyboard)
+        {
+            switch (AutoSummonState.ResetModifier)
+            {
+                case Modifier.None: return true;
+                case Modifier.Shift:
+                    return keyboard.GetKey(KeyCode.LeftShift) || keyboard.GetKey(KeyCode.RightShift);
+                case Modifier.Alt:
+                    return keyboard.GetKey(KeyCode.LeftAlt) || keyboard.GetKey(KeyCode.RightAlt);
+                default:
+                    return keyboard.GetKey(KeyCode.LeftControl) || keyboard.GetKey(KeyCode.RightControl);
+            }
         }
 
         /// Counts the local player's live minions by type.
@@ -151,42 +212,98 @@ namespace CkQol.Features
             objects.Dispose();
         }
 
-        /// Adopts anything the player summoned themselves.
-        ///
-        /// No input inspection: our own summons never take a type above its wanted
-        /// count, so a census above it can only have come from the player.
-        private void Learn(Entity player)
+        /// Adopts anything the player summoned themselves, by comparing against the
+        /// previous census rather than inspecting input - which would mean edge
+        /// detecting a held button and misreading summons that failed on mana.
+        private void Learn()
         {
-            var wanted = AutoSummonState.Wanted;
-
             foreach (var entry in _census)
             {
-                int have = Count(wanted, entry.Key);
-                for (int i = have; i < entry.Value; i++) wanted.Add(entry.Key);
+                _previous.TryGetValue(entry.Key, out int before);
+                if (entry.Value <= before) continue;
+                if (entry.Key == _justSummoned) continue;
+
+                AutoSummonState.LatestSummon = entry.Key;
+
+                int have = Count(AutoSummonState.Wanted, entry.Key);
+                for (int i = have; i < entry.Value; i++) AutoSummonState.Wanted.Add(entry.Key);
             }
 
-            // Trim oldest first, mirroring the game's own over-cap rule: it culls the
-            // minion with the lowest remaining lifespan (MinionHandlerSystem.cs:198-220).
-            int cap = MinionExtensions.GetMaxMinions(
-                EntityManager.GetBuffer<SummarizedConditionEffectsBuffer>(player, true));
+            _justSummoned = ObjectID.None;
 
-            while (wanted.Count > cap && wanted.Count > 0) wanted.RemoveAt(0);
+            _previous.Clear();
+            foreach (var entry in _census) _previous[entry.Key] = entry.Value;
+        }
+
+        /// How many of each type the current mode wants.
+        private void BuildTarget(Entity player, int cap)
+        {
+            _target.Clear();
+
+            switch (AutoSummonState.Mode)
+            {
+                case SummonMode.Latest:
+                    if (AutoSummonState.LatestSummon != ObjectID.None)
+                    {
+                        _target[AutoSummonState.LatestSummon] = cap;
+                    }
+                    break;
+
+                case SummonMode.SplitHotbar:
+                    SplitHotbar(player, cap);
+                    break;
+
+                default:
+                    // Trim oldest first, mirroring the game's own over-cap rule.
+                    var wanted = AutoSummonState.Wanted;
+                    while (wanted.Count > cap && wanted.Count > 0) wanted.RemoveAt(0);
+
+                    for (int i = 0; i < wanted.Count; i++)
+                    {
+                        _target.TryGetValue(wanted[i], out int count);
+                        _target[wanted[i]] = count + 1;
+                    }
+                    break;
+            }
+        }
+
+        /// Divides the cap between the summoning weapons on the open hotbar row, giving
+        /// the remainder to the leftmost.
+        private void SplitHotbar(Entity player, int cap)
+        {
+            var local = Manager.main != null ? Manager.main.player : null;
+            if (local == null) return;
+
+            var contained = EntityManager.GetBuffer<ContainedObjectsBuffer>(player, true);
+
+            var types = new List<ObjectID>();
+            int last = local.hotbarEndIndex > contained.Length ? contained.Length : local.hotbarEndIndex;
+
+            for (int i = local.hotbarStartIndex; i < last; i++)
+            {
+                if (!PlayerSlots.Usable(i)) continue;
+                ObjectID minion = MinionOf(contained[i].objectData);
+                if (minion != ObjectID.None && !types.Contains(minion)) types.Add(minion);
+            }
+
+            if (types.Count == 0) return;
+
+            int share = cap / types.Count;
+            int spare = cap % types.Count;
+
+            for (int i = 0; i < types.Count; i++)
+            {
+                _target[types[i]] = share + (i < spare ? 1 : 0);
+            }
         }
 
         /// A wanted type that is short, or None.
         private ObjectID FirstMissing()
         {
-            var wanted = AutoSummonState.Wanted;
-            if (wanted.Count == 0) return ObjectID.None;
-
-            // Off, this waits for a wipe rather than topping up.
-            if (!AutoSummonState.TopUp && Alive() > 0) return ObjectID.None;
-
-            for (int i = 0; i < wanted.Count; i++)
+            foreach (var entry in _target)
             {
-                ObjectID id = wanted[i];
-                _census.TryGetValue(id, out int alive);
-                if (alive < Count(wanted, id)) return id;
+                _census.TryGetValue(entry.Key, out int alive);
+                if (alive < entry.Value) return entry.Key;
             }
             return ObjectID.None;
         }
@@ -205,6 +322,19 @@ namespace CkQol.Features
             return count;
         }
 
+        /// The minion an item summons, or None if it is not a summoning weapon.
+        private static ObjectID MinionOf(ObjectDataCD objectData)
+        {
+            if (objectData.objectID == ObjectID.None || objectData.amount <= 0) return ObjectID.None;
+
+            // Guarded: PugDatabase.GetComponent throws on a prefab without the
+            // component, the same trap as GetBuffer (PugDatabase.cs:545).
+            if (!PugDatabase.HasComponent<SecondaryUseCD>(objectData)) return ObjectID.None;
+
+            var use = PugDatabase.GetComponent<SecondaryUseCD>(objectData);
+            return use.summonsMinion ? use.minionToSpawn : ObjectID.None;
+        }
+
         /// A carried weapon that summons this minion, or -1.
         private int FindWeapon(Entity player, ObjectID minion)
         {
@@ -218,16 +348,7 @@ namespace CkQol.Features
                 for (int i = inventories[inv].startIndex; i < last; i++)
                 {
                     if (!PlayerSlots.Usable(i)) continue;
-
-                    var objectData = contained[i].objectData;
-                    if (objectData.objectID == ObjectID.None || objectData.amount <= 0) continue;
-
-                    // Guarded: PugDatabase.GetComponent throws on a prefab without the
-                    // component, the same trap as GetBuffer (PugDatabase.cs:545).
-                    if (!PugDatabase.HasComponent<SecondaryUseCD>(objectData)) continue;
-
-                    var use = PugDatabase.GetComponent<SecondaryUseCD>(objectData);
-                    if (use.summonsMinion && use.minionToSpawn == minion) return i;
+                    if (MinionOf(contained[i].objectData) == minion) return i;
                 }
             }
 

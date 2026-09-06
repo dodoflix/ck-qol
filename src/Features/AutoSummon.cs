@@ -1,33 +1,56 @@
 using System.Collections.Generic;
 using CkQol.Config;
+using UnityEngine;
 
 namespace CkQol.Features
 {
-    /// Keeps the player's own mix of minions topped up. The work is in
-    /// AutoSummonSystem.cs; this owns the settings and mirrors them into
-    /// AutoSummonState.
+    /// Keeps minions summoned. The work is in AutoSummonSystem.cs; this owns the
+    /// settings and mirrors them into AutoSummonState.
     public class AutoSummon : QolFeatureBase
     {
         public override string Name => "Auto Summon";
 
         public override string Description =>
-            "Resummons your minions as they expire or die, keeping the mix you summoned " +
-            "yourself. Summon by hand once to teach it what you want. Forgotten when " +
-            "the feature is switched off, and on quit.";
+            "Resummons your minions as they expire or die. Never summons past your cap, " +
+            "so a change of plan fills in as the old ones run out rather than culling " +
+            "them.";
 
-        private readonly BoolSetting _topUp =
-            new BoolSetting("TopUp", "Keep mix topped up", true,
-                            "Off waits until every minion is gone before summoning.");
+        private const string KeepMix = "Keep mix";
+        private const string Latest = "Latest summon";
+        private const string Split = "Split hotbar";
+
+        private readonly ChoiceSetting _mode =
+            new ChoiceSetting("Mode", "Mode", new[] { KeepMix, Latest, Split }, KeepMix,
+                              "Keep mix holds the set you summoned by hand. Latest " +
+                              "summon moves everything to the type you summoned last. " +
+                              "Split hotbar divides your cap between the summoning " +
+                              "weapons on your hotbar.");
+
+        private const string Ctrl = "Ctrl";
+        private const string Shift = "Shift";
+        private const string Alt = "Alt";
+        private const string NoModifier = "None";
+
+        private readonly KeySetting _resetKey =
+            new KeySetting("ResetKey", "Reset key", KeyCode.R,
+                           "With a summoning weapon in hand, forgets what it learned.");
+
+        private readonly ChoiceSetting _resetModifier =
+            new ChoiceSetting("ResetModifier", "Reset modifier",
+                              new[] { Ctrl, Shift, Alt, NoModifier }, Ctrl,
+                              "Held alongside the reset key.");
 
         public override IEnumerable<ModSetting> GetSettings()
         {
-            yield return _topUp;
+            yield return _mode;
+            yield return _resetKey;
+            yield return _resetModifier;
         }
 
         public override void Init()
         {
             base.Init();
-            Log($"started (topUp={_topUp.Value})");
+            Log($"started (mode={_mode.Value}, reset={_resetModifier.Value}+{_resetKey.Name})");
         }
 
         public override void Shutdown()
@@ -39,26 +62,44 @@ namespace CkQol.Features
         protected override void Apply()
         {
             AutoSummonState.Enabled = Running;
-            AutoSummonState.TopUp = _topUp.Value;
 
-            // Switching the feature off is how a player re-teaches it a loadout without
-            // restarting; there is no separate row for that.
-            if (!Running) AutoSummonState.Wanted.Clear();
+            AutoSummonState.Mode = _mode.Value == Latest ? SummonMode.Latest
+                                 : _mode.Value == Split ? SummonMode.SplitHotbar
+                                                        : SummonMode.KeepMix;
+
+            AutoSummonState.ResetKey = (int)_resetKey.Value;
+            AutoSummonState.ResetModifier =
+                _resetModifier.Value == Shift ? Modifier.Shift :
+                _resetModifier.Value == Alt ? Modifier.Alt :
+                _resetModifier.Value == NoModifier ? Modifier.None : Modifier.Ctrl;
+
+            if (!Running) AutoSummonState.Forget();
         }
     }
+
+    internal enum SummonMode { KeepMix, Latest, SplitHotbar }
+
+    internal enum Modifier { None, Ctrl, Shift, Alt }
 
     /// What the summoning system reads. Separate from the feature so the system holds
     /// no reference to it and costs one bool test while off.
     internal static class AutoSummonState
     {
         internal static volatile bool Enabled;
-        internal static volatile bool TopUp = true;
+        internal static volatile SummonMode Mode = SummonMode.KeepMix;
+        internal static volatile int ResetKey;
+        internal static volatile Modifier ResetModifier = Modifier.Ctrl;
 
-        /// The minions to keep alive, in the order they were learned, trimmed from the
-        /// front to the cap. Session only - never persisted.
-        ///
-        /// Only touched by the summoning system on the main thread, plus a Clear from
-        /// the feature when it stops.
+        /// The mix to keep alive, in the order learned. Session only.
         internal static readonly List<ObjectID> Wanted = new List<ObjectID>();
+
+        /// The type the player summoned most recently, for Latest mode.
+        internal static ObjectID LatestSummon = ObjectID.None;
+
+        internal static void Forget()
+        {
+            Wanted.Clear();
+            LatestSummon = ObjectID.None;
+        }
     }
 }
