@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Draw assets/logo.png.
 
-Everything is drawn at 320x180 and scaled up with NEAREST, so the result is
-actually pixel art rather than a smooth render shrunk down - which is what
-sits next to it on a Core Keeper mod page.
+Two layers on purpose. The ground and the feature glyphs are drawn small and
+scaled up with NEAREST, so they read as pixel art beside the rest of a Core
+Keeper mod page. The type is drawn at full size instead: upscaling antialiased
+glyphs turns their soft edges into grey blocks, which just looks like a low
+resolution image rather than like pixel art.
 """
 
 import os
@@ -11,17 +13,20 @@ import random
 
 from PIL import Image, ImageDraw, ImageFont
 
-W, H = 320, 180
+W, H = 1280, 720
 SCALE = 4
+SW, SH = W // SCALE, H // SCALE
 
 DEEP = (22, 20, 30)
 MID = (36, 32, 50)
 STONE = (58, 52, 76)
-STONE_LIT = (78, 70, 100)
+STONE_LIT = (82, 74, 106)
 GOLD = (242, 206, 122)
 TEAL = (116, 204, 192)
-TEXT = (236, 232, 244)
-DIM = (146, 140, 172)
+TEXT = (238, 234, 246)
+DIM = (150, 144, 176)
+
+TILE = 26
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -48,30 +53,39 @@ def centre(d, text, f, y, fill, spacing=0):
     d.text(((W - (box[2] - box[0])) / 2 - box[0], y), text, font=f, fill=fill)
 
 
-def background(d):
-    for y in range(H):
-        t = y / H
-        # darker at the edges, as though lit from the middle
-        d.line([(0, y), (W, y)], fill=tuple(
-            int(DEEP[i] + (MID[i] - DEEP[i]) * (1 - abs(t - 0.42) * 1.7)) for i in range(3)))
+def ground():
+    """The pixel layer: a lit cave wall with ore in it."""
+    img = Image.new("RGB", (SW, SH), DEEP)
+    d = ImageDraw.Draw(img)
 
-    # scattered ore specks, seeded so the file does not churn between runs
+    for y in range(SH):
+        t = y / SH
+        d.line([(0, y), (SW, y)], fill=tuple(
+            int(DEEP[i] + (MID[i] - DEEP[i]) * (1 - abs(t - 0.42) * 1.7))
+            for i in range(3)))
+
+    # Seeded, so the file does not churn between runs. Kept clear of the type,
+    # where a speck reads as dirt on the image rather than as ore in the wall.
     rng = random.Random(7)
     for _ in range(90):
-        x, y = rng.randrange(W), rng.randrange(H)
-        # keep them off the type, where they read as dirt rather than ore
-        if 30 < y < 158 and 24 < x < 296:
+        x, y = rng.randrange(SW), rng.randrange(SH)
+        if 28 < y < 160 and 20 < x < 300:
             continue
-        colour = rng.choice([STONE, STONE, STONE_LIT, GOLD, TEAL])
         size = rng.choice([1, 1, 1, 2])
-        d.rectangle([(x, y), (x + size - 1, y + size - 1)], fill=colour)
+        d.rectangle([(x, y), (x + size - 1, y + size - 1)],
+                    fill=rng.choice([STONE, STONE, STONE_LIT, GOLD, TEAL]))
+
+    return img.resize((W, H), Image.NEAREST)
 
 
-def tile(d, x, y, size=26):
-    """A stone plate for a glyph to sit on."""
-    d.rectangle([(x, y), (x + size, y + size)], fill=STONE)
-    d.rectangle([(x, y), (x + size, y)], fill=STONE_LIT)
-    d.rectangle([(x, y), (x, y + size)], fill=STONE_LIT)
+def plate(glyph):
+    """One stone tile with a glyph on it, at pixel scale."""
+    img = Image.new("RGB", (TILE + 1, TILE + 1), STONE)
+    d = ImageDraw.Draw(img)
+    d.rectangle([(0, 0), (TILE, 0)], fill=STONE_LIT)
+    d.rectangle([(0, 0), (0, TILE)], fill=STONE_LIT)
+    glyph(d, 0, 0)
+    return img.resize(((TILE + 1) * SCALE, (TILE + 1) * SCALE), Image.NEAREST)
 
 
 def rod(d, x, y):
@@ -108,29 +122,23 @@ def meter(d, x, y):
 
 
 def main():
-    img = Image.new("RGB", (W, H), DEEP)
-    d = ImageDraw.Draw(img)
-
-    background(d)
-
-    centre(d, "CORE KEEPER", font(10, False), 36, DIM, spacing=2)
-    centre(d, "QUALITY OF LIFE", font(25, True), 52, TEXT)
-
-    d.rectangle([(W / 2 - 40, 88), (W / 2 + 40, 89)], fill=GOLD)
+    img = ground()
 
     glyphs = (rod, food, minion, meter)
-    step = 34
-    left = (W - (len(glyphs) * step - 8)) / 2
+    size = (TILE + 1) * SCALE
+    gap = 32
+    left = (W - (len(glyphs) * size + (len(glyphs) - 1) * gap)) // 2
     for i, glyph in enumerate(glyphs):
-        x = int(left + i * step)
-        tile(d, x, 102)
-        glyph(d, x, 102)
+        img.paste(plate(glyph), (left + i * (size + gap), 404))
 
-    centre(d, "fishing   eating   summons   dps", font(10, False), 142, DIM, spacing=1)
+    d = ImageDraw.Draw(img)
+    centre(d, "CORE KEEPER", font(36, False), 132, DIM, spacing=11)
+    centre(d, "QUALITY OF LIFE", font(104, True), 190, TEXT)
+    d.rectangle([(W / 2 - 160, 350), (W / 2 + 160, 355)], fill=GOLD)
+    centre(d, "fishing    eating    summons    dps", font(34, False), 570, DIM)
 
-    img.resize((W * SCALE, H * SCALE), Image.NEAREST).save(
-        os.path.join(HERE, "logo.png"))
-    print(f"wrote logo.png at {W * SCALE}x{H * SCALE}")
+    img.save(os.path.join(HERE, "logo.png"))
+    print(f"wrote logo.png at {W}x{H}")
 
 
 if __name__ == "__main__":
