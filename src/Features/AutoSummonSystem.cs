@@ -45,6 +45,10 @@ namespace CkQol.Features
 
         private bool _resetHeld;
 
+        /// Set by a reset: the next census is recorded without learning from it.
+        /// Minions still alive are not the player asking for them again.
+        private bool _reseed;
+
         protected override void OnCreate()
         {
             _playerQuery = GetEntityQuery(
@@ -171,7 +175,8 @@ namespace CkQol.Features
             if (down && !_resetHeld)
             {
                 AutoSummonState.Forget();
-                _previous.Clear();
+                _justSummoned = ObjectID.None;
+                _reseed = true;
                 Say("Minions forgotten");
                 UnityEngine.Debug.Log("[CkQol/Auto Summon] forgot the learned minions");
             }
@@ -230,6 +235,13 @@ namespace CkQol.Features
         /// detecting a held button and misreading summons that failed on mana.
         private void Learn()
         {
+            if (_reseed)
+            {
+                _reseed = false;
+                Remember();
+                return;
+            }
+
             foreach (var entry in _census)
             {
                 _previous.TryGetValue(entry.Key, out int before);
@@ -243,7 +255,11 @@ namespace CkQol.Features
             }
 
             _justSummoned = ObjectID.None;
+            Remember();
+        }
 
+        private void Remember()
+        {
             _previous.Clear();
             foreach (var entry in _census) _previous[entry.Key] = entry.Value;
         }
