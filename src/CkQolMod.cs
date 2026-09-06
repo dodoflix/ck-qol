@@ -23,6 +23,7 @@ namespace CkQol
             yield return new Features.AutoFishing();
             yield return new Features.AutoEat();
             yield return new Features.AutoSummon();
+            yield return new Features.DpsTracker();
         }
 
         public void EarlyInit() { }

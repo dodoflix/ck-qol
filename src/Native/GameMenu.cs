@@ -17,9 +17,9 @@ namespace CkQol.Native
     {
         private static Transform _staging;
 
-        /// Inactive parent to clone into: an active one runs Awake at once, and the
-        /// stock option scripts write game preferences there.
-        private static Transform Staging
+        /// Inactive parent to clone into: an active one runs the donor's Awake before
+        /// its script is swapped, which for option rows writes game preferences.
+        internal static Transform Staging
         {
             get
             {

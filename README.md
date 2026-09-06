@@ -23,6 +23,10 @@ summoning weapons on your hotbar. Never summons past the cap, so a change of pla
 fills in as minions expire rather than culling healthy ones. Ctrl+R with a
 summoning weapon in hand toggles it for the session.
 
+**DPS Tracker** — your damage per second, under the minion counter, while you are
+dealing any. Detailed mode breaks it down by source, each with its icon. Burning and
+acid get a row of their own, because the game does not record who applied a condition.
+
 ## Install
 
 ```sh
@@ -134,6 +138,41 @@ Every one of these produced an invisible hint:
   hint at zero size forever.
 - Never deactivate a sprite's GameObject to hide it — the donor's sprites can be
   the label's own parent. Disable the renderer.
+
+## The stat panel
+
+`GameStatPanel` stacks icon-and-number rows under the minion counter, cloned from the
+hover window's ingredient row — `HoverRequiredMaterialUIElement` is five public fields
+and no logic, and is already an icon beside a number.
+
+The HUD has no anchoring helper and no screen-corner maths anywhere: every widget
+carries a hardcoded position and rewrites its own y from the one above it
+(`MinionCountUI.cs:51-54`, `PlayerHungerBarUI.cs:83-92`). The panel does the same, and
+has to cope with the minion counter hiding itself entirely at zero minions.
+
+## Reading the damage you deal
+
+The client is told the exact damage of every hit it draws a number for, **and who dealt
+it**: `EffectEventCD.value1` and `entity2` are both `[GhostField]`, replicated to every
+client. Only the damage-number UI throws the attacker away
+(`EffectEventExtensions.cs:224`).
+
+`PlayLocalEffectEventSystem` de-duplicates each replicated event against the client's
+own predicted copy and records what it played in `LocalEffectEventBuffer`. Reading that
+buffer, ordered after that system, gives the de-duplicated stream for free — and it is
+ten deep where the replicated ring it comes from is three.
+
+An attacker is the player's if walking `OwnerReferenceCD.owner` reaches them, which is
+what the server itself does in `EntityUtility.GetOwnerInfo`. A minion or pet anywhere
+in that chain names the row, resolved to the weapon that summons it because creature
+prefabs often carry no icon; otherwise the row is the weapon in hand.
+
+Two things it cannot see:
+
+- **Who applied a condition.** Burning and acid ticks carry no attacker at all, so that
+  row counts every tick on nearby enemies, other players' included. It has a setting.
+- **More than three effects on one entity between snapshots.** The replicated ring
+  overwrites, and damage numbers share it with unrelated effects, so wide AoE reads low.
 
 ## PugMod quirks worked around
 

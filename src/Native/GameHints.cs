@@ -196,7 +196,7 @@ namespace CkQol.Native
 
             try
             {
-                var clone = UnityEngine.Object.Instantiate(donor.gameObject, Staging);
+                var clone = UnityEngine.Object.Instantiate(donor.gameObject, GameMenu.Staging);
                 clone.name = "CkQolHint";
 
                 foreach (var stale in clone.GetComponentsInChildren<IngameButtonHint>(true))
@@ -265,21 +265,5 @@ namespace CkQol.Native
             }
         }
 
-        /// Instantiating into an active parent would run the donor's Awake, which reads
-        /// the equipped item before the script is swapped.
-        private static Transform _staging;
-
-        private static Transform Staging
-        {
-            get
-            {
-                if (_staging != null) return _staging;
-                var go = new GameObject("CkQolHintStaging");
-                go.SetActive(false);
-                UnityEngine.Object.DontDestroyOnLoad(go);
-                _staging = go.transform;
-                return _staging;
-            }
-        }
     }
 }
