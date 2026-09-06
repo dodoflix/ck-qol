@@ -119,10 +119,16 @@ namespace CkQol.Native
         /// whole menu.
         /// debugName is passed in rather than read from typeof(T).Name: that call
         /// compiles to MemberInfo.get_Name, which the security verifier rejects.
+        /// parent defaults to the donor's own parent. Rows live under a container
+        /// inside the menu, not directly under the menu root, and that container
+        /// carries an offset - parenting to the root gave rows the correct local
+        /// position from the layout but the wrong world position, putting them well
+        /// below the visible list.
         public static T CloneAndSwap<T>(RadicalMenuOption donor, Transform parent, string debugName)
             where T : RadicalMenuOption
         {
             if (donor == null) return null;
+            if (parent == null) parent = donor.transform.parent;
 
             try
             {
@@ -172,6 +178,7 @@ namespace CkQol.Native
             RadicalOptionsMenuOption_Slider donor, Transform parent)
         {
             if (donor == null) return null;
+            if (parent == null) parent = donor.transform.parent;
 
             try
             {
@@ -296,7 +303,7 @@ namespace CkQol.Native
         private static readonly Dictionary<RadicalMenu, float> _pitchCache =
             new Dictionary<RadicalMenu, float>();
 
-        public static void LayoutWithGame(RadicalMenu menu, RadicalMenuOption ours = null)
+        public static void LayoutWithGame(RadicalMenu menu)
         {
             if (menu == null) return;
 
@@ -340,42 +347,7 @@ namespace CkQol.Native
             menu.menuEntryVirtualHeight = pitch;
             menu.menuEntryStartPositionY = (top + bottom) * 0.5f - pitch * 0.5f;
 
-            var active = menu.GetAllCurrentlyActiveMenuOptions();
-            bool oursIncluded = ours != null && active.Contains(ours);
             menu.UpdatePosition();
-
-            // The game's layout keeps excluding our row despite it reporting ACTIVE
-            // and being present in menuOptions. Rather than guess at why, place it
-            // against the grid UpdatePosition has just produced: read the real
-            // positions it assigned and continue the sequence by one pitch.
-            if (ours != null && !oursIncluded)
-            {
-                float lowest = float.MaxValue;
-                float x = ours.transform.localPosition.x;
-                float z = ours.transform.localPosition.z;
-                foreach (var row in active)
-                {
-                    if (row == null) continue;
-                    var local = row.transform.localPosition;
-                    if (local.y < lowest)
-                    {
-                        lowest = local.y;
-                        x = local.x;
-                        z = local.z;
-                    }
-                }
-                if (lowest < float.MaxValue)
-                {
-                    ours.transform.localPosition = new Vector3(x, lowest - pitch, z);
-                }
-            }
-
-            Debug.Log($"[CkQol] laid out: rows={ys.Count} positioned={active.Count} " +
-                      $"oursIncluded={oursIncluded} menuOptions={menu.menuOptions.Count} " +
-                      $"override={(menu.autoPositioningOverride != null ? menu.autoPositioningOverride.Count : -1)} " +
-                      $"pitch={pitch} startY={menu.menuEntryStartPositionY} " +
-                      $"oursState={(ours != null ? ours.GetActiveStateInCurrentScene().ToString() : "n/a")} " +
-                      $"oursExtraSpacing={(ours != null ? ours.extraVerticalSpacing : -1f)}");
         }
 
         /// Stacks rows down a menu we built ourselves, reusing the slot positions the

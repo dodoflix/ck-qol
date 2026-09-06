@@ -32,10 +32,7 @@ trap 'rm -rf "$WORK"' EXIT
   </ItemGroup>
   <ItemGroup>
 EOF
-  for dll in UnityEngine.CoreModule UnityEngine.UI UnityEngine.UIModule \
-             UnityEngine.TextRenderingModule UnityEngine.InputLegacyModule \
-             UnityEngine.IMGUIModule Unity.TextMeshPro \
-             UnityEngine.TextCoreFontEngineModule UnityEngine.TextCoreTextEngineModule \
+  for dll in UnityEngine.CoreModule \
              PugMod.SDK.Runtime PugMod.SDK Pug.Other Pug.Base \
              Unity.Entities Unity.Mathematics Unity.Collections; do
     [ -f "$MANAGED/$dll.dll" ] &&

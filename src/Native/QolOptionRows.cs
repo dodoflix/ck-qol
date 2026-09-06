@@ -12,8 +12,6 @@ namespace CkQol.Native
     {
         public RadicalMenu Target;
         public string Label;
-        public bool LogState;
-
         /// Set when this row was appended to a menu that did not have room for it.
         public RadicalMenu Owner;
 
@@ -34,31 +32,7 @@ namespace CkQol.Native
             if (!_layoutPending) return;
             _layoutPending = false;
 
-            if (Owner != null) GameMenu.LayoutWithGame(Owner, this);
-
-            if (!LogState) return;
-            string render = labelText == null ? "no labelText"
-                : $"textLocal={labelText.transform.localPosition} " +
-                  $"textWorld={labelText.transform.position} " +
-                  $"dims={labelText.dimensions.size} text='{labelText.GetText()}'";
-
-            // Compare against a stock row: if ours differs only in Y we are placed
-            // correctly, and anything else points at where it is actually drawing.
-            string reference = "no reference";
-            if (Owner != null)
-            {
-                foreach (var other in Owner.menuOptions)
-                {
-                    if (other == null || other == this || other.labelText == null) continue;
-                    if (!other.gameObject.activeSelf) continue;
-                    reference = $"stock '{other.labelText.GetText()}' " +
-                                $"rowWorld={other.transform.position} " +
-                                $"textWorld={other.labelText.transform.position}";
-                    break;
-                }
-            }
-
-            Debug.Log($"[CkQol] after layout: rowWorld={transform.position} {render} | {reference}");
+            if (Owner != null) GameMenu.LayoutWithGame(Owner);
         }
 
         private void Start()

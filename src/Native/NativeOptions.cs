@@ -55,9 +55,8 @@ namespace CkQol.Native
 
                 if (plainDonor != null || _attempts == MaxAttempts)
                 {
-                    Debug.Log($"[CkQol] donors after {_attempts} attempt(s): " +
-                              $"plain={(plainDonor != null)} toggle={(toggleDonor != null)} " +
-                              $"slider={(sliderDonor != null)}");
+                    Debug.Log($"[CkQol] donors: plain={(plainDonor != null)} " +
+                              $"toggle={(toggleDonor != null)} slider={(sliderDonor != null)}");
                 }
 
                 if (plainDonor == null)
@@ -77,7 +76,7 @@ namespace CkQol.Native
                     var page = BuildFeaturePage(handle, plainDonor, toggleDonor, sliderDonor);
                     if (page == null) continue;
 
-                    var row = GameMenu.CloneAndSwap<QolSubmenuOption>(plainDonor, rootMenu.transform, "Submenu");
+                    var row = GameMenu.CloneAndSwap<QolSubmenuOption>(plainDonor, RowParent(rootMenu), "Submenu");
                     if (row == null) continue;
                     row.Label = handle.Name;
                     row.Target = page;
@@ -87,7 +86,7 @@ namespace CkQol.Native
                 GameMenu.Refresh(rootMenu);
                 LayoutOwnMenu(rootMenu);
 
-                var entry = GameMenu.CloneAndSwap<QolSubmenuOption>(plainDonor, optionsMenu.transform, "Entry");
+                var entry = GameMenu.CloneAndSwap<QolSubmenuOption>(plainDonor, null, "Entry");
                 if (entry == null)
                 {
                     Debug.LogError("[CkQol] could not add the entry to the Options menu");
@@ -95,13 +94,11 @@ namespace CkQol.Native
                 }
                 entry.Label = "QoL settings";
                 entry.Target = rootMenu;
-                entry.LogState = true;
                 GameMenu.Refresh(optionsMenu);
                 entry.Owner = optionsMenu;
 
                 _installed = true;
                 Debug.Log($"[CkQol] added to the game's Options menu after {_attempts} attempt(s)");
-                Report(optionsMenu, entry);
             }
             catch (Exception e)
             {
@@ -109,23 +106,6 @@ namespace CkQol.Native
                 Debug.LogError("[CkQol] failed to install into the Options menu");
                 Debug.LogException(e);
             }
-        }
-
-        /// Dumps which layout list the menu actually uses and whether our row is in
-        /// it. The row was rendering but never getting a slot, and guessing between
-        /// menuOptions and autoPositioningOverride was not converging.
-        private static void Report(RadicalMenu menu, RadicalMenuOption ours)
-        {
-            int overrideCount = menu.autoPositioningOverride != null
-                ? menu.autoPositioningOverride.Count : -1;
-            bool inOptions = menu.menuOptions != null && menu.menuOptions.Contains(ours);
-            bool inOverride = menu.autoPositioningOverride != null &&
-                              menu.autoPositioningOverride.Contains(ours);
-            Debug.Log($"[CkQol] layout: menuOptions={menu.menuOptions?.Count ?? -1} " +
-                      $"(ours in it: {inOptions}), autoPositioningOverride={overrideCount} " +
-                      $"(ours in it: {inOverride}), autoPositioning={menu.autoPositioning}, " +
-                      $"parent={ours.transform.parent?.name}, state={ours.GetActiveStateInCurrentScene()}, " +
-                      $"activeInTitle={ours.activeInTitle}, activeInSP={ours.activeInSPStage}");
         }
 
         /// A fresh page cloned from a stock options page, emptied of its rows, so it
@@ -136,6 +116,18 @@ namespace CkQol.Native
             System.Collections.Generic.List<Vector3>> _slots =
             new System.Collections.Generic.Dictionary<RadicalMenu,
                 System.Collections.Generic.List<Vector3>>();
+
+        /// Container the menu's rows live under. Captured from the template before
+        /// its rows were deleted; falls back to the menu root.
+        private static readonly System.Collections.Generic.Dictionary<RadicalMenu, Transform>
+            _rowParents = new System.Collections.Generic.Dictionary<RadicalMenu, Transform>();
+
+        private static Transform RowParent(RadicalMenu menu)
+        {
+            if (menu == null) return null;
+            return _rowParents.TryGetValue(menu, out var parent) && parent != null
+                ? parent : menu.transform;
+        }
 
         private static RadicalMenu BuildMenu(RadicalMenu template, string name)
         {
@@ -151,6 +143,9 @@ namespace CkQol.Native
             // Record where the template's rows sat before deleting them, so our rows
             // can occupy the same slots and match the game's spacing exactly.
             _slots[menu] = GameMenu.CaptureSlots(menu);
+
+            var firstRow = clone.GetComponentInChildren<RadicalMenuOption>(true);
+            if (firstRow != null) _rowParents[menu] = firstRow.transform.parent;
 
             foreach (var option in clone.GetComponentsInChildren<RadicalMenuOption>(true))
             {
@@ -170,7 +165,7 @@ namespace CkQol.Native
 
             if (handle.CanBeDisabled && toggleDonor != null)
             {
-                var row = GameMenu.CloneAndSwap<QolToggleOption>(toggleDonor, page.transform, "Toggle");
+                var row = GameMenu.CloneAndSwap<QolToggleOption>(toggleDonor, RowParent(page), "Toggle");
                 if (row != null)
                 {
                     row.Label = "Enabled";
@@ -196,14 +191,14 @@ namespace CkQol.Native
             if (setting is BoolSetting b)
             {
                 if (toggleDonor == null) return;
-                var row = GameMenu.CloneAndSwap<QolToggleOption>(toggleDonor, page.transform, "Toggle");
+                var row = GameMenu.CloneAndSwap<QolToggleOption>(toggleDonor, RowParent(page), "Toggle");
                 if (row != null) { row.Label = b.Label; row.Setting = b; }
                 return;
             }
 
             if (sliderDonor == null) return;
 
-            var slider = GameMenu.CloneSlider(sliderDonor, page.transform);
+            var slider = GameMenu.CloneSlider(sliderDonor, RowParent(page));
             if (slider == null) return;
 
             var binding = slider.gameObject.AddComponent<QolSliderBinding>();
@@ -231,7 +226,7 @@ namespace CkQol.Native
 
         private static void AddBack(RadicalMenuOption donor, RadicalMenu menu)
         {
-            var back = GameMenu.CloneAndSwap<QolBackOption>(donor, menu.transform, "Back");
+            var back = GameMenu.CloneAndSwap<QolBackOption>(donor, RowParent(menu), "Back");
             if (back != null) back.Label = "Back";
         }
 

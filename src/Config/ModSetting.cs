@@ -114,33 +114,6 @@ namespace CkQol.Config
             _entry = API.Config.Register(mod, section, Tooltip, Key, _default);
     }
 
-    public class StringSetting : ModSetting
-    {
-        private readonly string _default;
-        private IConfigEntry<string> _entry;
-        private string _fallback;
-
-        public StringSetting(string key, string label, string defaultValue, string tooltip = "")
-        {
-            Key = key; Label = label; Tooltip = tooltip;
-            _default = defaultValue; _fallback = defaultValue;
-        }
-
-        public string Value
-        {
-            get => (_entry != null ? _entry.Value : _fallback) ?? _default;
-            set
-            {
-                if (Value == value) return;
-                if (_entry != null) _entry.Value = value; else _fallback = value;
-                RaiseChanged();
-            }
-        }
-
-        public override void Bind(string mod, string section) =>
-            _entry = API.Config.Register(mod, section, Tooltip, Key, _default);
-    }
-
     /// Pick one of a fixed list. Stored as the option string, not its index, so
     /// reordering the options later cannot silently change anyone's setting.
     public class ChoiceSetting : ModSetting
@@ -176,38 +149,5 @@ namespace CkQol.Config
 
         public override void Bind(string mod, string section) =>
             _entry = API.Config.Register(mod, section, Tooltip, Key, _default);
-    }
-
-    /// A keyboard shortcut. Stored as a KeyCode name so the config file stays readable.
-    public class KeySetting : ModSetting
-    {
-        private readonly KeyCode _default;
-        private IConfigEntry<string> _entry;
-        private string _fallback;
-
-        public KeySetting(string key, string label, KeyCode defaultValue, string tooltip = "")
-        {
-            Key = key; Label = label; Tooltip = tooltip;
-            _default = defaultValue; _fallback = defaultValue.ToString();
-        }
-
-        public KeyCode Value
-        {
-            get
-            {
-                string raw = (_entry != null ? _entry.Value : _fallback) ?? _default.ToString();
-                return Enum.TryParse(raw, true, out KeyCode parsed) ? parsed : _default;
-            }
-            set
-            {
-                if (Value == value) return;
-                string v = value.ToString();
-                if (_entry != null) _entry.Value = v; else _fallback = v;
-                RaiseChanged();
-            }
-        }
-
-        public override void Bind(string mod, string section) =>
-            _entry = API.Config.Register(mod, section, Tooltip, Key, _default.ToString());
     }
 }
