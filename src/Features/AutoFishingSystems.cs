@@ -7,14 +7,11 @@ using PlayerState;
 
 namespace CkQol.Features
 {
-    /// Per-player timers for the automatic fishing.
+    /// Per-player state for the automatic fishing.
     public struct CkQolAutoReelCD : IComponentData
     {
-        /// Holds the hook press down for a moment once it is made.
+        /// Holds the hook press down for Reel hold once it is made.
         public TickTimer ReelTimer;
-
-        /// Counts down Pull delay, between the bite and the hook press.
-        public TickTimer DelayTimer;
     }
 
     /// Fishes for the local player.
@@ -25,7 +22,7 @@ namespace CkQol.Features
     ///
     /// That one button does three different jobs depending on the phase, and this
     /// system drives two of them:
-    ///   charging a throw - held while castTimer runs, and the elapsed ratio at
+    ///   casting          - held while castTimer runs, and the elapsed ratio at
     ///                      release is the cast distance (Fishing.cs:462)
     ///   hooking a fish   - pressed while fishIsNibbling, which lands it
     ///   pulling up empty - pressed with the line out and no bite, which is why the
@@ -69,7 +66,7 @@ namespace CkQol.Features
         private static void StartReel(ref CkQolAutoReelCD state, ref ClientInput input,
                                       NetworkTick tick, uint tps)
         {
-            state.ReelTimer.Start(tick, AutoFishingState.HookHoldSeconds, tps);
+            state.ReelTimer.Start(tick, AutoFishingState.ReelHoldSeconds, tps);
             input.SetButtonState(CommandInputButtonStateNames.SecondInteract_HeldDown, true);
 
             AutoFishingState.RaiseShoalCheck();
@@ -123,8 +120,7 @@ namespace CkQol.Features
             {
                 EntityManager.AddComponentData(player, new CkQolAutoReelCD
                 {
-                    ReelTimer = new TickTimer(0),
-                    DelayTimer = new TickTimer(0)
+                    ReelTimer = new TickTimer(0)
                 });
             }
 
@@ -144,16 +140,8 @@ namespace CkQol.Features
             if (!state.ReelTimer.isRunning && !_pressedLastFrame &&
                 input.IsButtonStateSet(CommandInputButtonStateNames.SecondInteract_HeldDown))
             {
-                // Time it, so Learn throw can throw for as long as the player does.
+                // Time it, so Learn casting charges for as long as the player does.
                 if (_holdStart < 0d && AutoFishingState.LearnEnabled) _holdStart = now;
-
-                // They beat us to it - drop any pending hook press so we do not yank
-                // the line a second time once Pull delay runs out.
-                if (state.DelayTimer.isRunning)
-                {
-                    state.DelayTimer.Stop(tick);
-                    EntityManager.SetComponentData(player, state);
-                }
 
                 _pressedLastFrame = false;
                 inputData = UnsafeUtility.As<ClientInput, ClientInputData>(ref input);
@@ -179,7 +167,7 @@ namespace CkQol.Features
             if (fishState.castTimer.isRunning &&
                 !fishState.castTimer.IsTimerElapsed(tick) &&
                 fishState.castTimer.GetElapsedSeconds(tick, tps) <
-                    AutoFishingState.EffectiveThrowDelay)
+                    AutoFishingState.EffectiveCastingTime)
             {
                 input.SetButtonState(CommandInputButtonStateNames.SecondInteract_HeldDown, true);
                 pressing = true;
@@ -196,33 +184,10 @@ namespace CkQol.Features
                     state.ReelTimer.Stop(tick);
                 }
             }
-            else if (state.DelayTimer.isRunning)
-            {
-                // Waiting out the configured pause. If the fish gets bored first there
-                // is nothing left to reel, so drop it rather than yanking an empty line.
-                if (!fishState.fishIsNibbling)
-                {
-                    state.DelayTimer.Stop(tick);
-                }
-                else if (state.DelayTimer.IsTimerElapsed(tick))
-                {
-                    state.DelayTimer.Stop(tick);
-                    StartReel(ref state, ref input, tick, tps);
-                    pressing = true;
-                }
-            }
             else if (fishState.fishIsNibbling && !fishState.isFishingAtOctopusBoss)
             {
-                float delay = AutoFishingState.PullDelaySeconds;
-                if (delay > 0f)
-                {
-                    state.DelayTimer.Start(tick, delay, tps);
-                }
-                else
-                {
-                    StartReel(ref state, ref input, tick, tps);
-                    pressing = true;
-                }
+                StartReel(ref state, ref input, tick, tps);
+                pressing = true;
             }
 
             _pressedLastFrame = pressing;
