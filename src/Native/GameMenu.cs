@@ -266,6 +266,9 @@ namespace CkQol.Native
         {
             if (menu == null || ours == null) return;
 
+            // Positions in child order. The direction the list runs is derived from
+            // them rather than assumed - this is world-space UI and the sign of "down"
+            // is not something to guess at.
             var ys = new List<float>();
             float x = ours.transform.localPosition.x;
             float z = ours.transform.localPosition.z;
@@ -280,20 +283,31 @@ namespace CkQol.Native
             }
 
             if (ys.Count == 0) return;
-            ys.Sort();
 
-            // Smallest positive gap between rows is the row pitch; duplicates and
-            // any stray row sharing a position are ignored.
+            float first = ys[0];
+            float last = ys[ys.Count - 1];
+
+            var sorted = new List<float>(ys);
+            sorted.Sort();
+
             float pitch = 0f;
-            for (int i = 1; i < ys.Count; i++)
+            for (int i = 1; i < sorted.Count; i++)
             {
-                float gap = ys[i] - ys[i - 1];
+                float gap = sorted[i] - sorted[i - 1];
                 if (gap > 0.0001f && (pitch <= 0f || gap < pitch)) pitch = gap;
             }
             if (pitch <= 0f) pitch = Mathf.Abs(menu.menuEntryVirtualHeight);
             if (pitch <= 0f) pitch = 1f;
 
-            ours.transform.localPosition = new Vector3(x, ys[0] - pitch, z);
+            // Continue past whichever end the list ends on.
+            float y = last <= first ? sorted[0] - pitch : sorted[sorted.Count - 1] + pitch;
+
+            var placed = new Vector3(x, y, z);
+            ours.transform.localPosition = placed;
+
+            Debug.Log($"[CkQol] placed row at {placed} pitch={pitch} firstY={first} lastY={last} " +
+                      $"minY={sorted[0]} maxY={sorted[sorted.Count - 1]} rows={ys.Count} " +
+                      $"world={ours.transform.position} active={ours.gameObject.activeInHierarchy}");
         }
 
         /// Stacks rows down a menu we built ourselves, reusing the slot positions the
