@@ -22,7 +22,8 @@ namespace CkQol.Native
         private IngameButtonHint _sibling;
         private bool _active;
         private bool _initialized;
-        private bool _loggedVisible;
+        private int _reports;
+        private float _nextReport;
         private string _shown;
 
         public override bool isButtonActive => _active;
@@ -49,25 +50,9 @@ namespace CkQol.Native
             bool visible = Visible != null && Visible() &&
                            !Manager.ui.isAnyInventoryShowing && !Manager.ui.isShowingMap;
 
-            if (visible && _text != null)
-            {
-                string label = Label != null ? Label() : string.Empty;
-                if (label != _shown)
-                {
-                    GameMenu.SetLiteral(_text, label);
-                    _shown = label;
-                }
-            }
-
-            if (visible && !_loggedVisible)
-            {
-                _loggedVisible = true;
-                Debug.Log($"[CkQol] hint '{name}' visible, label '{_shown}', " +
-                          $"active={gameObject.activeInHierarchy} scale={transform.localScale} " +
-                          $"sibling={(_sibling != null ? _sibling.transform.localScale.ToString() : "none")} " +
-                          $"local={transform.localPosition} world={transform.position}");
-            }
-
+            // Activation first: PugText releases its glyphs to the pool when disabled
+            // (PugText.cs:307-308), so text rendered into a disabled object is dropped
+            // and comes back blank.
             if (visible != _active || !_initialized)
             {
                 if (_text != null) _text.gameObject.SetActive(visible);
@@ -80,15 +65,36 @@ namespace CkQol.Native
                     if (sprite != null) sprite.enabled = false;
                 }
 
-                // The donor's own wording, blanked rather than hidden for the same
-                // reason.
                 foreach (var text in _otherTexts)
                 {
                     if (text != null) GameMenu.SetLiteral(text, string.Empty);
                 }
 
+                // Re-render on the way back in: the glyphs were freed on the way out.
+                _shown = null;
                 _active = visible;
                 _initialized = true;
+            }
+
+            if (visible && _text != null)
+            {
+                string label = Label != null ? Label() : string.Empty;
+                if (label != _shown)
+                {
+                    GameMenu.SetLiteral(_text, label);
+                    _shown = label;
+                }
+            }
+
+            if (visible && Time.unscaledTime >= _nextReport && _reports < 5)
+            {
+                _reports++;
+                _nextReport = Time.unscaledTime + 2f;
+                Debug.Log($"[CkQol] hint scale={transform.localScale} " +
+                          $"sibling={(_sibling != null ? _sibling.transform.localScale.ToString() : "none")} " +
+                          $"local={transform.localPosition} label='{_shown}' " +
+                          $"glyphs={(_text != null ? _text.glyphs.Count : -1)} " +
+                          $"textActive={(_text != null && _text.gameObject.activeInHierarchy)}");
             }
 
             base.LateUpdate();
