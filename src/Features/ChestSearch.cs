@@ -76,7 +76,6 @@ namespace CkQol.Features
         private readonly List<SearchRow> _rows = new List<SearchRow>();
 
         private ObjectID _wanted = ObjectID.None;
-        private string _wantedName;
         private double _nextScan;
 
         /// Beyond this the panel would run past the inventory it sits beside.
@@ -152,7 +151,6 @@ namespace CkQol.Features
             if (index < 0 || index >= _matches.Count) return;
 
             _wanted = _matches[index].Id;
-            _wantedName = _matches[index].Name;
             _nextScan = 0;
             Rescan();
         }
@@ -160,10 +158,9 @@ namespace CkQol.Features
         private void Clear()
         {
             _wanted = ObjectID.None;
-            _wantedName = null;
             _rows.Clear();
             _hits.Clear();
-            if (_panel != null) _panel.SetRows(_wantedName, _rows);
+            if (_panel != null) _panel.SetRows(_rows);
         }
 
         private void Rescan()
@@ -192,7 +189,7 @@ namespace CkQol.Features
                 });
             }
 
-            if (_panel != null) _panel.SetRows(_wantedName, _rows);
+            if (_panel != null) _panel.SetRows(_rows);
             Point();
         }
 

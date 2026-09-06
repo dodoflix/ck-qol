@@ -19,7 +19,12 @@ namespace CkQol.Native
     /// Manager.input.activeInputField makes MenuManager.HandleTypingInput feed this
     /// Input.inputString, and that runs before any menu check, so it works in the
     /// world and not only in a menu.
-    public class CkQolSearchPanel : MonoBehaviour, InputManager.TextInputInterface
+    /// A UIelement, not a plain MonoBehaviour, and that is load bearing:
+    /// UIMouse.TrySelectNewElement (:837) casts Manager.input.activeInputField to
+    /// UIelement unconditionally. A field that is not one throws there every frame
+    /// the mouse moves, taking the whole of UIMouse's update with it - which reads
+    /// as hovering having died everywhere, not as an error.
+    public class CkQolSearchPanel : UIelement, InputManager.TextInputInterface
     {
         public Func<bool> Visible;
         public Func<string, List<SearchRow>> Suggest;
@@ -33,7 +38,14 @@ namespace CkQol.Native
         private const float FromInventory = 0.6f;
 
         private const int MaxRows = 10;
-        private const int MaxLength = 32;
+        private const int MaxLength = 24;
+
+        /// What fits a row before it runs past the backing panel.
+        private const int RowCharacters = 20;
+
+        /// Wide enough for RowCharacters plus an icon, and no wider - the panel sits
+        /// against the right of the screen.
+        internal const float PanelWidth = 6f;
 
         /// Row index sentinels for the parts that are not suggestions.
         internal const int FocusTarget = -1;
@@ -59,6 +71,9 @@ namespace CkQol.Native
         private PugText _clear;
         private SpriteRenderer _listPanel;
         private SpriteRenderer _window;
+        private SpriteRenderer _picked;
+        private BoxCollider _boxHit;
+        private BoxCollider _clearHit;
 
         private readonly List<Row> _pool = new List<Row>();
         private readonly List<SearchRow> _suggestions = new List<SearchRow>();
@@ -69,16 +84,12 @@ namespace CkQol.Native
         private int _highlight;
         private bool _focused;
         private bool _active;
-        private string _title;
         private string _shownQuery;
-
-        /// Stamped by any of our own clickable parts, so a click anywhere else can
-        /// be told apart from one on the panel.
-        internal int ClickedFrame;
 
         internal void Bind(HoverRequiredMaterialUIElement donor, Transform anchor,
                            PugText query, PugText hint, PugText clear,
-                           SpriteRenderer listPanel, SpriteRenderer window)
+                           SpriteRenderer listPanel, SpriteRenderer window,
+                           SpriteRenderer picked, BoxCollider boxHit, BoxCollider clearHit)
         {
             _donor = donor;
             _anchor = anchor;
@@ -87,23 +98,25 @@ namespace CkQol.Native
             _clear = clear;
             _listPanel = listPanel;
             _window = window;
+            _picked = picked;
+            _boxHit = boxHit;
+            _clearHit = clearHit;
         }
 
         /// Handed the current results by the feature.
-        public void SetRows(string title, List<SearchRow> rows)
+        public void SetRows(List<SearchRow> rows)
         {
-            _title = title;
             _results.Clear();
             if (rows != null) _results.AddRange(rows);
         }
 
-        /// Takes the keyboard, and only that.
+        /// Takes the keyboard, and stops the player's keys reaching the game.
         ///
-        /// No DisableInput, which the chat and sign fields pair with this: it stops
-        /// every player key and with them all UI hovering and clicking, so slots and
-        /// suggestions go dead while typing. It is not needed here either, because
-        /// PlayerController.isMovingBlocked (:735-743) already returns true whenever
-        /// an inventory is showing, and this panel only exists then.
+        /// DisableInput is needed despite the inventory already blocking movement:
+        /// the inventory shortcuts are gated only on the window being open
+        /// (PlayerController.cs:1685-1698), so without it typing an f locks a slot
+        /// and a q quick stacks. It costs clicking, which UIMouse drives from
+        /// UI_INTERACT - so the panel hit tests its own rows instead.
         internal void Focus()
         {
             if (_focused) return;
@@ -111,6 +124,7 @@ namespace CkQol.Native
             _focused = true;
             _caret = _typed.Length;
             Manager.input.SetActiveInputField(this);
+            Manager.input.DisableInput();
         }
 
         private void Blur()
@@ -122,6 +136,7 @@ namespace CkQol.Native
             {
                 Manager.input.SetActiveInputField(null);
             }
+            Manager.input.EnableInput();
         }
 
         internal void ClearQuery()
@@ -130,6 +145,7 @@ namespace CkQol.Native
             _caret = 0;
             _suggestions.Clear();
             _highlight = 0;
+            if (_picked != null) _picked.enabled = false;
             Cleared?.Invoke();
         }
 
@@ -158,8 +174,50 @@ namespace CkQol.Native
             _highlight = (_highlight + by + _suggestions.Count) % _suggestions.Count;
         }
 
-        private void LateUpdate()
+        /// Acts on whichever of our own parts the pointer is over, and says whether
+        /// it found one. World space against the colliders, because the click never
+        /// reaches UIMouse while input is disabled.
+        private bool Hit()
         {
+            var pointer = Manager.ui.mouse != null ? Manager.ui.mouse.pointer : null;
+            if (pointer == null) return false;
+
+            Vector3 at = pointer.position;
+
+            if (_boxHit != null && Covers(_boxHit, at)) return true;
+
+            if (_clearHit != null && _clear != null && _clear.gameObject.activeSelf &&
+                Covers(_clearHit, at))
+            {
+                ClearQuery();
+                return true;
+            }
+
+            for (int i = 0; i < _pool.Count; i++)
+            {
+                var row = _pool[i];
+                if (row.Pick.Index < 0 || !Covers(row.Box, at)) continue;
+
+                Choose(row.Pick.Index);
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool Covers(BoxCollider box, Vector3 at)
+        {
+            if (box == null || box.size == Vector3.zero) return false;
+
+            Bounds bounds = box.bounds;
+            return at.x >= bounds.min.x && at.x <= bounds.max.x &&
+                   at.y >= bounds.min.y && at.y <= bounds.max.y;
+        }
+
+        protected override void LateUpdate()
+        {
+            base.LateUpdate();
+
             bool visible = Visible != null && Visible();
             if (visible != _active) Show(visible);
             if (!visible) return;
@@ -167,11 +225,11 @@ namespace CkQol.Native
             transform.localScale = Manager.ui.CalcGameplayUITargetScaleMultiplier();
             Place();
 
-            // The game only auto-deactivates a real TextInputField on an outside
-            // click (UIMouse.cs:593-595), and this is deliberately not one. Checked
-            // in LateUpdate, so a click UIMouse handled in Update has already
-            // stamped ClickedFrame.
-            if (_focused && Input.GetMouseButtonDown(0) && ClickedFrame != Time.frameCount)
+            // UIMouse only routes clicks it sees through UI_INTERACT, which is off
+            // while typing, so the panel resolves its own. It also has to close
+            // itself on a click elsewhere: the game does that only for a real
+            // TextInputField (UIMouse.cs:593-595), which this deliberately is not.
+            if (_focused && Input.GetMouseButtonDown(0) && !Hit())
             {
                 Blur();
             }
@@ -217,17 +275,7 @@ namespace CkQol.Native
                 return used;
             }
 
-            if (_title != null && used < MaxRows)
-            {
-                var head = RowAt(used);
-                if (head != null)
-                {
-                    head.Pick.Index = FocusTarget;
-                    Draw(head, used, null, _title, string.Empty, false);
-                    used++;
-                }
-            }
-
+            // No heading row: the box above already shows the name that was picked.
             for (int i = 0; i < _results.Count && used < MaxRows; i++, used++)
             {
                 var row = RowAt(used);
@@ -276,6 +324,8 @@ namespace CkQol.Native
                           bool highlighted)
         {
             row.Root.transform.localPosition = new Vector3(0f, -RowStep * index, 0f);
+
+            text = Clip(text);
 
             string shown = text + " " + amount;
             if (row.Shown != shown)
@@ -445,6 +495,12 @@ namespace CkQol.Native
             _typed = Trim(_suggestions[index].Text);
             _caret = _typed.Length;
 
+            if (_picked != null)
+            {
+                _picked.sprite = _suggestions[index].Icon;
+                _picked.enabled = _picked.sprite != null;
+            }
+
             _suggestions.Clear();
             Picked?.Invoke(index);
         }
@@ -530,6 +586,14 @@ namespace CkQol.Native
             if (string.IsNullOrEmpty(text)) return string.Empty;
             return text.Length <= MaxLength ? text : text.Substring(0, MaxLength);
         }
+
+        /// Cut rather than wrapped: PugText only wraps above a maxWidth, and wrapping
+        /// would make a row two lines tall and break the stack's spacing.
+        private static string Clip(string text)
+        {
+            if (string.IsNullOrEmpty(text) || text.Length <= RowCharacters) return text;
+            return text.Substring(0, RowCharacters - 1) + ".";
+        }
     }
 
     /// A clickable part of the panel. Same mechanism as QolStepStrip: a collider
@@ -566,8 +630,6 @@ namespace CkQol.Native
         {
             base.OnLeftClicked(mod1, mod2);
             if (Panel == null) return;
-
-            Panel.ClickedFrame = Time.frameCount;
 
             if (Index >= 0) Panel.Choose(Index);
             else if (Index == CkQolSearchPanel.ClearTarget) Panel.ClearQuery();
@@ -610,9 +672,13 @@ namespace CkQol.Native
 
                 var panel = root.AddComponent<CkQolSearchPanel>();
 
-                // Behind everything else, so it is added first.
-                var listPanel = Backing(root.transform, ui, new Vector3(3f, 0f, 0.2f), 8f, 1f);
-                Backing(root.transform, ui, new Vector3(3f, 1.6f, 0.2f), 8f, 1.3f);
+                // Behind everything else, so these are added first.
+                float width = CkQolSearchPanel.PanelWidth;
+                float middle = width * 0.5f;
+                var listPanel = Backing(root.transform, ui,
+                                        new Vector3(middle, 0f, 0.2f), width, 1f);
+                Backing(root.transform, ui,
+                        new Vector3(middle, 1.6f, 0.2f), width, 1.3f);
 
                 // The donor's own script implements this same interface and would
                 // fight for the active field. Destroying it also takes
@@ -668,18 +734,22 @@ namespace CkQol.Native
 
                 var collider = box.AddComponent<BoxCollider>();
                 collider.isTrigger = true;
-                collider.size = new Vector3(7f, 1f, 0.4f);
-                collider.center = new Vector3(3f, 0f, 0f);
+                collider.size = new Vector3(width - 1f, 1f, 0.4f);
+                collider.center = new Vector3((width - 1f) * 0.5f, 0f, 0f);
 
+                // Room on the left for the picked item's icon.
                 box.transform.SetParent(root.transform, false);
-                box.transform.localPosition = new Vector3(0f, 1.6f, 0f);
+                box.transform.localPosition = new Vector3(1.1f, 1.6f, 0f);
                 box.SetActive(true);
 
+                var picked = Icon(root.transform, donor, new Vector3(0.4f, 1.6f, 0f));
+
                 var clear = Clear(root.transform, layer, panel, query,
-                                  new Vector3(7.4f, 1.6f, 0f));
+                                  new Vector3(width - 0.7f, 1.6f, 0f),
+                                  out BoxCollider clearHit);
 
                 panel.Bind(donor, anchor, query, hint, clear, listPanel,
-                           ui.playerInventoryUI.backgroundSR);
+                           ui.playerInventoryUI.backgroundSR, picked, collider, clearHit);
 
                 Debug.Log("[CkQol] added the search panel to the HUD");
                 return panel;
@@ -719,11 +789,32 @@ namespace CkQol.Native
             return sr;
         }
 
+        /// A lone icon, cloned off a row so it carries the right material and sorting
+        /// order, for whatever the player has picked.
+        private static SpriteRenderer Icon(Transform parent,
+                                           HoverRequiredMaterialUIElement donor, Vector3 at)
+        {
+            if (donor == null || donor.SR == null) return null;
+
+            var clone = UnityEngine.Object.Instantiate(donor.SR.gameObject, GameMenu.Staging);
+            clone.name = "CkQolSearchIcon";
+
+            var sr = clone.GetComponent<SpriteRenderer>();
+            sr.color = Color.white;
+            sr.enabled = false;
+
+            clone.transform.SetParent(parent, false);
+            clone.transform.localPosition = at;
+            clone.SetActive(true);
+            return sr;
+        }
+
         /// The clear button: the query's own text object cloned, so it matches, with
         /// a collider over it.
         private static PugText Clear(Transform parent, int layer, CkQolSearchPanel panel,
-                                     PugText style, Vector3 at)
+                                     PugText style, Vector3 at, out BoxCollider hit)
         {
+            hit = null;
             if (style == null) return null;
 
             var clone = UnityEngine.Object.Instantiate(style.gameObject, GameMenu.Staging);
@@ -742,6 +833,7 @@ namespace CkQol.Native
             box.isTrigger = true;
             box.size = new Vector3(1.2f, 1f, 0.4f);
             box.center = new Vector3(0.5f, 0f, 0f);
+            hit = box;
 
             clone.transform.SetParent(parent, false);
             clone.transform.localPosition = at;
