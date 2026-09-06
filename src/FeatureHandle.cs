@@ -54,6 +54,16 @@ namespace CkQol
             Enabled.Changed += _ => Apply();
         }
 
+        /// Restores every setting on this feature, including the Enabled toggle.
+        public void ResetToDefaults()
+        {
+            Enabled.ResetToDefault();
+            foreach (var setting in Settings)
+            {
+                setting.ResetToDefault();
+            }
+        }
+
         /// Starts or stops the feature to match the Enabled toggle.
         public void Apply()
         {

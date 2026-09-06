@@ -50,6 +50,53 @@ namespace CkQol.Native
         }
     }
 
+    /// Restores every setting on a feature page, after a confirmation.
+    ///
+    /// Uses the game's own confirm dialog rather than a menu of our own, so it looks
+    /// and behaves like the ones the game already shows. Its two option labels are
+    /// the game's localization keys, so they follow the player's language; only the
+    /// question itself is ours, hence localize: false.
+    public class QolResetOption : RadicalPauseMenuOption
+    {
+        public FeatureHandle Feature;
+        public string Label = "Reset to defaults";
+
+        private void Start()
+        {
+            GameMenu.SetLabel(this, Label);
+            GameMenu.ClearValue(this);
+        }
+
+        public override void OnActivated()
+        {
+            base.OnActivated();
+            if (Feature == null) return;
+
+            Manager.menu.centerPopUpText.StartNewDisplaySequence(
+                "Reset " + Feature.Name + " settings to their defaults?",
+                options: new System.Collections.Generic.List<string> { "cancelDialogue", "confirm" },
+                optionsCallback: OnAnswered,
+                localize: false,
+                menuInputCooldown: true,
+                fadeTime: 0f,
+                staticTime: 1.5f,
+                useUnscaledTime: true,
+                textBackgroundAlpha: 1f,
+                minWidth: 10f,
+                backgroundAlpha: 0.95f,
+                textMaxWidth: 18f,
+                pauseGame: true);
+        }
+
+        /// Option 0 is cancel, option 1 is confirm.
+        private void OnAnswered(PopupResponse response)
+        {
+            if (!response.IsConfirm || Feature == null) return;
+            Feature.ResetToDefaults();
+            Debug.Log($"[CkQol] reset '{Feature.Name}' settings to defaults");
+        }
+    }
+
     /// Leaves the current menu. Escape already does this, but a visible row matters
     /// for mouse users who never press it.
     public class QolBackOption : RadicalPauseMenuOption
@@ -75,7 +122,13 @@ namespace CkQol.Native
         public BoolSetting Setting;
         public string Label;
 
-        private void Start() => Refresh();
+        private void Start()
+        {
+            Refresh();
+            // Redraw when the value moves without this row doing it - a reset, or a
+            // feature changing its own setting.
+            if (Setting != null) Setting.Changed += _ => Refresh();
+        }
 
         public override bool IsOn() => Setting != null && Setting.Value;
 
@@ -150,6 +203,9 @@ namespace CkQol.Native
             }
             Refresh();
             if (_segments > 0) QolStepStrip.Build(this, _segments);
+
+            ModSetting bound = Float ?? (Int ?? (ModSetting)Choice);
+            if (bound != null) bound.Changed += _ => Refresh();
         }
 
         /// Clicking the label drops a bar row to its minimum, the way clicking an
@@ -331,7 +387,11 @@ namespace CkQol.Native
         public int MaxCharactersForOnScreenKeyboard =>
             Setting != null ? Setting.MaxLength : 32;
 
-        private void Start() => Refresh();
+        private void Start()
+        {
+            Refresh();
+            if (Setting != null) Setting.Changed += _ => Refresh();
+        }
 
         public override void OnActivated()
         {
@@ -454,7 +514,11 @@ namespace CkQol.Native
         /// runs, so binding cannot start until the frame after.
         private int _listenFrom;
 
-        private void Start() => Refresh();
+        private void Start()
+        {
+            Refresh();
+            if (Setting != null) Setting.Changed += _ => Refresh();
+        }
 
         public override void OnActivated()
         {

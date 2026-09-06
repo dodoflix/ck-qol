@@ -22,6 +22,10 @@ namespace CkQol.Config
         /// Registers with PugMod config under [section]. Called once at load.
         public abstract void Bind(string mod, string section);
 
+        /// Restores the value the setting was constructed with. Raises Changed, so
+        /// menu rows redraw themselves.
+        public abstract void ResetToDefault();
+
         protected void RaiseChanged() => Changed?.Invoke(this);
     }
 
@@ -50,6 +54,8 @@ namespace CkQol.Config
 
         public override void Bind(string mod, string section) =>
             _entry = API.Config.Register(mod, section, Tooltip, Key, _default);
+
+        public override void ResetToDefault() => Value = _default;
     }
 
     public class IntSetting : ModSetting
@@ -81,6 +87,8 @@ namespace CkQol.Config
 
         public override void Bind(string mod, string section) =>
             _entry = API.Config.Register(mod, section, Tooltip, Key, _default);
+
+        public override void ResetToDefault() => Value = _default;
     }
 
     public class FloatSetting : ModSetting
@@ -112,6 +120,8 @@ namespace CkQol.Config
 
         public override void Bind(string mod, string section) =>
             _entry = API.Config.Register(mod, section, Tooltip, Key, _default);
+
+        public override void ResetToDefault() => Value = _default;
     }
 
     /// Free text.
@@ -151,6 +161,8 @@ namespace CkQol.Config
 
         public override void Bind(string mod, string section) =>
             _entry = API.Config.Register(mod, section, Tooltip, Key, _default);
+
+        public override void ResetToDefault() => Value = _default;
     }
 
     /// A rebindable key.
@@ -199,6 +211,8 @@ namespace CkQol.Config
 
         public override void Bind(string mod, string section) =>
             _entry = API.Config.Register(mod, section, Tooltip, Key, (int)_default);
+
+        public override void ResetToDefault() => Value = _default;
     }
 
     /// Pick one of a fixed list. Stored as the option string, not its index, so
@@ -236,5 +250,7 @@ namespace CkQol.Config
 
         public override void Bind(string mod, string section) =>
             _entry = API.Config.Register(mod, section, Tooltip, Key, _default);
+
+        public override void ResetToDefault() => Value = _default;
     }
 }

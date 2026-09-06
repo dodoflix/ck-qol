@@ -183,6 +183,11 @@ namespace CkQol.Native
                 AddSettingRow(page, setting, toggleDonor, barDonor);
             }
 
+            // Feature pages only. The root page owns no settings of its own, so a
+            // reset there would have nothing to act on.
+            var reset = GameMenu.CloneAndSwap<QolResetOption>(plainDonor, RowParent(page), "Reset");
+            if (reset != null) reset.Feature = handle;
+
             AddBack(plainDonor, page);
             GameMenu.Refresh(page);
             LayoutOwnMenu(page);
