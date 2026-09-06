@@ -21,21 +21,19 @@ namespace CkQol.Features
     {
         /// Long enough for the press to reach the server, as with the fishing hold. The
         /// 0.4s eat cooldown (EatableSlot.cs:9) rules out a second bite inside it.
-        private const float PressSeconds = 0.2f;
+        private const double PressSeconds = 0.2;
 
-        /// Walking the inventory is a managed database call per slot, so it happens at
-        /// this rate rather than per frame.
+        /// Walking the inventory costs a database lookup per slot, so it happens at this
+        /// rate rather than per frame.
         private const double ScanSeconds = 0.5;
 
         private EntityQuery _playerQuery;
-        private EntityQuery _networkTimeQuery;
-        private EntityQuery _tickRateQuery;
 
         private double _nextScan;
 
         /// Slot being eaten from while the press is held, or -1.
         private int _slot = -1;
-        private TickTimer _press;
+        private double _pressUntil;
 
         protected override void OnCreate()
         {
@@ -46,9 +44,6 @@ namespace CkQol.Features
                 ComponentType.ReadOnly<GhostOwnerIsLocal>(),
                 ComponentType.ReadOnly<HungerCD>());
 
-            _networkTimeQuery = GetEntityQuery(ComponentType.ReadOnly<NetworkTime>());
-            _tickRateQuery = GetEntityQuery(ComponentType.ReadOnly<ClientServerTickRate>());
-
             RequireForUpdate(_playerQuery);
             base.OnCreate();
             UnityEngine.Debug.Log("[CkQol/Auto Eat] eating system created");
@@ -56,105 +51,82 @@ namespace CkQol.Features
 
         protected override void OnUpdate()
         {
+            Tick();
+            base.OnUpdate();
+        }
+
+        /// Split out so the guards can return plainly rather than each repeating the
+        /// base call.
+        private void Tick()
+        {
             if (!AutoEatState.Enabled || _playerQuery.IsEmpty)
             {
                 _slot = -1;
-                base.OnUpdate();
                 return;
             }
 
             Entity player = _playerQuery.GetSingletonEntity();
-
-            NetworkTick tick = _networkTimeQuery.GetSingleton<NetworkTime>().ServerTick;
-            uint tps = (uint)_tickRateQuery.GetSingleton<ClientServerTickRate>().SimulationTickRate;
-
-            var inputData = EntityManager.GetComponentData<ClientInputData>(player);
-            ClientInput input = UnsafeUtility.As<ClientInputData, ClientInput>(ref inputData);
+            double now = World.Time.ElapsedTime;
 
             // Mid-press: keep the food equipped and the button down until it elapses.
             if (_slot >= 0)
             {
-                if (!_press.IsTimerElapsed(tick))
-                {
-                    input.equippedSlotIndex = (byte)_slot;
-                    input.SetButtonState(CommandInputButtonStateNames.SecondInteract_HeldDown, true);
-                    inputData = UnsafeUtility.As<ClientInput, ClientInputData>(ref input);
-                    EntityManager.SetComponentData(player, inputData);
-                }
-                else
-                {
-                    _slot = -1;
-                }
-
-                base.OnUpdate();
+                if (now < _pressUntil) Press(player, _slot);
+                else _slot = -1;
                 return;
             }
 
-            if (Manager.ui.isAnyInventoryShowing || Manager.menu.IsAnyMenuActive())
-            {
-                base.OnUpdate();
-                return;
-            }
-
+            // Cheapest meaningful gate, and the common case, so nothing above it reads
+            // more than one component.
             var hunger = EntityManager.GetComponentData<HungerCD>(player);
-            if (hunger.hunger >= AutoEatState.Threshold)
-            {
-                base.OnUpdate();
-                return;
-            }
+            if (hunger.hunger >= AutoEatState.Threshold) return;
+
+            if (Manager.ui.isAnyInventoryShowing || Manager.menu.IsAnyMenuActive()) return;
 
             // Auto Fishing drives the same button; both writing it in one frame is
             // undefined, so fishing wins.
             var playerState = EntityManager.GetComponentData<PlayerStateCD>(player);
-            if (playerState.HasAnyState(PlayerStateEnum.Fishing))
-            {
-                base.OnUpdate();
-                return;
-            }
-
-            // Mid-action: swapping the slot now would swing the wrong item, and a slot
-            // change resets equipmentSlotCD (SelectedEquipmentChangeSystem:211-215).
-            if (input.IsButtonStateSet(CommandInputButtonStateNames.Interact_HeldDown) ||
-                input.IsButtonStateSet(CommandInputButtonStateNames.SecondInteract_HeldDown))
-            {
-                base.OnUpdate();
-                return;
-            }
+            if (playerState.HasAnyState(PlayerStateEnum.Fishing)) return;
 
             // EquipmentUpdateSystem:140 would drop the press anyway.
             var slotCD = EntityManager.GetComponentData<EquipmentSlotCD>(player);
-            if (slotCD.secondInteractBlockedUntilRelease)
+            if (slotCD.secondInteractBlockedUntilRelease) return;
+
+            // Mid-action: swapping the slot now would swing the wrong item, and a slot
+            // change resets equipmentSlotCD (SelectedEquipmentChangeSystem:211-215).
+            var inputData = EntityManager.GetComponentData<ClientInputData>(player);
+            ClientInput input = UnsafeUtility.As<ClientInputData, ClientInput>(ref inputData);
+            if (input.IsButtonStateSet(CommandInputButtonStateNames.Interact_HeldDown) ||
+                input.IsButtonStateSet(CommandInputButtonStateNames.SecondInteract_HeldDown))
             {
-                base.OnUpdate();
                 return;
             }
 
-            double now = World.Time.ElapsedTime;
-            if (now < _nextScan)
-            {
-                base.OnUpdate();
-                return;
-            }
+            if (now < _nextScan) return;
             _nextScan = now + ScanSeconds;
 
             int slot = FindFood(player, out int restores, out ObjectID picked);
-            if (slot < 0)
-            {
-                base.OnUpdate();
-                return;
-            }
+            if (slot < 0) return;
 
             _slot = slot;
-            _press.Start(tick, PressSeconds, tps);
+            _pressUntil = now + PressSeconds;
+            Press(player, slot);
+
+            UnityEngine.Debug.Log(
+                $"[CkQol/Auto Eat] eating {picked} (+{restores}) at hunger {hunger.hunger}");
+        }
+
+        /// Equips the slot and holds the use button, for this frame.
+        private void Press(Entity player, int slot)
+        {
+            var inputData = EntityManager.GetComponentData<ClientInputData>(player);
+            ClientInput input = UnsafeUtility.As<ClientInputData, ClientInput>(ref inputData);
 
             input.equippedSlotIndex = (byte)slot;
             input.SetButtonState(CommandInputButtonStateNames.SecondInteract_HeldDown, true);
+
             inputData = UnsafeUtility.As<ClientInput, ClientInputData>(ref input);
             EntityManager.SetComponentData(player, inputData);
-
-            UnityEngine.Debug.Log($"[CkQol/Auto Eat] eating {picked} (+{restores}) at hunger {hunger.hunger}");
-
-            base.OnUpdate();
         }
 
         /// The smallest edible thing in scope, so a big dish is not spent on a small
@@ -199,6 +171,13 @@ namespace CkQol.Features
                     var objectData = contained[i].objectData;
                     if (objectData.objectID == ObjectID.None || objectData.amount <= 0) continue;
 
+                    // First, because it rejects everything inedible in one lookup and
+                    // most of what a player carries is inedible.
+                    if (!PugDatabase.HasComponent<GivesConditionsWhenConsumedBuffer>(objectData))
+                    {
+                        continue;
+                    }
+
                     bool cooked = PugDatabase.HasComponent<CookedFoodCD>(objectData);
                     if (cooked && !AutoEatState.AllowCooked) continue;
 
@@ -218,13 +197,12 @@ namespace CkQol.Features
         }
 
         /// Hunger an item restores, or 0 if it restores none - which is also how
-        /// potions and everything inedible are rejected.
+        /// potions and everything else inedible are rejected.
+        ///
+        /// Caller has already established the buffer exists: PugDatabase.GetBuffer does
+        /// not check that itself (PugDatabase.cs:545), unlike TryGetComponent.
         private static int HungerValue(ObjectDataCD objectData, bool cooked)
         {
-            // PugDatabase.GetBuffer does not check the prefab actually has the buffer
-            // (PugDatabase.cs:545), unlike TryGetComponent - so anything inedible throws.
-            if (!PugDatabase.HasComponent<GivesConditionsWhenConsumedBuffer>(objectData)) return 0;
-
             var conditions = PugDatabase.GetBuffer<GivesConditionsWhenConsumedBuffer>(objectData);
             for (int i = 0; i < conditions.Length; i++)
             {
