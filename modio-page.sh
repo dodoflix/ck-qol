@@ -17,15 +17,18 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 API="https://g-$GAME_ID.modapi.io/v1/games/$GAME_ID/mods"
 
 : "${MODIO_TOKEN:?set MODIO_TOKEN to a write-scoped mod.io access token}"
-VISIBLE="${MODIO_VISIBLE:-0}"
+
+# Unset means "leave it alone" on an update: defaulting it would hide a page
+# that is already published every time the copy is edited.
+VISIBLE="${MODIO_VISIBLE:-}"
 
 SUMMARY="Client-side quality of life: auto fishing, auto eat, auto summon and a DPS tracker. All optional and configurable from the game's own settings menu. Client-side only, so other players do not need it."
 
 if [ -z "${MODIO_MOD_ID:-}" ]; then
-  echo "creating the page (visible=$VISIBLE)"
+  echo "creating the page (visible=${VISIBLE:-0})"
   curl -sS -X POST "$API" \
     -H "Authorization: Bearer $MODIO_TOKEN" -H 'Accept: application/json' \
-    -F "visible=$VISIBLE" \
+    -F "visible=${VISIBLE:-0}" \
     -F 'name=Quality of Life' \
     -F 'name_id=quality-of-life' \
     -F "summary=$SUMMARY" \
@@ -35,10 +38,10 @@ if [ -z "${MODIO_MOD_ID:-}" ]; then
     -o response.json
 else
   # Edit takes urlencoded fields, not multipart; the logo has its own endpoint.
-  echo "updating mod $MODIO_MOD_ID (visible=$VISIBLE)"
+  echo "updating mod $MODIO_MOD_ID (visible=${VISIBLE:-unchanged})"
   curl -sS -X PUT "$API/$MODIO_MOD_ID" \
     -H "Authorization: Bearer $MODIO_TOKEN" -H 'Accept: application/json' \
-    --data-urlencode "visible=$VISIBLE" \
+    ${VISIBLE:+--data-urlencode "visible=$VISIBLE"} \
     --data-urlencode "summary=$SUMMARY" \
     --data-urlencode "description@$REPO/assets/modio-description.html" \
     --data-urlencode 'homepage_url=https://github.com/dodoflix/ck-qol' \
