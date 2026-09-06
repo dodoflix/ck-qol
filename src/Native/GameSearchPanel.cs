@@ -73,8 +73,6 @@ namespace CkQol.Native
             public PugText[] AmountShadows;
             public BoxCollider Box;
             public int Index;
-            public string Shown;
-            public string ShownAmount;
         }
 
         private HoverRequiredMaterialUIElement _donor;
@@ -105,7 +103,6 @@ namespace CkQol.Native
         private int _highlight;
         private bool _focused;
         private bool _active;
-        private string _shownQuery;
         private int _hovered = -1;
 
         internal void Bind(HoverRequiredMaterialUIElement donor, Transform anchor,
@@ -338,12 +335,7 @@ namespace CkQol.Native
                 }
             }
 
-            string shown = typed + (_focused ? "_" : string.Empty);
-            if (shown != _shownQuery)
-            {
-                GameMenu.SetLiteral(_query, shown);
-                _shownQuery = shown;
-            }
+            Write(_query, typed + (_focused ? "_" : string.Empty));
 
             // The donor's hint reads "Label...", and nothing hides it any more: the
             // script that did was destroyed with the rest of the chest field.
@@ -432,21 +424,9 @@ namespace CkQol.Native
             // in step and the list reads as one moving block.
             text = Marquee(text, index);
 
-            if (row.Shown != text)
-            {
-                GameMenu.SetLiteral(row.Text, text);
-                row.Shown = text;
-            }
-
-            // Tracked apart from the name, which changes several times a second as it
-            // scrolls. Re-rendering the count with it made SetLiteral rebuild glyphs
-            // it already had, and the number flickered against its own shadow.
-            if (row.ShownAmount != amount)
-            {
-                GameMenu.SetLiteral(row.Amount, amount);
-                foreach (var shadow in row.AmountShadows) GameMenu.SetLiteral(shadow, amount);
-                row.ShownAmount = amount;
-            }
+            Write(row.Text, text);
+            Write(row.Amount, amount);
+            foreach (var shadow in row.AmountShadows) Write(shadow, amount);
 
             row.Icon.sprite = icon;
             row.Icon.enabled = icon != null;
@@ -464,6 +444,21 @@ namespace CkQol.Native
             row.Box.center = new Vector3(width * 0.5f, 0f, 0f);
         }
 
+        /// Written every frame, unforced, so PugText's own check does the work: it
+        /// early-outs on an unchanged string and leaves the glyphs alone.
+        ///
+        /// GameMenu.SetLiteral forces instead, which a fresh clone needs once to get
+        /// glyphs at all - Build does that - but which here rebuilt a count several
+        /// times a second as the name beside it scrolled, and it flickered against
+        /// its own shadow. Tracking the two separately only desynchronised them.
+        private static void Write(PugText text, string value)
+        {
+            if (text == null) return;
+
+            text.localize = false;
+            text.Render(value ?? string.Empty, rewindEffectAnims: false, force: false);
+        }
+
         private static void Recolour(PugText text, Color tint)
         {
             if (text == null) return;
@@ -477,29 +472,35 @@ namespace CkQol.Native
 
         private void Blank(Row row)
         {
-            if (row == null || row.Shown == string.Empty) return;
+            if (row == null) return;
 
-            GameMenu.SetLiteral(row.Text, string.Empty);
-            GameMenu.SetLiteral(row.Amount, string.Empty);
-            foreach (var shadow in row.AmountShadows) GameMenu.SetLiteral(shadow, string.Empty);
+            Write(row.Text, string.Empty);
+            Write(row.Amount, string.Empty);
+            foreach (var shadow in row.AmountShadows) Write(shadow, string.Empty);
 
             row.Icon.enabled = false;
             row.Index = -1;
             row.Box.size = Vector3.zero;
-            row.Shown = string.Empty;
-            row.ShownAmount = string.Empty;
         }
 
         private void Show(bool visible)
         {
-            // PugText releases its glyphs to the pool when disabled, so everything
-            // has to be rendered again on the way back in.
-            foreach (var row in _pool)
+            // PugText releases its glyphs to the pool when disabled, so a row coming
+            // back needs a forced render to take them again - an unforced one would
+            // early-out on a string it still thinks it is showing.
+            if (visible)
             {
-                row.Shown = null;
-                row.ShownAmount = null;
+                foreach (var row in _pool)
+                {
+                    GameMenu.SetLiteral(row.Text, string.Empty);
+                    GameMenu.SetLiteral(row.Amount, string.Empty);
+                    foreach (var shadow in row.AmountShadows)
+                    {
+                        GameMenu.SetLiteral(shadow, string.Empty);
+                    }
+                }
+                GameMenu.SetLiteral(_query, string.Empty);
             }
-            _shownQuery = null;
 
             for (int i = 0; i < transform.childCount; i++)
             {
