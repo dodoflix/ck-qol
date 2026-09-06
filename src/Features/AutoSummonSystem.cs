@@ -172,9 +172,22 @@ namespace CkQol.Features
             {
                 AutoSummonState.Forget();
                 _previous.Clear();
+                Say("Minions forgotten");
                 UnityEngine.Debug.Log("[CkQol/Auto Summon] forgot the learned minions");
             }
             _resetHeld = down;
+        }
+
+        /// Floats a line over the player, the way the game acknowledges a skill
+        /// increase (PlayerController.SpawnSkillIncreasePopup).
+        private static void Say(string text)
+        {
+            var local = Manager.main != null ? Manager.main.player : null;
+            if (local == null) return;
+
+            Vector3 position = local.RenderPosition + Vector3.up * 0.7f;
+            CombatText.SpawnCombatText(text, CombatText.NumberColor.White, position,
+                                       isDamageNumber: false);
         }
 
         private static bool ModifierHeld(Rewired.Keyboard keyboard)
