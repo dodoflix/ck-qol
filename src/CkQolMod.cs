@@ -8,7 +8,7 @@ using UnityEngine;
 namespace CkQol
 {
     /// Entry point: builds the features, binds their config, installs the pages into
-    /// the game's Options menu and forwards the PugMod lifecycle.
+    /// the game's Settings menu and forwards the PugMod lifecycle.
     public class CkQolMod : IMod
     {
         public const string ModName = "CkQol";
@@ -50,7 +50,7 @@ namespace CkQol
             API.Client.OnWorldDestroyed += OnWorldDestroyed;
 
             Debug.Log($"[{ModName}] loaded with {_features.Count} feature(s), " +
-                      "settings live under Options in the game menu");
+                      "settings live under Settings in the game menu");
         }
 
         public void Shutdown()

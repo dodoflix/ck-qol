@@ -2,7 +2,7 @@
 
 Client-side quality-of-life tweaks, bundled as one PugMod mod.
 
-Settings live in the game's own menu: **Options → QoL settings**.
+Settings live in the game's own menu: **Settings → QoL settings**.
 
 Targets Core Keeper **1.2.1.5** (Unity 6000.0.59f2).
 

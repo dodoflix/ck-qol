@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace CkQol.Native
 {
-    /// Adds the mod's settings to the game's Options menu: one entry opening a list
+    /// Adds the mod's settings to the game's Settings menu: one entry opening a list
     /// of features, each opening a page. Every row is a clone of a real one, so
     /// navigation, sound and fonts come from the game.
     public static class NativeOptions
@@ -53,7 +53,7 @@ namespace CkQol.Native
                 {
                     if (_attempts >= MaxAttempts)
                     {
-                        Debug.LogError("[CkQol] no plain row to clone, cannot add the options entry");
+                        Debug.LogError("[CkQol] no plain row to clone, cannot add the settings entry");
                     }
                     return; // rows may not exist yet, try again next frame
                 }
@@ -80,7 +80,7 @@ namespace CkQol.Native
                 var entry = GameMenu.CloneAndSwap<QolSubmenuOption>(plainDonor, null, "Entry");
                 if (entry == null)
                 {
-                    Debug.LogError("[CkQol] could not add the entry to the Options menu");
+                    Debug.LogError("[CkQol] could not add the entry to the Settings menu");
                     return;
                 }
                 entry.Label = "QoL settings";
@@ -89,12 +89,12 @@ namespace CkQol.Native
                 entry.Owner = optionsMenu;
 
                 _installed = true;
-                Debug.Log($"[CkQol] added to the game's Options menu after {_attempts} attempt(s)");
+                Debug.Log($"[CkQol] added to the game's Settings menu after {_attempts} attempt(s)");
             }
             catch (Exception e)
             {
                 _installed = true; // a throw will not fix itself on the next frame
-                Debug.LogError("[CkQol] failed to install into the Options menu");
+                Debug.LogError("[CkQol] failed to install into the Settings menu");
                 Debug.LogException(e);
             }
         }
