@@ -14,12 +14,18 @@ namespace CkQol.Native
 
         public Func<bool> Visible;
 
+        /// Given the hint's icon renderer, sets a sprite on it or leaves it null.
+        public Action<SpriteRenderer> Icon;
+
         private PugText _text;
         private PugText[] _otherTexts;
         private SpriteRenderer[] _sprites;
 
         /// A stock hint in the same row, whose scale is mirrored.
         private IngameButtonHint _sibling;
+
+        /// The donor's icon renderer, kept for our own sprite.
+        private SpriteRenderer _icon;
         private bool _active;
         private bool _initialized;
         private int _reports;
@@ -29,12 +35,13 @@ namespace CkQol.Native
         public override bool isButtonActive => _active;
 
         internal void Bind(PugText text, PugText[] otherTexts, SpriteRenderer[] sprites,
-                           IngameButtonHint sibling)
+                           IngameButtonHint sibling, SpriteRenderer icon)
         {
             _text = text;
             _otherTexts = otherTexts;
             _sprites = sprites;
             _sibling = sibling;
+            _icon = icon;
         }
 
         public override void UpdateVisuals()
@@ -71,8 +78,9 @@ namespace CkQol.Native
                 // deactivating those takes the label down with them.
                 foreach (var sprite in _sprites)
                 {
-                    if (sprite != null) sprite.enabled = false;
+                    if (sprite != null && sprite != _icon) sprite.enabled = false;
                 }
+                if (_icon != null && !visible) _icon.enabled = false;
 
                 foreach (var text in _otherTexts)
                 {
@@ -83,6 +91,13 @@ namespace CkQol.Native
                 _shown = null;
                 _active = visible;
                 _initialized = true;
+            }
+
+            if (visible && _icon != null)
+            {
+                _icon.sprite = null;
+                Icon?.Invoke(_icon);
+                _icon.enabled = _icon.sprite != null;
             }
 
             if (visible && _text != null)
@@ -169,6 +184,14 @@ namespace CkQol.Native
                 // Everything except the one label: the donor's own wording and its
                 // key glyph, neither of which means anything here.
                 var sprites = clone.GetComponentsInChildren<SpriteRenderer>(true);
+
+                // The donor's own icon, reused for ours. Its sibling Flare is the
+                // light-up animation and stays off.
+                SpriteRenderer icon = null;
+                foreach (var sprite in sprites)
+                {
+                    if (sprite != null && sprite.name == "Icon") { icon = sprite; break; }
+                }
                 var others = new PugText[texts.Length - 1];
                 for (int i = 1; i < texts.Length; i++) others[i - 1] = texts[i];
 
@@ -178,7 +201,7 @@ namespace CkQol.Native
                 foreach (var other in others) other.maxWidth = 0f;
 
                 var hint = clone.AddComponent<CkQolHint>();
-                hint.Bind(texts[0], others, sprites, donor);
+                hint.Bind(texts[0], others, sprites, donor, icon);
                 hint.Label = label;
                 hint.Visible = visible;
 
@@ -189,7 +212,8 @@ namespace CkQol.Native
                 var report = new System.Text.StringBuilder();
                 report.Append("[CkQol] hint donor '").Append(donor.name)
                       .Append("' texts=").Append(texts.Length)
-                      .Append(" sprites=").Append(sprites.Length).Append(" |");
+                      .Append(" sprites=").Append(sprites.Length)
+                      .Append(" icon=").Append(icon != null ? icon.name : "none").Append(" |");
                 foreach (var text in texts) report.Append(" T:").Append(Path(text.transform, clone.transform));
                 foreach (var sprite in sprites) report.Append(" S:").Append(Path(sprite.transform, clone.transform));
                 Debug.Log(report.ToString());

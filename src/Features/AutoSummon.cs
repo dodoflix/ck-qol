@@ -83,6 +83,7 @@ namespace CkQol.Features
         {
             if (_hint != null || Manager.main == null || Manager.main.player == null) return;
             _hint = GameHints.Install(HintLabel, HintVisible);
+            if (_hint != null) _hint.Icon = HintIcon;
         }
 
         private string HintLabel()
@@ -91,6 +92,35 @@ namespace CkQol.Features
                 ? _toggleKey.Name
                 : $"{AutoSummonState.ToggleModifier}+{_toggleKey.Name}";
             return $"{key} Summon {(AutoSummonState.Armed ? "on" : "off")}";
+        }
+
+        /// The equipped weapon's own icon, the way the secondary-use hint shows the
+        /// held item (UseWeaponSecondaryButton.CheckAndUpdateSprite).
+        private void HintIcon(SpriteRenderer renderer)
+        {
+            var player = Manager.main != null ? Manager.main.player : null;
+            var slot = player != null ? player.GetEquippedSlot() : null;
+            if (slot == null) return;
+
+            var objectData = slot.objectData;
+            if (objectData.objectID == ObjectID.None) return;
+
+            var over = Manager.ui.itemOverridesTable.GetIconOverride(objectData, getSmallIcon: false);
+            if (over != null)
+            {
+                renderer.sprite = over;
+            }
+            else
+            {
+                var info = PugDatabase.GetObjectInfo(objectData.objectID, objectData.variation);
+                if (info == null) return;
+                renderer.sprite = info.icon;
+            }
+
+            if (renderer.sprite != null)
+            {
+                Manager.ui.ApplyAnyIconGradientMap(slot.containedObject, renderer);
+            }
         }
 
         /// Only with a summoning weapon in hand, which is also when the binding works.
