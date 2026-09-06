@@ -76,6 +76,7 @@ namespace CkQol.Native
                     if (row == null) continue;
                     row.Label = handle.Name;
                     row.Target = page;
+                    row.Tooltip = handle.Description;
                 }
 
                 AddBack(plainDonor, rootMenu);

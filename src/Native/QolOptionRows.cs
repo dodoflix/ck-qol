@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using CkQol.Config;
 using UnityEngine;
 
@@ -12,6 +13,9 @@ namespace CkQol.Native
     {
         public RadicalMenu Target;
         public string Label;
+
+        /// Shown on hover. On the root page this is the feature's description.
+        public string Tooltip;
 
         /// Set when this row was appended to a menu that had no room for it, so the
         /// menu needs re-laying out once it is open.
@@ -48,6 +52,9 @@ namespace CkQol.Native
             base.OnActivated();
             if (Target != null) Manager.menu.PushMenu(Target);
         }
+
+        public override List<TextAndFormatFields> GetHoverDescription() =>
+            GameMenu.Hover(Tooltip);
     }
 
     /// Restores every setting on a feature page, after a confirmation.
@@ -87,6 +94,11 @@ namespace CkQol.Native
                 textMaxWidth: 18f,
                 pauseGame: true);
         }
+
+        public override List<TextAndFormatFields> GetHoverDescription() =>
+            GameMenu.Hover(Feature != null
+                ? "Restores every setting on this page, including whether the feature is enabled."
+                : null);
 
         /// Option 0 is cancel, option 1 is confirm.
         private void OnAnswered(PopupResponse response)
@@ -131,6 +143,9 @@ namespace CkQol.Native
         }
 
         public override bool IsOn() => Setting != null && Setting.Value;
+
+        public override List<TextAndFormatFields> GetHoverDescription() =>
+            GameMenu.Hover(Setting != null ? Setting.Tooltip : null);
 
         public override void OnActivated()
         {
@@ -204,9 +219,15 @@ namespace CkQol.Native
             Refresh();
             if (_segments > 0) QolStepStrip.Build(this, _segments);
 
-            ModSetting bound = Float ?? (Int ?? (ModSetting)Choice);
+            ModSetting bound = Bound;
             if (bound != null) bound.Changed += _ => Refresh();
         }
+
+        /// Whichever of the three a row was built for.
+        private ModSetting Bound => Float ?? (Int ?? (ModSetting)Choice);
+
+        public override List<TextAndFormatFields> GetHoverDescription() =>
+            GameMenu.Hover(Bound != null ? Bound.Tooltip : null);
 
         /// Clicking the label drops a bar row to its minimum, the way clicking an
         /// audio row's label mutes it. Rows without a bar have no such anchor, so
@@ -466,6 +487,9 @@ namespace CkQol.Native
 
         public bool IsHidden() => false;
 
+        public override List<TextAndFormatFields> GetHoverDescription() =>
+            GameMenu.Hover(Setting != null ? Setting.Tooltip : null);
+
         /// commit is false when the player backed out with escape.
         public void Deactivate(bool commit)
         {
@@ -562,6 +586,9 @@ namespace CkQol.Native
             _listening = false;
             Refresh();
         }
+
+        public override List<TextAndFormatFields> GetHoverDescription() =>
+            GameMenu.Hover(Setting != null ? Setting.Tooltip : null);
 
         private void Refresh()
         {

@@ -396,6 +396,22 @@ namespace CkQol.Native
             target.Render(text ?? string.Empty, rewindEffectAnims: true, force: true);
         }
 
+        /// A hover description for a row, or null for no tooltip.
+        ///
+        /// UIMouse.UpdateHoverText already renders these for whatever the mouse has
+        /// selected, menus included - stock rows simply never return one.
+        public static List<TextAndFormatFields> Hover(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return null;
+
+            // dontLocalize: the render loop drops any entry that is not marked so and
+            // has no translation, and these strings are literals rather than keys.
+            return new List<TextAndFormatFields>
+            {
+                new TextAndFormatFields { text = text, dontLocalize = true }
+            };
+        }
+
         public static void SetLabel(RadicalMenuOption option, string text)
         {
             if (option != null) SetLiteral(option.labelText, text);
