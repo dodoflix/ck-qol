@@ -345,6 +345,29 @@ namespace CkQol.Native
             target.Render(text ?? string.Empty, rewindEffectAnims: true, force: true);
         }
 
+        /// Makes a cloned text survive being hidden and shown.
+        ///
+        /// Three defaults on the game's own prefabs conspire against a clone that gets
+        /// toggled. renderOnStart is false, so Start never sets startCalled and OnEnable
+        /// never re-renders (PugText.cs:287); freeResourcesOnDisable is false, so hiding
+        /// keeps the glyphs on screen rather than returning them to the pool (:305). A
+        /// blank written meanwhile still records textString, so HasCorrectGlyphs then
+        /// reports a match against glyphs nobody drew (:666) and every later write
+        /// early-outs - which is the donor's own ingredient row, stuck on our panel with
+        /// no way to clear it.
+        ///
+        /// Turning all three on hands the lifecycle back to PugText: glyphs go on hide
+        /// and are drawn again from textString on show. keepEnabledOnStart because Start
+        /// deactivates the object outright otherwise (:262).
+        public static void KeepRendered(PugText text)
+        {
+            if (text == null) return;
+
+            text.renderOnStart = true;
+            text.keepEnabledOnStart = true;
+            text.freeResourcesOnDisable = true;
+        }
+
         /// Colours a rendered line.
         ///
         /// Every caller does this every frame rather than once on change: Render

@@ -469,9 +469,18 @@ namespace CkQol.Native
 
         private void Show(bool visible)
         {
-            // PugText releases its glyphs to the pool when disabled, so a row coming
-            // back needs a forced render to take them again - an unforced one would
-            // early-out on a string it still thinks it is showing.
+            for (int i = 0; i < transform.childCount; i++)
+            {
+                transform.GetChild(i).gameObject.SetActive(visible);
+            }
+
+            // Only now the rows are active, and forced. PugText releases its glyphs
+            // when disabled, so a row coming back needs a forced render to take them
+            // again - but Render sets textString before it draws (PugText.cs:659), so
+            // blanking while still disabled records the empty string against glyphs
+            // that were never redrawn. Every later unforced write of "" then early-outs
+            // on HasCorrectGlyphs (:666) and the donor's own words stay on screen for
+            // good. This is the stuck ingredient row, for the third time.
             if (visible)
             {
                 foreach (var row in _pool)
@@ -480,11 +489,6 @@ namespace CkQol.Native
                     GameMenu.SetLiteral(row.Amount, string.Empty);
                 }
                 GameMenu.SetLiteral(_query, string.Empty);
-            }
-
-            for (int i = 0; i < transform.childCount; i++)
-            {
-                transform.GetChild(i).gameObject.SetActive(visible);
             }
 
             if (!visible) Blur();
@@ -523,6 +527,7 @@ namespace CkQol.Native
             foreach (var text in clone.GetComponentsInChildren<PugText>(true))
             {
                 text.maxWidth = 0f;
+                GameMenu.KeepRendered(text);
             }
 
             // The count's two shadow copies are left blank for good. Three texts
@@ -810,6 +815,7 @@ namespace CkQol.Native
                 foreach (var text in box.GetComponentsInChildren<PugText>(true))
                 {
                     text.maxWidth = 0f;
+                    GameMenu.KeepRendered(text);
                 }
 
                 // The donor's own frame is as wide as a chest window and ran most of

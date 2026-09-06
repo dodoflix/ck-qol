@@ -180,6 +180,7 @@ namespace CkQol.Native
             foreach (var text in clone.GetComponentsInChildren<PugText>(true))
             {
                 text.maxWidth = 0f;
+                GameMenu.KeepRendered(text);
                 text.style.fontFace = Font;
                 text.style.horizontalAlignment = PugTextStyle.HorizontalAlignment.left;
                 text.style.verticalAlignment = PugTextStyle.VerticalAlignment.center;
