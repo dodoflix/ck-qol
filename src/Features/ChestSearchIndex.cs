@@ -264,11 +264,16 @@ namespace CkQol.Features
 
             var contained = em.GetBuffer<ContainedObjectsBuffer>(container, true);
 
+            // amount is only a stack count on something stackable. On a weapon or a
+            // piece of armour it is the durability, so those count one per slot.
+            var info = PugDatabase.GetObjectInfo(wanted);
+            bool stacks = info == null || info.isStackable;
+
             int total = 0;
             for (int i = 0; i < contained.Length; i++)
             {
                 if (contained[i].objectData.objectID != wanted) continue;
-                total += contained[i].objectData.amount;
+                total += stacks ? contained[i].objectData.amount : 1;
             }
             return total;
         }

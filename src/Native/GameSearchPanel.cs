@@ -62,7 +62,7 @@ namespace CkQol.Native
         internal const float BoxRow = 1.15f;
 
         /// Where the count ends, short of the backing's right edge.
-        private const float CountGap = 0.4f;
+        private const float CountGap = 0.75f;
 
         private class Row
         {
@@ -494,10 +494,22 @@ namespace CkQol.Native
             // and runs off the panel. Moved to the right end of the row and aligned
             // right, so it ends a fixed gap short of the backing however many digits
             // it has. Shadows carried by the same delta, to stay under it.
+            // One line: the donor stacks its parts at three different heights, for a
+            // hover window that is laid out differently.
+            float line = element.text != null
+                ? element.text.transform.localPosition.y
+                : 0f;
+
+            if (element.SR != null)
+            {
+                Vector3 icon = element.SR.transform.localPosition;
+                element.SR.transform.localPosition = new Vector3(icon.x, line, icon.z);
+            }
+
             if (element.amountNumber != null)
             {
                 Vector3 was = element.amountNumber.transform.localPosition;
-                var moved = new Vector3(PanelWidth - CountGap, was.y, was.z);
+                var moved = new Vector3(PanelWidth - CountGap, line, was.z);
                 Vector3 shift = moved - was;
 
                 element.amountNumber.transform.localPosition = moved;
@@ -641,14 +653,12 @@ namespace CkQol.Native
             Refresh();
         }
 
-        /// Escape and Enter both land here, and only while the box has the keyboard -
-        /// picking a suggestion lets go of it, so an Escape after that never reaches
-        /// this and the search stands.
+        /// Escape and Enter both land here. Neither empties the box - the clear
+        /// button is the only thing that does, so a search survives letting go of the
+        /// keyboard.
         public void Deactivate(bool commit)
         {
             if (commit && _suggestions.Count > 0) Commit();
-            else if (!commit) ClearQuery();
-
             Blur();
         }
 
@@ -790,10 +800,15 @@ namespace CkQol.Native
                 if (hint != null) GameMenu.SetLiteral(hint, "search...");
                 GameMenu.SetLiteral(query, string.Empty);
 
-                var picked = Icon(root.transform, donor, new Vector3(0.55f, boxRow, 0f));
+                // The box's text sits at its own offset inside the donor, so the icon
+                // and the clear button take their height from where it actually
+                // landed rather than from the row they were placed on.
+                float line = root.transform.InverseTransformPoint(query.transform.position).y;
+
+                var picked = Icon(root.transform, donor, new Vector3(0.75f, line, 0f));
 
                 var clear = Clear(root.transform, query,
-                                  new Vector3(width - 0.9f, boxRow, 0f),
+                                  new Vector3(width - 0.5f, line, 0f),
                                   out BoxCollider clearHit);
 
                 // Ordered by sortingOrder rather than by sibling index, so these can
@@ -802,8 +817,6 @@ namespace CkQol.Native
                                         new Vector3(middle, 0f, 0.2f), width, 1f, query);
                 Backing(root.transform, ui,
                         new Vector3(middle, boxRow, 0.2f), width, 1.2f, query);
-                Backing(root.transform, ui,
-                        new Vector3(width - 0.75f, boxRow, 0.1f), 1.1f, 1f, query);
 
                 panel.Bind(donor, anchor, query, hint, clear, listPanel,
                            ui.playerInventoryUI.backgroundSR, picked, collider, clearHit);
@@ -889,7 +902,6 @@ namespace CkQol.Native
 
             var pug = clone.GetComponent<PugText>();
             pug.maxWidth = 0f;
-            GameMenu.SetLiteral(pug, "[x]");
 
             var box = clone.AddComponent<BoxCollider>();
             box.isTrigger = true;
@@ -900,6 +912,9 @@ namespace CkQol.Native
             clone.transform.SetParent(parent, false);
             clone.transform.localPosition = at;
             clone.SetActive(true);
+
+            // Set once active: a render made in staging is dropped.
+            GameMenu.SetLiteral(pug, "X");
             return pug;
         }
     }
