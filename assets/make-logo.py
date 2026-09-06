@@ -1,11 +1,17 @@
 #!/usr/bin/env python3
 """Draw assets/logo.png.
 
-Two layers on purpose. The ground and the feature glyphs are drawn small and
-scaled up with NEAREST, so they read as pixel art beside the rest of a Core
-Keeper mod page. The type is drawn at full size instead: upscaling antialiased
-glyphs turns their soft edges into grey blocks, which just looks like a low
-resolution image rather than like pixel art.
+Everything is composed at 320x180 and scaled up once with NEAREST, so it is
+pixel art rather than a smooth render shrunk down - which is what sits beside it
+on a Core Keeper mod page.
+
+Two things have to hold for that to work: the font is a real pixel font at a
+multiple of its native size, and text is drawn 1-bit. Antialiasing is what made
+an earlier attempt look like a low resolution photograph, because each soft edge
+pixel became a 4x4 grey block on the way up.
+
+No font could be taken from the game itself - its UI font is a sprite atlas
+inside the packed Unity assets, and no TTF ships with it.
 """
 
 import os
@@ -40,13 +46,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 
 
 def font(size, bold):
-    name = "DejaVuSans-Bold.ttf" if bold else "DejaVuSans.ttf"
-    for base in ("/usr/share/fonts/TTF", "/usr/share/fonts/truetype/dejavu"):
-        try:
-            return ImageFont.truetype(os.path.join(base, name), size)
-        except OSError:
-            continue
-    return ImageFont.load_default()
+    """Silkscreen, an OFL pixel font, at a multiple of its native 8px - anything
+    else lands the strokes between pixels and the hard edges go soft."""
+    name = "Silkscreen-Bold.ttf" if bold else "Silkscreen-Regular.ttf"
+    return ImageFont.truetype(os.path.join(HERE, "fonts", name), size)
 
 
 def centre(d, text, f, y, fill, spacing=0, width=SW):
@@ -141,17 +144,17 @@ def main():
     gap = 8
     left = (SW - (len(glyphs) * size + (len(glyphs) - 1) * gap)) // 2
     for i, glyph in enumerate(glyphs):
-        img.paste(plate(glyph), (left + i * (size + gap), 109))
+        img.paste(plate(glyph), (left + i * (size + gap), 110))
 
     d = ImageDraw.Draw(img)
 
     # 1-bit, at pixel scale, the way the game's own font is drawn. Antialiasing
-    # is what made the earlier attempt look like a low resolution photograph:
-    # its soft edge pixels became 4x4 grey blocks on the way up.
+    # is what made an earlier attempt look like a low resolution photograph: its
+    # soft edge pixels became 4x4 grey blocks on the way up.
     d.fontmode = "1"
-    centre(d, "CORE KEEPER", font(9, False), 41, DIM, spacing=3)
-    centre(d, "QUALITY OF LIFE", font(26, True), 56, TEXT)
-    d.rectangle([(SW / 2 - 40, 96), (SW / 2 + 40, 97)], fill=GOLD)
+    centre(d, "CORE KEEPER", font(8, False), 44, DIM, spacing=3)
+    centre(d, "QUALITY OF LIFE", font(24, True), 60, TEXT)
+    d.rectangle([(SW / 2 - 40, 94), (SW / 2 + 40, 95)], fill=GOLD)
 
     img.resize((W, H), Image.NEAREST).save(os.path.join(HERE, "logo.png"))
     print(f"wrote logo.png at {W}x{H}")

@@ -314,3 +314,6 @@ listen server.
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+`assets/fonts/` is [Silkscreen](https://github.com/googlefonts/silkscreen) under
+the SIL Open Font License, not MIT; its licence sits beside it.
