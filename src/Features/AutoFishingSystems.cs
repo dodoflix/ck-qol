@@ -28,6 +28,16 @@ namespace CkQol.Features
         private EntityQuery _networkTimeQuery;
         private EntityQuery _tickRateQuery;
 
+        /// World time the player's own reel began, or -1 when they are not reeling.
+        private double _manualHoldStart = -1d;
+
+        /// Whether the previous frame's button press was ours.
+        ///
+        /// We write the press into the same ClientInputData a real one arrives in, so
+        /// without this the next frame could read our own press back and time it as if
+        /// the player had done it.
+        private bool _pressedLastFrame;
+
         protected override void OnCreate()
         {
             _playerQuery = GetEntityQuery(
@@ -45,10 +55,19 @@ namespace CkQol.Features
             UnityEngine.Debug.Log("[CkQol/AutoFishing] reel system created");
         }
 
+        /// Drops a half-finished measurement. Walking away mid-hold would otherwise
+        /// time the gap until the next reel instead of the reel itself.
+        private void Forget()
+        {
+            _manualHoldStart = -1d;
+            _pressedLastFrame = false;
+        }
+
         protected override void OnUpdate()
         {
             if (!AutoFishingState.ReelEnabled || _playerQuery.IsEmpty)
             {
+                Forget();
                 base.OnUpdate();
                 return;
             }
@@ -60,6 +79,7 @@ namespace CkQol.Features
                 Manager.ui.isAnyInventoryShowing ||
                 Manager.menu.IsAnyMenuActive())
             {
+                Forget();
                 base.OnUpdate();
                 return;
             }
@@ -67,6 +87,7 @@ namespace CkQol.Features
             var playerState = EntityManager.GetComponentData<PlayerStateCD>(player);
             if (!playerState.HasAnyState(PlayerStateEnum.Fishing))
             {
+                Forget();
                 base.OnUpdate();
                 return;
             }
@@ -88,22 +109,43 @@ namespace CkQol.Features
             NetworkTick tick = _networkTimeQuery.GetSingleton<NetworkTime>().ServerTick;
             uint tps = (uint)_tickRateQuery.GetSingleton<ClientServerTickRate>().SimulationTickRate;
 
+            double now = World.Time.ElapsedTime;
+
             // Reeling by hand wins. Without this the mod's own hold would fight the
             // player's, and neither press would land cleanly.
-            if (!state.ReelTimer.isRunning &&
+            if (!state.ReelTimer.isRunning && !_pressedLastFrame &&
                 input.IsButtonStateSet(CommandInputButtonStateNames.SecondInteract_HeldDown))
             {
+                // Time it, so auto reel can use the player's own timing. Only a hold
+                // that started on a bite counts - anything else is not a reel.
+                if (_manualHoldStart < 0d && AutoFishingState.LearnEnabled &&
+                    fishState.fishIsNibbling)
+                {
+                    _manualHoldStart = now;
+                }
+
+                _pressedLastFrame = false;
                 inputData = UnsafeUtility.As<ClientInput, ClientInputData>(ref input);
                 EntityManager.SetComponentData(player, inputData);
                 base.OnUpdate();
                 return;
             }
 
+            // Not holding any more: whatever was being timed has ended.
+            if (_manualHoldStart >= 0d)
+            {
+                AutoFishingState.ReportLearnedHold((float)(now - _manualHoldStart));
+                _manualHoldStart = -1d;
+            }
+
+            bool pressing = false;
+
             if (state.ReelTimer.isRunning)
             {
                 if (!state.ReelTimer.IsTimerElapsed(tick))
                 {
                     input.SetButtonState(CommandInputButtonStateNames.SecondInteract_HeldDown, true);
+                    pressing = true;
                 }
                 else
                 {
@@ -112,11 +154,14 @@ namespace CkQol.Features
             }
             else if (fishState.fishIsNibbling && !fishState.isFishingAtOctopusBoss)
             {
-                state.ReelTimer.Start(tick, AutoFishingState.ReelHoldSeconds, tps);
+                state.ReelTimer.Start(tick, AutoFishingState.EffectiveReelHold, tps);
                 input.SetButtonState(CommandInputButtonStateNames.SecondInteract_HeldDown, true);
+                pressing = true;
 
                 AutoFishingState.RaiseShoalCheck();
             }
+
+            _pressedLastFrame = pressing;
 
             inputData = UnsafeUtility.As<ClientInput, ClientInputData>(ref input);
             EntityManager.SetComponentData(player, inputData);

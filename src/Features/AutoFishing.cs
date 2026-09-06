@@ -24,10 +24,18 @@ namespace CkQol.Features
                             "Reel in automatically the moment a fish bites. Turn off " +
                             "if another fishing mod is doing the same job.");
 
+        private readonly BoolSetting _learnHold =
+            new BoolSetting("LearnReelHold", "Learn reel hold", true,
+                            "Copy your own timing: after you reel by hand, auto reel " +
+                            "holds for as long as you did. Not saved - Reel hold below " +
+                            "is used again after a restart.");
+
         private readonly FloatSetting _reelHold =
-            new FloatSetting("ReelHoldSeconds", "Reel hold", 0.2f, 0.1f, 0.5f,
+            new FloatSetting("ReelHoldSeconds", "Reel hold", 0.2f, 0.1f, 1f,
                              "How long the reel button is held for each catch. Raise " +
-                             "it if bites are being missed on a high-latency server.");
+                             "it if bites are being missed on a high-latency server. " +
+                             "Ignored while Learn reel hold is on and you have reeled " +
+                             "by hand at least once.");
 
         private readonly BoolSetting _infiniteShoal =
             new BoolSetting("InfiniteShoal", "Infinite fish shoal", true,
@@ -37,9 +45,11 @@ namespace CkQol.Features
         public override IEnumerable<ModSetting> GetSettings()
         {
             yield return _autoReel;
+            yield return _learnHold;
             yield return _reelHold;
             yield return _infiniteShoal;
         }
+
 
         public override void Init()
         {
@@ -64,6 +74,7 @@ namespace CkQol.Features
             AutoFishingState.ReelEnabled = _autoReel.Value;
             AutoFishingState.ShoalEnabled = _infiniteShoal.Value;
             AutoFishingState.ReelHoldSeconds = _reelHold.Value;
+            AutoFishingState.LearnEnabled = _learnHold.Value;
         }
     }
 
@@ -77,8 +88,35 @@ namespace CkQol.Features
         internal static volatile bool ReelEnabled;
         internal static volatile bool ShoalEnabled;
         internal static volatile float ReelHoldSeconds = 0.2f;
+        internal static volatile bool LearnEnabled;
+
+        /// How long the player's last manual reel lasted, or -1 if they have not
+        /// reeled by hand yet.
+        ///
+        /// Deliberately not persisted and never written back into the Reel hold
+        /// setting: that row stays whatever the player chose, and this shadows it only
+        /// while Learn reel hold is on. Every manual reel replaces it, so it tracks
+        /// current timing rather than freezing the first one, and a restart goes back
+        /// to the configured value until the next hand reel.
+        private static volatile float _learnedHold = -1f;
 
         private static volatile bool _shoalCheckPending;
+
+        /// Reported by the reeler when the player finishes a reel of their own.
+        /// Clamped so a stuck button or a paused frame cannot produce a hold that
+        /// jams fishing.
+        internal static void ReportLearnedHold(float seconds) =>
+            _learnedHold = UnityEngine.Mathf.Clamp(seconds, 0.05f, 1.5f);
+
+        /// What the reeler actually holds for.
+        internal static float EffectiveReelHold
+        {
+            get
+            {
+                float learned = _learnedHold;
+                return LearnEnabled && learned > 0f ? learned : ReelHoldSeconds;
+            }
+        }
 
         /// Raised by the reeler the moment it hooks a fish.
         ///
