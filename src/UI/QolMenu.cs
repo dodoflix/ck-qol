@@ -11,9 +11,9 @@ namespace CkQol.UI
     /// tree on every toggle would drop slider drags and input-field focus.
     public class QolMenu : MonoBehaviour
     {
-        private const float Width = 720f;
-        private const float Height = 460f;
-        private const float TabColumn = 180f;
+        private const float Width = 820f;
+        private const float Height = 520f;
+        private const float TabColumn = 200f;
 
         private CkQolMod _mod;
         private Canvas _canvas;
@@ -71,10 +71,26 @@ namespace CkQol.UI
             scaler.matchWidthOrHeight = 0.5f;
             canvasGo.AddComponent<GraphicRaycaster>();
 
+            // Everything lives under one root so showing/hiding is a single SetActive.
+            var rootGo = UiFactory.Node("Root", canvasGo.transform, out RectTransform rootRect);
+            UiFactory.Stretch(rootRect, 0f, 0f);
+            _root = rootGo;
+
+            // Full-screen catcher: absorbs clicks so they cannot reach the game behind,
+            // dims the scene, and closes the menu when clicked outside the window.
+            // Added before the window so it renders underneath it.
+            var blockerGo = UiFactory.Node("Blocker", rootGo.transform, out RectTransform blockerRect);
+            UiFactory.Stretch(blockerRect, 0f, 0f);
+            var blockerImage = blockerGo.AddComponent<Image>();
+            blockerImage.color = new Color(0f, 0f, 0f, 0.45f);
+            blockerImage.raycastTarget = true;
+            var blockerButton = blockerGo.AddComponent<Button>();
+            blockerButton.transition = Selectable.Transition.None;
+            blockerButton.onClick.AddListener(() => SetOpen(false));
+
             // Window
-            var window = UiFactory.Panel("Window", canvasGo.transform, GameTheme.PanelBg,
+            var window = UiFactory.Panel("Window", rootGo.transform, GameTheme.PanelBg,
                                          out RectTransform windowRect);
-            _root = window.gameObject;
             windowRect.anchorMin = new Vector2(0.5f, 0.5f);
             windowRect.anchorMax = new Vector2(0.5f, 0.5f);
             windowRect.pivot = new Vector2(0.5f, 0.5f);
@@ -169,7 +185,7 @@ namespace CkQol.UI
             {
                 int index = _pages.Count;
                 var button = UiFactory.FlatButton("Tab_" + feature.Name, _tabList,
-                                                  feature.Name, 34f, () => Select(index));
+                                                  feature.Name, GameTheme.RowHeight, () => Select(index));
                 _tabButtons.Add(button);
                 _pages.Add(BuildPage(feature));
             }
@@ -184,12 +200,12 @@ namespace CkQol.UI
             var header = UiFactory.Label("Desc", content, feature.Description, 13f, GameTheme.TextDim);
             header.textWrappingMode = TextWrappingModes.Normal;
             var headerLayout = header.gameObject.AddComponent<LayoutElement>();
-            headerLayout.minHeight = 34f;
+            headerLayout.minHeight = GameTheme.RowHeight * 1.2f;
 
             // Enable toggle, unless this is a pseudo-feature with nothing to switch off.
             if (feature.CanBeDisabled)
             {
-                UiFactory.Row(content, "Enabled", "Turn this feature on or off", 30f,
+                UiFactory.Row(content, "Enabled", "Turn this feature on or off", GameTheme.RowHeight,
                               out RectTransform slot);
                 UiFactory.Checkbox(slot, feature.Enabled.Value,
                                    v => feature.Enabled.Value = v);
@@ -210,33 +226,33 @@ namespace CkQol.UI
             {
                 case BoolSetting b:
                 {
-                    UiFactory.Row(content, b.Label, b.Tooltip, 30f, out RectTransform slot);
+                    UiFactory.Row(content, b.Label, b.Tooltip, GameTheme.RowHeight, out RectTransform slot);
                     UiFactory.Checkbox(slot, b.Value, v => b.Value = v);
                     break;
                 }
                 case IntSetting i:
                 {
-                    UiFactory.Row(content, i.Label, i.Tooltip, 30f, out RectTransform slot);
+                    UiFactory.Row(content, i.Label, i.Tooltip, GameTheme.RowHeight, out RectTransform slot);
                     UiFactory.HorizontalSlider(slot, i.Value, i.Min, i.Max, true,
                                                v => i.Value = Mathf.RoundToInt(v), out _);
                     break;
                 }
                 case FloatSetting f:
                 {
-                    UiFactory.Row(content, f.Label, f.Tooltip, 30f, out RectTransform slot);
+                    UiFactory.Row(content, f.Label, f.Tooltip, GameTheme.RowHeight, out RectTransform slot);
                     UiFactory.HorizontalSlider(slot, f.Value, f.Min, f.Max, false,
                                                v => f.Value = v, out _);
                     break;
                 }
                 case ChoiceSetting c:
                 {
-                    UiFactory.Row(content, c.Label, c.Tooltip, 30f, out RectTransform slot);
+                    UiFactory.Row(content, c.Label, c.Tooltip, GameTheme.RowHeight, out RectTransform slot);
                     BuildChoice(slot, c);
                     break;
                 }
                 case KeySetting k:
                 {
-                    UiFactory.Row(content, k.Label, k.Tooltip, 30f, out RectTransform slot);
+                    UiFactory.Row(content, k.Label, k.Tooltip, GameTheme.RowHeight, out RectTransform slot);
                     UiFactory.TextBox(slot, k.Value.ToString(), v =>
                     {
                         if (System.Enum.TryParse(v, true, out KeyCode parsed)) k.Value = parsed;
@@ -245,7 +261,7 @@ namespace CkQol.UI
                 }
                 case StringSetting s:
                 {
-                    UiFactory.Row(content, s.Label, s.Tooltip, 30f, out RectTransform slot);
+                    UiFactory.Row(content, s.Label, s.Tooltip, GameTheme.RowHeight, out RectTransform slot);
                     UiFactory.TextBox(slot, s.Value, v => s.Value = v);
                     break;
                 }
@@ -266,7 +282,7 @@ namespace CkQol.UI
             for (int i = 0; i < setting.Options.Length; i++)
             {
                 string option = setting.Options[i];
-                var button = UiFactory.FlatButton("Opt_" + option, rowGo.transform, option, 24f, null);
+                var button = UiFactory.FlatButton("Opt_" + option, rowGo.transform, option, GameTheme.RowHeight * 0.8f, null);
                 var image = button.targetGraphic as Image;
                 buttons.Add(image);
                 button.onClick.AddListener(() =>

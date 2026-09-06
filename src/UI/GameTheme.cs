@@ -55,7 +55,8 @@ namespace CkQol.UI
                 _font = fonts.FirstOrDefault(f => !f.name.Contains("Liberation"))
                         ?? fonts[0];
 
-                Debug.Log($"[CkQol] using font '{_font.name}' ({fonts.Count} loaded: " +
+                Debug.Log($"[CkQol] using font '{_font.name}' nativeSize={NativeSize} " +
+                          $"({fonts.Count} loaded: " +
                           string.Join(", ", fonts.Take(8).Select(f => f.name)) + ")");
                 return _font;
             }
@@ -113,15 +114,42 @@ namespace CkQol.UI
             Debug.Log($"[CkQol] 9-sliced sprites ({sliced.Count} shown): {string.Join(", ", sliced)}");
         }
 
+        /// The font's own design size. A pixel font only renders cleanly at integer
+        /// multiples of this - at 1.4x you get dropped and doubled rows of pixels,
+        /// which reads as "corrupted text".
+        public static float NativeSize
+        {
+            get
+            {
+                var font = Font;
+                float size = font != null ? font.faceInfo.pointSize : 0f;
+                return size > 0f ? size : 16f;
+            }
+        }
+
+        /// Rounds a desired size to the nearest whole multiple of the font's native
+        /// size, never below 1x.
+        public static float Snap(float desired)
+        {
+            float native = NativeSize;
+            if (native <= 0f) return desired;
+            return native * Mathf.Max(1f, Mathf.Round(desired / native));
+        }
+
+        /// Row height that comfortably fits snapped text.
+        public static float RowHeight => Mathf.Max(30f, Snap(14f) * 1.7f);
+
         public static void ApplyText(TextMeshProUGUI text, float size, Color color,
                                      TextAlignmentOptions align = TextAlignmentOptions.MidlineLeft)
         {
             if (Font != null) text.font = Font;
-            text.fontSize = size;
+            text.fontSize = Snap(size);
             text.color = color;
             text.alignment = align;
             text.richText = true;
             text.raycastTarget = false;
+            // Pixel fonts must not be auto-shrunk back off a whole multiple.
+            text.enableAutoSizing = false;
         }
     }
 }
