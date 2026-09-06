@@ -24,30 +24,24 @@ namespace CkQol.Features
                             "Reel in automatically the moment a fish bites. Turn off " +
                             "if another fishing mod is doing the same job.");
 
-        private readonly BoolSetting _learnHold =
-            new BoolSetting("LearnReelHold", "Learn reel hold", false,
-                            "Hold the reel for as long as the previous reel took. Any " +
-                            "reel you do by hand sets it. Not saved - Reel hold below " +
-                            "is used again after a restart.");
+        private readonly FloatSetting _throwDelay =
+            new FloatSetting("ThrowDelaySeconds", "Throw delay", 2f, 0f, 2f,
+                             "How long the button is held before the rod is thrown. " +
+                             "The game sets cast distance from how far the throw was " +
+                             "charged, so this is how far the line lands. Held past " +
+                             "the game's own cast timer it simply throws at maximum.");
 
-        private readonly BoolSetting _fullRangeCast =
-            new BoolSetting("FullRangeCast", "Full range casts", true,
-                            "Charge every cast to the end so the line lands as far out " +
-                            "as it can. Off casts at whatever range the rod happens to " +
-                            "throw at.");
-
-        private readonly FloatSetting _reelHold =
-            new FloatSetting("ReelHoldSeconds", "Reel hold", 0.2f, 0.1f, 2f,
-                             "How long the reel button is held for each catch. Raise " +
-                             "it if bites are being missed on a high-latency server. " +
-                             "Ignored while Learn reel hold is on and you have reeled " +
-                             "by hand at least once.");
+        private readonly BoolSetting _learnPull =
+            new BoolSetting("LearnPull", "Learn pull", false,
+                            "Use your own throw instead of the setting above: hold the " +
+                            "button as long as you like on a cast by hand and every " +
+                            "automatic throw copies it. Not saved.");
 
         private readonly FloatSetting _pullDelay =
             new FloatSetting("PullDelaySeconds", "Pull delay", 0f, 0f, 2f,
-                             "Wait this long after a fish bites before reeling. Zero " +
-                             "reels the instant it bites. Raise it to look less like " +
-                             "a machine, at the risk of losing a fish.");
+                             "Wait this long after a fish bites before hooking it. " +
+                             "Zero hooks the instant it bites. A fish stays on the " +
+                             "line for three to four seconds, so a long wait loses it.");
 
         private readonly BoolSetting _infiniteShoal =
             new BoolSetting("InfiniteShoal", "Infinite fish shoal", true,
@@ -57,9 +51,8 @@ namespace CkQol.Features
         public override IEnumerable<ModSetting> GetSettings()
         {
             yield return _autoReel;
-            yield return _fullRangeCast;
-            yield return _learnHold;
-            yield return _reelHold;
+            yield return _throwDelay;
+            yield return _learnPull;
             yield return _pullDelay;
             yield return _infiniteShoal;
         }
@@ -85,9 +78,8 @@ namespace CkQol.Features
 
             _running = true;
             Push();
-            Log($"started (reel={_autoReel.Value}, cast={_fullRangeCast.Value}, " +
-                $"hold={_reelHold.Value:0.00}s, " +
-                $"learn={_learnHold.Value}, delay={_pullDelay.Value:0.00}s, " +
+            Log($"started (reel={_autoReel.Value}, throw={_throwDelay.Value:0.00}s, " +
+                $"learn={_learnPull.Value}, pull={_pullDelay.Value:0.00}s, " +
                 $"shoal={_infiniteShoal.Value})");
         }
 
@@ -102,10 +94,9 @@ namespace CkQol.Features
         {
             AutoFishingState.ReelEnabled = _running && _autoReel.Value;
             AutoFishingState.ShoalEnabled = _running && _infiniteShoal.Value;
-            AutoFishingState.ReelHoldSeconds = _reelHold.Value;
-            AutoFishingState.LearnEnabled = _learnHold.Value;
+            AutoFishingState.ThrowDelaySeconds = _throwDelay.Value;
+            AutoFishingState.LearnEnabled = _learnPull.Value;
             AutoFishingState.PullDelaySeconds = _pullDelay.Value;
-            AutoFishingState.FullRangeCast = _running && _fullRangeCast.Value;
         }
     }
 
@@ -118,34 +109,37 @@ namespace CkQol.Features
     {
         internal static volatile bool ReelEnabled;
         internal static volatile bool ShoalEnabled;
-        internal static volatile float ReelHoldSeconds = 0.2f;
         internal static volatile bool LearnEnabled;
         internal static volatile float PullDelaySeconds;
-        internal static volatile bool FullRangeCast;
+        internal static volatile float ThrowDelaySeconds = 2f;
 
-        /// How long the previous reel lasted, or -1 before there has been one.
+        /// How long the hook press is held.
         ///
-        /// Not persisted and never written back into the Reel hold setting: that row
-        /// stays whatever the player chose, and this shadows it only while Learn reel
-        /// hold is on.
-        private static volatile float _lastHold = -1f;
+        /// Not a setting: hooking needs a press, not a duration, and this only exists
+        /// so one frame of it cannot be lost on the way to a server. Longer is worse,
+        /// not better - a press still held once the line is back out with no bite
+        /// pulls it straight up empty (Fishing.cs:272).
+        internal const float HookHoldSeconds = 0.2f;
+
+        /// How long the player held the button on their last throw of their own, or
+        /// -1 before there has been one. Not persisted; the Throw delay setting is
+        /// used again after a restart.
+        private static volatile float _lastThrowHold = -1f;
 
         private static volatile bool _shoalCheckPending;
 
-        /// Reported by the reeler when a reel it did not perform itself ends.
-        /// Clamped so a stuck button or a paused frame cannot produce a hold that
-        /// jams fishing.
+        /// Reported when a button hold the mod did not perform itself ends.
         internal static void ReportHold(float seconds) =>
-            _lastHold = UnityEngine.Mathf.Clamp(seconds, 0.05f, 2f);
+            _lastThrowHold = UnityEngine.Mathf.Clamp(seconds, 0f, 2f);
 
-        /// What the reeler holds for: the previous reel's length once there has been
-        /// one, otherwise the configured value.
-        internal static float EffectiveReelHold
+        /// How long to charge a throw for: the player's own last throw while Learn
+        /// pull is on, otherwise the configured value.
+        internal static float EffectiveThrowDelay
         {
             get
             {
-                float last = _lastHold;
-                return LearnEnabled && last > 0f ? last : ReelHoldSeconds;
+                float last = _lastThrowHold;
+                return LearnEnabled && last >= 0f ? last : ThrowDelaySeconds;
             }
         }
 

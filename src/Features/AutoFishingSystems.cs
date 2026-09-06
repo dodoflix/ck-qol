@@ -7,21 +7,29 @@ using PlayerState;
 
 namespace CkQol.Features
 {
-    /// Per-player state for the reeler: just the short hold timer.
+    /// Per-player timers for the automatic fishing.
     public struct CkQolAutoReelCD : IComponentData
     {
+        /// Holds the hook press down for a moment once it is made.
         public TickTimer ReelTimer;
 
-        /// Counts down the configured pause between the bite and the reel.
+        /// Counts down Pull delay, between the bite and the hook press.
         public TickTimer DelayTimer;
     }
 
-    /// Reels in for the local player.
+    /// Fishes for the local player.
     ///
     /// Runs after SendClientInputSystem and sets the SecondInteract button in the
     /// player's ClientInputData, which is the same path a real button press takes -
-    /// so the game's own fishing loop does the catching and carries on to the next
-    /// cast. Nothing about fishing is reimplemented here.
+    /// so the game's own fishing loop does the work. Nothing is reimplemented here.
+    ///
+    /// That one button does three different jobs depending on the phase, and this
+    /// system drives two of them:
+    ///   charging a throw - held while castTimer runs, and the elapsed ratio at
+    ///                      release is the cast distance (Fishing.cs:462)
+    ///   hooking a fish   - pressed while fishIsNibbling, which lands it
+    ///   pulling up empty - pressed with the line out and no bite, which is why the
+    ///                      hook press is kept short (Fishing.cs:272)
     [WorldSystemFilter(WorldSystemFilterFlags.ClientSimulation)]
     [UpdateInGroup(typeof(RunSimulationSystemGroup), OrderLast = true)]
     [UpdateAfter(typeof(SendClientInputSystem))]
@@ -31,7 +39,7 @@ namespace CkQol.Features
         private EntityQuery _networkTimeQuery;
         private EntityQuery _tickRateQuery;
 
-        /// World time the reel being timed began, or -1 when none is.
+        /// World time the player's own button hold began, or -1 when none is.
         private double _holdStart = -1d;
 
         /// Whether the previous frame's button press was ours.
@@ -55,20 +63,20 @@ namespace CkQol.Features
 
             RequireForUpdate(_playerQuery);
             base.OnCreate();
-            UnityEngine.Debug.Log("[CkQol/AutoFishing] reel system created");
+            UnityEngine.Debug.Log("[CkQol/Auto Fishing] fishing system created");
         }
 
         private static void StartReel(ref CkQolAutoReelCD state, ref ClientInput input,
                                       NetworkTick tick, uint tps)
         {
-            state.ReelTimer.Start(tick, AutoFishingState.EffectiveReelHold, tps);
+            state.ReelTimer.Start(tick, AutoFishingState.HookHoldSeconds, tps);
             input.SetButtonState(CommandInputButtonStateNames.SecondInteract_HeldDown, true);
 
             AutoFishingState.RaiseShoalCheck();
         }
 
         /// Drops a half-finished measurement. Walking away mid-hold would otherwise
-        /// time the gap until the next reel instead of the reel itself.
+        /// time the gap until the next press instead of the press itself.
         private void Forget()
         {
             _holdStart = -1d;
@@ -94,7 +102,7 @@ namespace CkQol.Features
                 return;
             }
 
-            // A menu or inventory pauses the mod; the previous hold time is kept, so
+            // A menu or inventory pauses the mod; the learned throw is kept, so
             // fishing carries on with the same timing when it closes.
             if (Manager.ui.isAnyInventoryShowing || Manager.menu.IsAnyMenuActive())
             {
@@ -136,12 +144,11 @@ namespace CkQol.Features
             if (!state.ReelTimer.isRunning && !_pressedLastFrame &&
                 input.IsButtonStateSet(CommandInputButtonStateNames.SecondInteract_HeldDown))
             {
-                // Time it, so the next auto reel is as long as this one. While fishing
-                // this button is the reel, so there is nothing else it could be.
+                // Time it, so Learn pull can throw for as long as the player does.
                 if (_holdStart < 0d && AutoFishingState.LearnEnabled) _holdStart = now;
 
-                // They beat us to it - drop any pending pull so we do not yank the line
-                // a second time once the delay runs out.
+                // They beat us to it - drop any pending hook press so we do not yank
+                // the line a second time once Pull delay runs out.
                 if (state.DelayTimer.isRunning)
                 {
                     state.DelayTimer.Stop(tick);
@@ -164,15 +171,15 @@ namespace CkQol.Features
 
             bool pressing = false;
 
-            // Charging the next cast. Fishing.ThrowFishingRod sets the distance from
-            // castTimer's elapsed ratio at the moment the button comes up, and
-            // Fishing's update throws as soon as it is not held - so letting go early
-            // is what makes an automatic recast land right at the player's feet.
-            // Holding until the timer elapses throws at the full ratio, and the game
-            // then throws for us without needing a release.
-            if (AutoFishingState.FullRangeCast &&
-                fishState.castTimer.isRunning &&
-                !fishState.castTimer.IsTimerElapsed(tick))
+            // Charging a throw. Fishing.ThrowFishingRod sets the cast distance from
+            // castTimer's elapsed ratio at the moment the button comes up, and Fishing
+            // throws as soon as it is not held - so releasing early is what makes an
+            // automatic throw land at the player's feet. Holding past the game's own
+            // cast timer is harmless: it throws at the full ratio on its own.
+            if (fishState.castTimer.isRunning &&
+                !fishState.castTimer.IsTimerElapsed(tick) &&
+                fishState.castTimer.GetElapsedSeconds(tick, tps) <
+                    AutoFishingState.EffectiveThrowDelay)
             {
                 input.SetButtonState(CommandInputButtonStateNames.SecondInteract_HeldDown, true);
                 pressing = true;
@@ -283,7 +290,7 @@ namespace CkQol.Features
             _objectDataHandle = GetComponentTypeHandle<ObjectDataCD>(true);
 
             base.OnCreate();
-            UnityEngine.Debug.Log("[CkQol/AutoFishing] shoal system created");
+            UnityEngine.Debug.Log("[CkQol/Auto Fishing] shoal system created");
         }
 
         protected override void OnUpdate()
