@@ -19,7 +19,10 @@ namespace CkQol.Native
         public Action<SpriteRenderer> Icon;
 
         private PugText _text;
-        private PugText[] _otherTexts;
+
+        /// The donor's outline copies of the label, drawn behind it as a shadow. They
+        /// carry the same string.
+        private PugText[] _shadows;
         private SpriteRenderer[] _otherSprites;
         private SpriteRenderer _icon;
 
@@ -38,11 +41,11 @@ namespace CkQol.Native
 
         public override bool isButtonActive => _active;
 
-        internal void Bind(PugText text, PugText[] otherTexts, SpriteRenderer[] otherSprites,
+        internal void Bind(PugText text, PugText[] shadows, SpriteRenderer[] otherSprites,
                            IngameButtonHint sibling, SpriteRenderer icon)
         {
             _text = text;
-            _otherTexts = otherTexts;
+            _shadows = shadows;
             _otherSprites = otherSprites;
             _sibling = sibling;
             _icon = icon;
@@ -68,6 +71,10 @@ namespace CkQol.Native
                     if (label != _shown)
                     {
                         GameMenu.SetLiteral(_text, label);
+                        foreach (var shadow in _shadows)
+                        {
+                            if (shadow != null) GameMenu.SetLiteral(shadow, label);
+                        }
                         _shown = label;
                         _placed = false;
                     }
@@ -114,12 +121,6 @@ namespace CkQol.Native
                 if (sprite != null) sprite.enabled = false;
             }
             if (_icon != null && !visible) _icon.enabled = false;
-
-            // The donor's own wording, blanked rather than hidden for the same reason.
-            foreach (var text in _otherTexts)
-            {
-                if (text != null) GameMenu.SetLiteral(text, string.Empty);
-            }
 
             // Re-render on the way back in: PugText releases its glyphs to the pool when
             // disabled (PugText.cs:307-308), so the old ones are gone.
@@ -178,6 +179,14 @@ namespace CkQol.Native
                     UnityEngine.Object.DestroyImmediate(stale);
                 }
 
+                // Would keep re-rendering the label to the donor's own key character
+                // (PlatformDependentPugText.cs:171-176), which shows through as the
+                // donor's text until whatever it resolves to stops changing.
+                foreach (var stale in clone.GetComponentsInChildren<PlatformDependentPugText>(true))
+                {
+                    UnityEngine.Object.DestroyImmediate(stale);
+                }
+
                 var texts = clone.GetComponentsInChildren<PugText>(true);
                 if (texts.Length == 0)
                 {
@@ -186,11 +195,11 @@ namespace CkQol.Native
                     return null;
                 }
 
-                // texts[0] is the label; the rest is the donor's own wording. The donor's
-                // width is sized for labels like "Tab", and PugFont only wraps when
-                // maxWidth is above zero (PugFont.cs:141).
-                var otherTexts = new PugText[texts.Length - 1];
-                for (int i = 1; i < texts.Length; i++) otherTexts[i - 1] = texts[i];
+                // texts[0] is the label and the rest are its outline copies, which draw
+                // the shadow and take the same string. The donor's width is sized for
+                // labels like "Tab", and PugFont only wraps above zero (PugFont.cs:141).
+                var shadows = new PugText[texts.Length - 1];
+                for (int i = 1; i < texts.Length; i++) shadows[i - 1] = texts[i];
                 foreach (var text in texts) text.maxWidth = 0f;
 
                 // The donor's icon is reused for ours; everything else it draws, such as
@@ -212,7 +221,7 @@ namespace CkQol.Native
                 }
 
                 var hint = clone.AddComponent<CkQolHint>();
-                hint.Bind(texts[0], otherTexts, otherSprites, donor, icon);
+                hint.Bind(texts[0], shadows, otherSprites, donor, icon);
                 hint.Label = label;
                 hint.Visible = visible;
 
