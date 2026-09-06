@@ -204,6 +204,20 @@ namespace CkQol.Native
                 return;
             }
 
+            if (setting is StringSetting s)
+            {
+                var row = GameMenu.CloneAndSwap<QolTextOption>(toggleDonor, RowParent(page), "Text");
+                if (row != null) { row.Label = s.Label; row.Setting = s; }
+                return;
+            }
+
+            if (setting is KeySetting k)
+            {
+                var row = GameMenu.CloneAndSwap<QolKeybindOption>(toggleDonor, RowParent(page), "Keybind");
+                if (row != null) { row.Label = k.Label; row.Setting = k; }
+                return;
+            }
+
             // Clone the volume row only when a bar will actually be drawn. Its
             // valueText is the only one with the diamond glyphs, but it is also
             // styled differently - a number rendered in it comes out bold and unlike

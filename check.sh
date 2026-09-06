@@ -32,8 +32,8 @@ trap 'rm -rf "$WORK"' EXIT
   </ItemGroup>
   <ItemGroup>
 EOF
-  for dll in UnityEngine.CoreModule UnityEngine.PhysicsModule \
-             PugMod.SDK.Runtime PugMod.SDK Pug.Other Pug.Base \
+  for dll in UnityEngine.CoreModule UnityEngine.PhysicsModule UnityEngine UnityEngine.InputLegacyModule \
+             PugMod.SDK.Runtime PugMod.SDK Pug.Other Pug.Base Rewired_Core \
              Unity.Entities Unity.Mathematics Unity.Collections; do
     [ -f "$MANAGED/$dll.dll" ] &&
       echo "    <Reference Include=\"$dll\"><HintPath>$MANAGED/$dll.dll</HintPath><Private>false</Private></Reference>"

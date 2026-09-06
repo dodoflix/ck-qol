@@ -114,6 +114,93 @@ namespace CkQol.Config
             _entry = API.Config.Register(mod, section, Tooltip, Key, _default);
     }
 
+    /// Free text.
+    public class StringSetting : ModSetting
+    {
+        private readonly string _default;
+        private IConfigEntry<string> _entry;
+        private string _fallback;
+
+        public int MaxLength { get; }
+
+        public StringSetting(string key, string label, string defaultValue,
+                             int maxLength = 32, string tooltip = "")
+        {
+            Key = key; Label = label; Tooltip = tooltip;
+            _default = defaultValue ?? string.Empty;
+            _fallback = _default;
+            MaxLength = Mathf.Max(1, maxLength);
+        }
+
+        public string Value
+        {
+            get
+            {
+                string v = (_entry != null ? _entry.Value : _fallback) ?? _default;
+                return v.Length > MaxLength ? v.Substring(0, MaxLength) : v;
+            }
+            set
+            {
+                string v = value ?? string.Empty;
+                if (v.Length > MaxLength) v = v.Substring(0, MaxLength);
+                if (Value == v) return;
+                if (_entry != null) _entry.Value = v; else _fallback = v;
+                RaiseChanged();
+            }
+        }
+
+        public override void Bind(string mod, string section) =>
+            _entry = API.Config.Register(mod, section, Tooltip, Key, _default);
+    }
+
+    /// A rebindable key.
+    ///
+    /// Stored as the numeric KeyCode rather than its name: turning a name back into
+    /// the enum needs Enum.Parse, and the game's own input stack is queried by
+    /// KeyCode anyway.
+    public class KeySetting : ModSetting
+    {
+        private readonly KeyCode _default;
+        private IConfigEntry<int> _entry;
+        private KeyCode _fallback;
+
+        public KeySetting(string key, string label, KeyCode defaultValue, string tooltip = "")
+        {
+            Key = key; Label = label; Tooltip = tooltip;
+            _default = defaultValue; _fallback = defaultValue;
+        }
+
+        public KeyCode Value
+        {
+            get => _entry != null ? (KeyCode)_entry.Value : _fallback;
+            set
+            {
+                if (Value == value) return;
+                if (_entry != null) _entry.Value = (int)value; else _fallback = value;
+                RaiseChanged();
+            }
+        }
+
+        /// Name as the game writes it in its own key hints.
+        public string Name =>
+            Value == KeyCode.None ? "none" : Rewired.Keyboard.GetKeyName(Value);
+
+        /// True on the frame the key goes down. Features poll this each frame rather
+        /// than caching, so a rebind takes effect immediately.
+        public bool WasPressed => Value != KeyCode.None && Keyboard != null &&
+                                  Keyboard.GetKeyDown(Value);
+
+        public bool IsHeld => Value != KeyCode.None && Keyboard != null &&
+                              Keyboard.GetKey(Value);
+
+        /// Null until Rewired has started, which is after mods load.
+        internal static Rewired.Keyboard Keyboard =>
+            Rewired.ReInput.isReady ? Rewired.ReInput.controllers.Keyboard : null;
+
+        public override void Bind(string mod, string section) =>
+            _entry = API.Config.Register(mod, section, Tooltip, Key, (int)_default);
+    }
+
     /// Pick one of a fixed list. Stored as the option string, not its index, so
     /// reordering the options later cannot silently change anyone's setting.
     public class ChoiceSetting : ModSetting

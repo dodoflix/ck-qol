@@ -123,9 +123,6 @@ namespace CkQol.Native
         /// Diamonds to draw, or zero for a plain numeric or text value.
         private int _segments;
 
-        /// Step under the pointer, or -1. Shown instead of the stored value so the
-        /// bar previews where a click would land.
-        private int _preview = -1;
 
         /// Matches the eight steps the game's volume rows use.
         public const int BarSegments = 8;
@@ -161,6 +158,18 @@ namespace CkQol.Native
             Step(1);
         }
 
+        public override void OnSelected()
+        {
+            base.OnSelected();
+            if (_segments > 0) PreviewStep(Filled);
+        }
+
+        public override void OnDeselected(bool playEffect = true)
+        {
+            base.OnDeselected(playEffect);
+            ClearPreview();
+        }
+
         public override bool OnSkimRight()
         {
             Step(1);
@@ -189,22 +198,33 @@ namespace CkQol.Native
                 Int.Value = Int.Min + step;
             }
 
-            _preview = -1;
             Refresh();
+            PreviewStep(step);
         }
 
+        /// Highlights the diamonds up to the one under the pointer, exactly as
+        /// RadicalOptionsMenuOption_Volume.PreSelectVolume does: the filled/hollow
+        /// characters keep showing the stored value, only the glyph colours change.
         public void PreviewStep(int step)
         {
-            if (_segments <= 0 || _preview == step) return;
-            _preview = step;
-            Refresh();
+            if (_segments <= 0 || valueText == null) return;
+            var glyphs = valueText.glyphs;
+            for (int i = 0; i < glyphs.Count; i++)
+            {
+                glyphs[i].color = i < step
+                    ? PugTextEffectMenuOption.SELECTED_VALUE_COLOR
+                    : PugTextEffectMenuOption.UNSELECTED_TEXT_COLOR;
+            }
         }
 
         public void ClearPreview()
         {
-            if (_preview < 0) return;
-            _preview = -1;
-            Refresh();
+            if (_segments <= 0 || valueText == null) return;
+            var glyphs = valueText.glyphs;
+            for (int i = 0; i < glyphs.Count; i++)
+            {
+                glyphs[i].color = PugTextEffectMenuOption.UNSELECTED_TEXT_COLOR;
+            }
         }
 
         /// Wraps at the ends, so a row can always be changed with one direction and
@@ -233,8 +253,8 @@ namespace CkQol.Native
                 Choice.Value = Choice.Options[(Choice.Index + direction + count) % count];
             }
 
-            _preview = -1;
             Refresh();
+            if (_segments > 0) PreviewStep(Filled);
         }
 
         /// Diamonds currently filled.
@@ -259,7 +279,7 @@ namespace CkQol.Native
             string value;
             if (_segments > 0)
             {
-                value = Bar(_preview >= 0 ? _preview : Filled, _segments);
+                value = Bar(Filled, _segments);
             }
             else if (Float != null)
             {
@@ -282,6 +302,204 @@ namespace CkQol.Native
             var bar = new System.Text.StringBuilder(total);
             for (int i = 0; i < total; i++) bar.Append(i < filled ? '\u2666' : '\u2662');
             return bar.ToString();
+        }
+    }
+
+    /// Text field row.
+    ///
+    /// Implements the game's own InputManager.TextInputInterface, so typing,
+    /// backspace, delete, caret movement, paste, IME and the controller on-screen
+    /// keyboard all come from MenuManager.HandleTypingInput. Nothing about text
+    /// entry is re-implemented here, and no donor row is needed - the stock
+    /// RadicalMenuOptionTextInput is not cloned because its Update override skips
+    /// base.Update, so it never sizes a click collider and cannot be clicked.
+    public class QolTextOption : RadicalPauseMenuOption, InputManager.TextInputInterface
+    {
+        public StringSetting Setting;
+        public string Label;
+
+        private string _editing = string.Empty;
+        private int _caret;
+        private bool _editingActive;
+
+        public bool WasAutoActivated { get; set; }
+
+        public int MaxCharactersForOnScreenKeyboard =>
+            Setting != null ? Setting.MaxLength : 32;
+
+        private void Start() => Refresh();
+
+        public override void OnActivated()
+        {
+            base.OnActivated();
+            if (Setting == null || _editingActive) return;
+
+            _editingActive = true;
+            _editing = Setting.Value ?? string.Empty;
+            _caret = _editing.Length;
+            Manager.input.SetActiveInputField(this);
+            Refresh();
+        }
+
+        public override void OnDeselected(bool playEffect = true)
+        {
+            base.OnDeselected(playEffect);
+            // Clicking another row leaves the field selected but no longer visible as
+            // the active one; commit rather than silently dropping what was typed.
+            if (_editingActive) Deactivate(commit: true);
+        }
+
+        public string GetInputText() => _editing;
+
+        public void SetInputText(string input)
+        {
+            _editing = Trim(input);
+            _caret = _editing.Length;
+            Refresh();
+        }
+
+        public void AppendString(string input)
+        {
+            if (string.IsNullOrEmpty(input)) return;
+
+            // Input.inputString carries backspace and carriage return alongside real
+            // characters; MenuManager handles those separately.
+            var text = new System.Text.StringBuilder(input.Length);
+            foreach (char c in input)
+            {
+                if (c >= ' ' && c != '\u007f') text.Append(c);
+            }
+            if (text.Length == 0) return;
+
+            _caret = Mathf.Clamp(_caret, 0, _editing.Length);
+            _editing = Trim(_editing.Insert(_caret, text.ToString()));
+            _caret = Mathf.Min(_caret + text.Length, _editing.Length);
+            WasAutoActivated = false;
+            Refresh();
+        }
+
+        public void MoveCharMarker(int n)
+        {
+            _caret = Mathf.Clamp(_caret + n, 0, _editing.Length);
+            Refresh();
+        }
+
+        public void RemoveCharAtMarker()
+        {
+            if (_caret >= _editing.Length) return;
+            _editing = _editing.Remove(_caret, 1);
+            Refresh();
+        }
+
+        public void RemoveCharBehindMarker()
+        {
+            if (_caret <= 0) return;
+            _editing = _editing.Remove(--_caret, 1);
+            Refresh();
+        }
+
+        public string GetHintString() => Label ?? string.Empty;
+
+        public bool IsHidden() => false;
+
+        /// commit is false when the player backed out with escape.
+        public void Deactivate(bool commit)
+        {
+            _editingActive = false;
+            Manager.input.SetActiveInputField(null);
+
+            if (Setting != null)
+            {
+                if (commit) Setting.Value = _editing;
+                else _editing = Setting.Value;
+            }
+            Refresh();
+        }
+
+        private string Trim(string text)
+        {
+            text = text ?? string.Empty;
+            int max = MaxCharactersForOnScreenKeyboard;
+            return text.Length > max ? text.Substring(0, max) : text;
+        }
+
+        private void Refresh()
+        {
+            GameMenu.SetLabel(this, Label);
+
+            string shown = Setting != null ? Setting.Value : string.Empty;
+            if (_editingActive) shown = _editing + "_";
+            GameMenu.SetValue(this, string.IsNullOrEmpty(shown) ? "..." : shown);
+        }
+    }
+
+    /// Rebindable key row.
+    ///
+    /// The game's own control mapper cannot be reused: it maps Rewired actions, and
+    /// a mod cannot add actions to Rewired's data at runtime. Keys are polled
+    /// directly through Rewired instead, which is the same input stack the game
+    /// reads.
+    public class QolKeybindOption : RadicalPauseMenuOption
+    {
+        public KeySetting Setting;
+        public string Label;
+
+        private bool _listening;
+
+        /// The keypress that opened the row is still down on the frame Update first
+        /// runs, so binding cannot start until the frame after.
+        private int _listenFrom;
+
+        private void Start() => Refresh();
+
+        public override void OnActivated()
+        {
+            base.OnActivated();
+            if (Setting == null || _listening) return;
+
+            _listening = true;
+            _listenFrom = Time.frameCount + 1;
+            Refresh();
+        }
+
+        protected override void Update()
+        {
+            base.Update();
+            if (!_listening || Time.frameCount < _listenFrom) return;
+
+            var keyboard = KeySetting.Keyboard;
+            if (keyboard == null) return;
+
+            if (keyboard.GetKeyDown(KeyCode.Escape))
+            {
+                Stop();
+                return;
+            }
+
+            var pressed = keyboard.PollForFirstKeyDown();
+            if (!pressed.success) return;
+
+            Setting.Value = pressed.keyboardKey;
+            Stop();
+        }
+
+        public override void OnDeselected(bool playEffect = true)
+        {
+            base.OnDeselected(playEffect);
+            if (_listening) Stop();
+        }
+
+        private void Stop()
+        {
+            _listening = false;
+            Refresh();
+        }
+
+        private void Refresh()
+        {
+            GameMenu.SetLabel(this, Label);
+            GameMenu.SetValue(this, _listening ? "press a key"
+                                               : Setting != null ? Setting.Name : "none");
         }
     }
 

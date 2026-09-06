@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using CkQol.Config;
+using UnityEngine;
 
 namespace CkQol.Features
 {
@@ -30,12 +31,22 @@ namespace CkQol.Features
                               new[] { "Off", "Low", "High" }, "Low",
                               "Demonstrates the choice buttons.");
 
+        private readonly StringSetting _label =
+            new StringSetting("SampleLabel", "Sample text", "hello", 24,
+                              "Demonstrates the text field.");
+
+        private readonly KeySetting _hotkey =
+            new KeySetting("SampleHotkey", "Sample hotkey", KeyCode.F9,
+                           "Demonstrates rebinding. Logs a line when pressed.");
+
         public override IEnumerable<ModSetting> GetSettings()
         {
             yield return _verbose;
             yield return _count;
             yield return _scale;
             yield return _mode;
+            yield return _label;
+            yield return _hotkey;
         }
 
         public override void Init()
@@ -52,6 +63,7 @@ namespace CkQol.Features
         public override void Update()
         {
             if (_verbose.Value) Log("tick");
+            if (_hotkey.WasPressed) Log($"hotkey {_hotkey.Name} pressed (text={_label.Value})");
         }
     }
 }

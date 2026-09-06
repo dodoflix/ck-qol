@@ -119,13 +119,10 @@ namespace CkQol.Native
         public override void OnSelected()
         {
             base.OnSelected();
+            // No matching OnDeselected: the game's volume rows leave the highlight
+            // alone when a step button is deselected and reset it only when the whole
+            // row loses selection, so moving between diamonds does not flicker.
             if (Row != null) Row.PreviewStep(Step);
-        }
-
-        public override void OnDeselected(bool playEffect = true)
-        {
-            base.OnDeselected(playEffect);
-            if (Row != null) Row.ClearPreview();
         }
 
         public override void OnLeftClicked(bool mod1, bool mod2)
