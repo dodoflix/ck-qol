@@ -27,6 +27,27 @@ namespace CkQol.Config
         public abstract void ResetToDefault();
 
         protected void RaiseChanged() => Changed?.Invoke(this);
+
+        /// Registers with PugMod, working around it dropping the metadata.
+        ///
+        /// ModAPIConfig.Register creates a brand-new file through Set(), which writes
+        /// only mod/section/key/value - the description and defaultValue it was given
+        /// are kept in memory and never reach disk. Every later run then reads that
+        /// incomplete file back, so the fields stay empty forever. Writing once while
+        /// the in-memory record is still the complete one persists them.
+        ///
+        /// Only for a file that does not exist yet: on an existing one the record
+        /// already came from disk, so this would rewrite it with the default and
+        /// throw away whatever the player had set.
+        protected static IConfigEntry<T> Register<T>(string mod, string section,
+                                                     string description, string key,
+                                                     T defaultValue)
+        {
+            bool isNew = !API.Config.TryGet<T>(mod, section, key, out _);
+            var entry = API.Config.Register(mod, section, description, key, defaultValue);
+            if (isNew) entry.Value = defaultValue;
+            return entry;
+        }
     }
 
     public class BoolSetting : ModSetting
@@ -53,7 +74,7 @@ namespace CkQol.Config
         }
 
         public override void Bind(string mod, string section) =>
-            _entry = API.Config.Register(mod, section, Tooltip, Key, _default);
+            _entry = Register(mod, section, Tooltip, Key, _default);
 
         public override void ResetToDefault() => Value = _default;
     }
@@ -86,7 +107,7 @@ namespace CkQol.Config
         }
 
         public override void Bind(string mod, string section) =>
-            _entry = API.Config.Register(mod, section, Tooltip, Key, _default);
+            _entry = Register(mod, section, Tooltip, Key, _default);
 
         public override void ResetToDefault() => Value = _default;
     }
@@ -119,7 +140,7 @@ namespace CkQol.Config
         }
 
         public override void Bind(string mod, string section) =>
-            _entry = API.Config.Register(mod, section, Tooltip, Key, _default);
+            _entry = Register(mod, section, Tooltip, Key, _default);
 
         public override void ResetToDefault() => Value = _default;
     }
@@ -160,7 +181,7 @@ namespace CkQol.Config
         }
 
         public override void Bind(string mod, string section) =>
-            _entry = API.Config.Register(mod, section, Tooltip, Key, _default);
+            _entry = Register(mod, section, Tooltip, Key, _default);
 
         public override void ResetToDefault() => Value = _default;
     }
@@ -210,7 +231,7 @@ namespace CkQol.Config
             Rewired.ReInput.isReady ? Rewired.ReInput.controllers.Keyboard : null;
 
         public override void Bind(string mod, string section) =>
-            _entry = API.Config.Register(mod, section, Tooltip, Key, (int)_default);
+            _entry = Register(mod, section, Tooltip, Key, (int)_default);
 
         public override void ResetToDefault() => Value = _default;
     }
@@ -249,7 +270,7 @@ namespace CkQol.Config
         public int Index => Mathf.Max(0, Array.IndexOf(Options, Value));
 
         public override void Bind(string mod, string section) =>
-            _entry = API.Config.Register(mod, section, Tooltip, Key, _default);
+            _entry = Register(mod, section, Tooltip, Key, _default);
 
         public override void ResetToDefault() => Value = _default;
     }
