@@ -34,7 +34,7 @@ namespace CkQol.Native
             if (!_layoutPending) return;
             _layoutPending = false;
 
-            if (Owner != null) GameMenu.LayoutWithGame(Owner);
+            if (Owner != null) GameMenu.LayoutWithGame(Owner, this);
 
             if (!LogState) return;
             string render = labelText == null ? "no labelText"

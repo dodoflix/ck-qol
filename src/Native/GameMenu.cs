@@ -290,7 +290,7 @@ namespace CkQol.Native
         private static readonly Dictionary<RadicalMenu, float> _pitchCache =
             new Dictionary<RadicalMenu, float>();
 
-        public static void LayoutWithGame(RadicalMenu menu)
+        public static void LayoutWithGame(RadicalMenu menu, RadicalMenuOption ours = null)
         {
             if (menu == null) return;
 
@@ -334,13 +334,41 @@ namespace CkQol.Native
             menu.menuEntryVirtualHeight = pitch;
             menu.menuEntryStartPositionY = (top + bottom) * 0.5f - pitch * 0.5f;
 
-            int positioned = menu.GetAllCurrentlyActiveMenuOptions().Count;
+            var active = menu.GetAllCurrentlyActiveMenuOptions();
+            bool oursIncluded = ours != null && active.Contains(ours);
             menu.UpdatePosition();
 
-            Debug.Log($"[CkQol] laid out: rows={ys.Count} positioned={positioned} " +
-                      $"menuOptions={menu.menuOptions.Count} " +
+            // The game's layout keeps excluding our row despite it reporting ACTIVE
+            // and being present in menuOptions. Rather than guess at why, place it
+            // against the grid UpdatePosition has just produced: read the real
+            // positions it assigned and continue the sequence by one pitch.
+            if (ours != null && !oursIncluded)
+            {
+                float lowest = float.MaxValue;
+                float x = ours.transform.localPosition.x;
+                float z = ours.transform.localPosition.z;
+                foreach (var row in active)
+                {
+                    if (row == null) continue;
+                    var local = row.transform.localPosition;
+                    if (local.y < lowest)
+                    {
+                        lowest = local.y;
+                        x = local.x;
+                        z = local.z;
+                    }
+                }
+                if (lowest < float.MaxValue)
+                {
+                    ours.transform.localPosition = new Vector3(x, lowest - pitch, z);
+                }
+            }
+
+            Debug.Log($"[CkQol] laid out: rows={ys.Count} positioned={active.Count} " +
+                      $"oursIncluded={oursIncluded} menuOptions={menu.menuOptions.Count} " +
                       $"override={(menu.autoPositioningOverride != null ? menu.autoPositioningOverride.Count : -1)} " +
-                      $"pitch={pitch} startY={menu.menuEntryStartPositionY}");
+                      $"pitch={pitch} startY={menu.menuEntryStartPositionY} " +
+                      $"oursState={(ours != null ? ours.GetActiveStateInCurrentScene().ToString() : "n/a")}");
         }
 
         /// Stacks rows down a menu we built ourselves, reusing the slot positions the
