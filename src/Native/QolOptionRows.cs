@@ -152,10 +152,14 @@ namespace CkQol.Native
             if (_segments > 0) QolStepStrip.Build(this, _segments);
         }
 
+        /// Clicking the label drops a bar row to its minimum, the way clicking an
+        /// audio row's label mutes it. Rows without a bar have no such anchor, so
+        /// they cycle instead.
         public override void OnActivated()
         {
             base.OnActivated();
-            Step(1);
+            if (_segments > 0) SetStep(0);
+            else Step(1);
         }
 
         public override void OnSelected()
