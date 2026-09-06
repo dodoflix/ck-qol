@@ -192,11 +192,10 @@ def plate(glyph):
 # Those calls decide their own edges, and at this size their idea of a curve is
 # a few stray pixels rather than a shape.
 #
-# 8 tripled is 24, which is exactly the recess inside a slot's three ring frame.
 # Every sprite is ART on its long axis, so no icon reads bigger than its
 # neighbour however well each one is centred.
 ART = 8
-ART_SCALE = 3
+ART_SCALE = 2
 
 
 def sprite(rows, palette):
