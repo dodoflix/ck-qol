@@ -26,8 +26,8 @@ if [ -z "${MODIO_MOD_ID:-}" ]; then
   curl -sS -X POST "$API" \
     -H "Authorization: Bearer $MODIO_TOKEN" -H 'Accept: application/json' \
     -F "visible=$VISIBLE" \
-    -F 'name=Core Keeper QoL' \
-    -F 'name_id=core-keeper-qol' \
+    -F 'name=Quality of Life' \
+    -F 'name_id=quality-of-life' \
     -F "summary=$SUMMARY" \
     -F "description=<$REPO/assets/modio-description.html" \
     -F 'homepage_url=https://github.com/dodoflix/ck-qol' \
