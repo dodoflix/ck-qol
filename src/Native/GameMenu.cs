@@ -324,12 +324,23 @@ namespace CkQol.Native
             if (_pitchCache.TryGetValue(menu, out float cached)) pitch = cached;
             else _pitchCache[menu] = pitch;
 
+            // UpdatePosition lays out GetAllCurrentlyActiveMenuOptions, which reads
+            // autoPositioningOverride when that is populated and menuOptions
+            // otherwise. Both were verified at install, but menuOptions is rebuilt in
+            // Awake when the menu first activates - so make sure our rows are in
+            // whichever list is authoritative, immediately before the layout runs.
+            Refresh(menu);
+
             menu.menuEntryVirtualHeight = pitch;
             menu.menuEntryStartPositionY = (top + bottom) * 0.5f - pitch * 0.5f;
+
+            int positioned = menu.GetAllCurrentlyActiveMenuOptions().Count;
             menu.UpdatePosition();
 
-            Debug.Log($"[CkQol] laid out via UpdatePosition: rows={ys.Count} pitch={pitch} " +
-                      $"startY={menu.menuEntryStartPositionY}");
+            Debug.Log($"[CkQol] laid out: rows={ys.Count} positioned={positioned} " +
+                      $"menuOptions={menu.menuOptions.Count} " +
+                      $"override={(menu.autoPositioningOverride != null ? menu.autoPositioningOverride.Count : -1)} " +
+                      $"pitch={pitch} startY={menu.menuEntryStartPositionY}");
         }
 
         /// Stacks rows down a menu we built ourselves, reusing the slot positions the

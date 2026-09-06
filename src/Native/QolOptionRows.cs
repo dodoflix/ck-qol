@@ -38,12 +38,27 @@ namespace CkQol.Native
 
             if (!LogState) return;
             string render = labelText == null ? "no labelText"
-                : $"textActive={labelText.gameObject.activeInHierarchy} " +
-                  $"enabled={labelText.enabled} dims={labelText.dimensions.size} " +
-                  $"localize={labelText.localize} text='{labelText.GetText()}'";
-            Debug.Log($"[CkQol] after layout: state={GetActiveStateInCurrentScene()} " +
-                      $"activeSelf={gameObject.activeSelf} pos={transform.localPosition} " +
-                      $"scale={transform.lossyScale} {render}");
+                : $"textLocal={labelText.transform.localPosition} " +
+                  $"textWorld={labelText.transform.position} " +
+                  $"dims={labelText.dimensions.size} text='{labelText.GetText()}'";
+
+            // Compare against a stock row: if ours differs only in Y we are placed
+            // correctly, and anything else points at where it is actually drawing.
+            string reference = "no reference";
+            if (Owner != null)
+            {
+                foreach (var other in Owner.menuOptions)
+                {
+                    if (other == null || other == this || other.labelText == null) continue;
+                    if (!other.gameObject.activeSelf) continue;
+                    reference = $"stock '{other.labelText.GetText()}' " +
+                                $"rowWorld={other.transform.position} " +
+                                $"textWorld={other.labelText.transform.position}";
+                    break;
+                }
+            }
+
+            Debug.Log($"[CkQol] after layout: rowWorld={transform.position} {render} | {reference}");
         }
 
         private void Start()
