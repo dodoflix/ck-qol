@@ -55,7 +55,16 @@ namespace CkQol.Native
             // and comes back blank.
             if (visible != _active || !_initialized)
             {
-                if (_text != null) _text.gameObject.SetActive(visible);
+                // The whole chain, not just the label: it is a child of textContainer,
+                // which every stock hint toggles (HonkButton.cs:40) and which the donor
+                // was not showing when it was cloned. An active child inside an
+                // inactive parent renders nothing.
+                for (var at = _text != null ? _text.transform : null;
+                     at != null && at != transform;
+                     at = at.parent)
+                {
+                    at.gameObject.SetActive(visible);
+                }
 
                 // Renderers are disabled rather than their GameObjects deactivated: the
                 // donor's sprites can be the label's own parent or the hint root, and
@@ -94,7 +103,8 @@ namespace CkQol.Native
                           $"sibling={(_sibling != null ? _sibling.transform.localScale.ToString() : "none")} " +
                           $"local={transform.localPosition} label='{_shown}' " +
                           $"glyphs={(_text != null ? _text.glyphs.Count : -1)} " +
-                          $"textActive={(_text != null && _text.gameObject.activeInHierarchy)}");
+                          $"textActive={(_text != null && _text.gameObject.activeInHierarchy)} " +
+                          $"rootActive={gameObject.activeInHierarchy}");
             }
 
             base.LateUpdate();
