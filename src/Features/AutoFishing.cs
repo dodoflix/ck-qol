@@ -37,6 +37,12 @@ namespace CkQol.Features
                              "Ignored while Learn reel hold is on and you have reeled " +
                              "by hand at least once.");
 
+        private readonly FloatSetting _pullDelay =
+            new FloatSetting("PullDelaySeconds", "Pull delay", 0f, 0f, 2f,
+                             "Wait this long after a fish bites before reeling. Zero " +
+                             "reels the instant it bites. Raise it to look less like " +
+                             "a machine, at the risk of losing a fish.");
+
         private readonly BoolSetting _infiniteShoal =
             new BoolSetting("InfiniteShoal", "Infinite fish shoal", true,
                             "Baited spots never deplete. The host decides this one, so " +
@@ -47,6 +53,7 @@ namespace CkQol.Features
             yield return _autoReel;
             yield return _learnHold;
             yield return _reelHold;
+            yield return _pullDelay;
             yield return _infiniteShoal;
         }
 
@@ -59,6 +66,7 @@ namespace CkQol.Features
             }
             Push();
             Log($"started (reel={_autoReel.Value}, hold={_reelHold.Value:0.00}s, " +
+                $"learn={_learnHold.Value}, delay={_pullDelay.Value:0.00}s, " +
                 $"shoal={_infiniteShoal.Value})");
         }
 
@@ -75,6 +83,7 @@ namespace CkQol.Features
             AutoFishingState.ShoalEnabled = _infiniteShoal.Value;
             AutoFishingState.ReelHoldSeconds = _reelHold.Value;
             AutoFishingState.LearnEnabled = _learnHold.Value;
+            AutoFishingState.PullDelaySeconds = _pullDelay.Value;
         }
     }
 
@@ -89,6 +98,7 @@ namespace CkQol.Features
         internal static volatile bool ShoalEnabled;
         internal static volatile float ReelHoldSeconds = 0.2f;
         internal static volatile bool LearnEnabled;
+        internal static volatile float PullDelaySeconds;
 
         /// How long the player's last manual reel lasted, or -1 if they have not
         /// reeled by hand yet.
