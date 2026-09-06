@@ -66,6 +66,16 @@ namespace CkQol
             // Scale is baked into the canvas at build time, so drop the menu and let
             // it rebuild at the new scale on next open.
             _general.UiScale.Changed += _ => DestroyMenu();
+            _general.UseGameSprites.Changed += _ =>
+            {
+                GameTheme.UseGameSprites = _general.UseGameSprites.Value;
+                GameTheme.ResetSpriteCache();
+                DestroyMenu();
+            };
+            _general.DumpAssets.Changed += _ =>
+            {
+                if (_general.DumpAssets.Value) GameTheme.DumpAssets();
+            };
 
             API.Client.OnWorldCreated += OnWorldCreated;
             API.Client.OnWorldDestroyed += OnWorldDestroyed;
@@ -160,6 +170,12 @@ namespace CkQol
                               "because the game's pixel font blurs at fractional scale. " +
                               "Reopen the menu to apply.");
 
+        public readonly BoolSetting UseGameSprites =
+            new BoolSetting("UseGameSprites", "Use game sprites", true,
+                            "Skin the menu with Core Keeper's own panel and button art. " +
+                            "Turn off for flat colours if a game update breaks the sprites. " +
+                            "Reopen the menu to apply.");
+
         public readonly BoolSetting DumpAssets =
             new BoolSetting("LogUiAssets", "Log UI assets on open", false,
                             "Writes the game's available fonts and sliced sprites to the log. " +
@@ -169,11 +185,13 @@ namespace CkQol
         {
             yield return MenuKey;
             yield return UiScale;
+            yield return UseGameSprites;
             yield return DumpAssets;
         }
 
         public override void Init()
         {
+            GameTheme.UseGameSprites = UseGameSprites.Value;
             if (DumpAssets.Value) GameTheme.DumpAssets();
         }
     }

@@ -22,13 +22,19 @@ namespace CkQol.UI
         {
             var go = Node(name, parent, out rect);
             var image = go.AddComponent<Image>();
-            image.color = color;
 
             var sprite = GameTheme.PanelSprite;
             if (sprite != null)
             {
                 image.sprite = sprite;
                 image.type = Image.Type.Sliced;
+                // Show the sprite's own art rather than tinting it into the flat
+                // colour it is replacing; alpha still comes from the requested colour.
+                image.color = new Color(1f, 1f, 1f, color.a);
+            }
+            else
+            {
+                image.color = color;
             }
             return image;
         }

@@ -62,29 +62,85 @@ namespace CkQol.UI
             }
         }
 
-        /// A 9-sliced panel sprite from the game, if we can find a plausible one.
-        /// Null is fine - callers fall back to a flat colour.
+        private static Dictionary<string, Sprite> _index;
+
+        /// Whether to use the game's own sprites. Off falls back to flat colours,
+        /// which is the escape hatch if a game update renames or changes them.
+        public static bool UseGameSprites = true;
+
+        /// Every loaded sprite by name. Built once - the game has thousands, and
+        /// FindObjectsOfTypeAll is far too slow to call per widget.
+        private static Dictionary<string, Sprite> Index
+        {
+            get
+            {
+                if (_index != null) return _index;
+                _index = new Dictionary<string, Sprite>();
+                foreach (var sprite in Resources.FindObjectsOfTypeAll<Sprite>())
+                {
+                    if (sprite == null || string.IsNullOrEmpty(sprite.name)) continue;
+                    _index[sprite.name] = sprite;
+                }
+                Debug.Log($"[CkQol] indexed {_index.Count} sprites");
+                return _index;
+            }
+        }
+
+        /// Forces the next lookup to re-resolve, after the use-game-sprites toggle.
+        public static void ResetSpriteCache()
+        {
+            _panelSprite = null; _panelSearched = false;
+            _buttonSprite = null; _buttonSearched = false;
+            _cursor = null;
+        }
+
+        /// First of these names that is loaded. Names come from the game's own
+        /// resources.assets, so they are exact rather than guessed by keyword.
+        public static Sprite FindSprite(params string[] names)
+        {
+            if (!UseGameSprites) return null;
+            foreach (var name in names)
+            {
+                if (Index.TryGetValue(name, out var sprite) && sprite != null) return sprite;
+            }
+            return null;
+        }
+
+        /// Window and panel shell. Must be 9-sliced or it stretches into mush, so a
+        /// sprite without borders is rejected in favour of a flat colour.
         public static Sprite PanelSprite
         {
             get
             {
                 if (_panelSearched) return _panelSprite;
                 _panelSearched = true;
-
-                var candidates = Resources.FindObjectsOfTypeAll<Sprite>()
-                    .Where(s => s != null && s.name != null && s.border != Vector4.zero)
-                    .ToList();
-
-                // Prefer something that names itself a panel/window/frame and is 9-sliced.
-                string[] wanted = { "panel", "window", "frame", "box", "bg", "background" };
-                _panelSprite = candidates.FirstOrDefault(
-                    s => wanted.Any(w => s.name.ToLowerInvariant().Contains(w)));
-
-                if (_panelSprite != null)
+                var found = FindSprite("32x32_menu_border", "32x32_itemui_border", "32x32_map_border");
+                if (found != null && found.border == Vector4.zero)
                 {
-                    Debug.Log($"[CkQol] using panel sprite '{_panelSprite.name}'");
+                    Debug.Log($"[CkQol] '{found.name}' has no 9-slice border, using flat panels");
+                    found = null;
                 }
+                _panelSprite = found;
+                if (_panelSprite != null) Debug.Log($"[CkQol] panel sprite '{_panelSprite.name}'");
                 return _panelSprite;
+            }
+        }
+
+        private static Sprite _buttonSprite;
+        private static bool _buttonSearched;
+
+        /// Button face.
+        public static Sprite ButtonSprite
+        {
+            get
+            {
+                if (_buttonSearched) return _buttonSprite;
+                _buttonSearched = true;
+                var found = FindSprite("base_button_1", "base_button_2", "button_1");
+                if (found != null && found.border == Vector4.zero) found = null;
+                _buttonSprite = found;
+                if (_buttonSprite != null) Debug.Log($"[CkQol] button sprite '{_buttonSprite.name}'");
+                return _buttonSprite;
             }
         }
 
@@ -102,6 +158,14 @@ namespace CkQol.UI
             get
             {
                 if (_cursor != null) return _cursor;
+
+                var game = FindSprite("cursor_inv");
+                if (game != null)
+                {
+                    Debug.Log($"[CkQol] cursor sprite '{game.name}'");
+                    _cursor = game;
+                    return _cursor;
+                }
 
                 const int w = 12, h = 19;
                 // 0 = transparent, 1 = outline, 2 = fill.
@@ -172,17 +236,45 @@ namespace CkQol.UI
             }
         }
 
-        /// Logs what UI assets are available. Handy when tuning the look against a
-        /// new game version - run once, read the log, pick better sprite names.
-        public static void DumpAssets(int limit = 40)
+        /// Writes every loaded sprite and font to a file. The log truncates and
+        /// the game has thousands of sprites, so a file is the only way to get a
+        /// usable inventory for picking exact names.
+        public static void DumpAssets()
         {
-            var fonts = Resources.FindObjectsOfTypeAll<TMP_FontAsset>().Select(f => f.name).Distinct().ToList();
-            Debug.Log($"[CkQol] TMP fonts ({fonts.Count}): {string.Join(", ", fonts.Take(limit))}");
+            try
+            {
+                string path = System.IO.Path.Combine(
+                    System.Environment.GetFolderPath(System.Environment.SpecialFolder.UserProfile),
+                    "ck-qol-assets.txt");
 
-            var sliced = Resources.FindObjectsOfTypeAll<Sprite>()
-                .Where(s => s != null && s.border != Vector4.zero)
-                .Select(s => s.name).Distinct().Take(limit).ToList();
-            Debug.Log($"[CkQol] 9-sliced sprites ({sliced.Count} shown): {string.Join(", ", sliced)}");
+                var lines = new List<string>();
+                var fonts = Resources.FindObjectsOfTypeAll<TMP_FontAsset>();
+                lines.Add($"# TMP fonts ({fonts.Length})");
+                foreach (var f in fonts.Where(f => f != null))
+                {
+                    lines.Add($"font\t{f.name}\tpointSize={f.faceInfo.pointSize}");
+                }
+
+                var sprites = Resources.FindObjectsOfTypeAll<Sprite>()
+                    .Where(sp => sp != null && !string.IsNullOrEmpty(sp.name))
+                    .OrderBy(sp => sp.name)
+                    .ToList();
+                lines.Add($"# sprites ({sprites.Count}), sliced ones first are the useful ones");
+                foreach (var sp in sprites)
+                {
+                    bool sliced = sp.border != Vector4.zero;
+                    lines.Add($"sprite\t{sp.name}\t{(int)sp.rect.width}x{(int)sp.rect.height}" +
+                              $"\tborder={sp.border}\tsliced={sliced}");
+                }
+
+                System.IO.File.WriteAllLines(path, lines);
+                Debug.Log($"[CkQol] wrote {sprites.Count} sprites and {fonts.Length} fonts to {path}");
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogError("[CkQol] asset dump failed");
+                Debug.LogException(e);
+            }
         }
 
         /// The font's own design size. A pixel font only renders cleanly at integer
