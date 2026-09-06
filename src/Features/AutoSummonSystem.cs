@@ -91,7 +91,7 @@ namespace CkQol.Features
 
             if (_slot >= 0)
             {
-                if (now < _pressUntil) PlayerSlots.Press(EntityManager, player, _slot);
+                if (now < _pressUntil) PlayerSlots.Press(EntityManager, player, _slot, aimAtSelf: true);
                 else _slot = -1;
                 return;
             }
@@ -147,7 +147,7 @@ namespace CkQol.Features
             _slot = slot;
             _pressUntil = now + PressSeconds;
             _justSummoned = missing;
-            PlayerSlots.Press(EntityManager, player, slot);
+            PlayerSlots.Press(EntityManager, player, slot, aimAtSelf: true);
 
             UnityEngine.Debug.Log(
                 $"[CkQol/Auto Summon] summoning {missing} ({Alive()}/{cap} alive)");

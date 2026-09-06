@@ -21,7 +21,6 @@ namespace CkQol.Native
         private bool _initialized;
         private bool _loggedVisible;
         private string _shown;
-        private Vector3 _scale;
 
         public override bool isButtonActive => _active;
 
@@ -34,14 +33,10 @@ namespace CkQol.Native
 
         public override void UpdateVisuals()
         {
-            // Every hint does this; without it the row does not follow the UI scale
-            // setting.
-            Vector3 scale = Manager.ui.CalcGameplayUITargetScaleMultiplier();
-            if (scale != _scale)
-            {
-                transform.localScale = scale;
-                _scale = scale;
-            }
+            // Assigned every update rather than cached. The multiplier is zero during
+            // a load fade, which is also the default of any cached field, so a cache
+            // cannot tell "not set yet" from "genuinely zero" and gets stuck there.
+            transform.localScale = Manager.ui.CalcGameplayUITargetScaleMultiplier();
 
             bool visible = Visible != null && Visible() &&
                            !Manager.ui.isAnyInventoryShowing && !Manager.ui.isShowingMap;
@@ -60,7 +55,8 @@ namespace CkQol.Native
             {
                 _loggedVisible = true;
                 Debug.Log($"[CkQol] hint '{name}' visible, label '{_shown}', " +
-                          $"active={gameObject.activeInHierarchy} scale={_scale}");
+                          $"active={gameObject.activeInHierarchy} scale={transform.localScale} " +
+                          $"local={transform.localPosition} world={transform.position}");
             }
 
             if (visible != _active || !_initialized)

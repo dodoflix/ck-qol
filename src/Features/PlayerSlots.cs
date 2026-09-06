@@ -1,5 +1,7 @@
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
+using Unity.Mathematics;
+using Unity.Transforms;
 
 namespace CkQol.Features
 {
@@ -14,13 +16,29 @@ namespace CkQol.Features
         /// on the same tick (:198-204). The player's real selection lives in a client
         /// MonoBehaviour that SendClientInputSystem copies back every tick, so the
         /// override lasts only as long as it is written and the hotbar never moves.
-        internal static void Press(EntityManager entityManager, Entity player, int slot)
+        internal static void Press(EntityManager entityManager, Entity player, int slot,
+                                   bool aimAtSelf = false)
         {
             var inputData = entityManager.GetComponentData<ClientInputData>(player);
             ClientInput input = UnsafeUtility.As<ClientInputData, ClientInput>(ref inputData);
 
             input.equippedSlotIndex = (byte)slot;
             input.SetButtonState(CommandInputButtonStateNames.SecondInteract_HeldDown, true);
+
+            // Summons land at player position + aimDirection, or for command-minion
+            // weapons up to 12 tiles along the aim marker (SummoningWeaponSlot.cs:74-77),
+            // so an untouched aim drops them wherever the mouse happens to be.
+            //
+            // mouseOrJoystickWorldPoint is an absolute point, not an offset: leaving it
+            // at zero would aim at the world origin rather than at the player.
+            if (aimAtSelf && entityManager.HasComponent<LocalTransform>(player))
+            {
+                float3 here = entityManager.GetComponentData<LocalTransform>(player).Position;
+
+                input.aimDirection = default;
+                input.targetingDirection = default;
+                input.mouseOrJoystickWorldPoint = new float2(here.x, here.z);
+            }
 
             inputData = UnsafeUtility.As<ClientInput, ClientInputData>(ref input);
             entityManager.SetComponentData(player, inputData);
