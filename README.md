@@ -5,8 +5,8 @@
 Client-side quality-of-life tweaks, bundled as one PugMod mod. Other players do not
 need it.
 
-Settings live in the game's own menu: **Settings → QoL settings**. Every feature has
-an Enabled toggle and is off until you turn it on.
+Settings live in the game's own menu: **Settings → QoL settings**. Every feature is
+on out of the box and has an Enabled toggle to switch it off.
 
 Targets Core Keeper **1.2.1.5**.
 
