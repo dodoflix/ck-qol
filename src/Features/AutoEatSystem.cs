@@ -160,9 +160,9 @@ namespace CkQol.Features
         /// The smallest edible thing the player is carrying, so a big dish is not spent
         /// on a small gap. Returns -1 when there is nothing to eat.
         ///
-        /// Covers the pouches as well as the main inventory: they are sub-ranges of the
-        /// same buffer, and the game equips out of them too - a non-empty pouch is one
-        /// of the hotbar rows (ItemSlotsBarUI.cs:264-289).
+        /// Index 0 is the main inventory and 1..4 are the pouches, all sub-ranges of the
+        /// same buffer. The game equips out of pouches too - a non-empty one is a hotbar
+        /// row (ItemSlotsBarUI.cs:264-289).
         private int FindFood(Entity player, out int restores, out ObjectID picked)
         {
             restores = 0;
@@ -173,7 +173,9 @@ namespace CkQol.Features
 
             int best = -1;
 
-            for (int inv = 0; inv < inventories.Length; inv++)
+            int count = AutoEatState.UsePouches ? inventories.Length : 1;
+
+            for (int inv = 0; inv < count; inv++)
             {
                 int first = inventories[inv].startIndex;
                 int last = first + inventories[inv].size;
