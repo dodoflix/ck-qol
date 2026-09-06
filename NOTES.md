@@ -189,6 +189,12 @@ it as a `CombatText`. Two things about that:
   damage numbers off (`CombatText.SpawnCombatText` returns on
   `Manager.prefs.showDamageNumbers`). The outline is the part that always shows.
 
+Suggestions start at the first character. They cost one keystroke, not one frame:
+a walk of the nearby containers to learn what is in stock, then up to four passes
+over the name index — nearby-and-prefix, nearby, prefix, the rest — each stopping
+at eight results. So the first letter offers what you already own before anything
+else, and a single letter is no more expensive than three.
+
 Item names go through `PugText.ProcessText("Items/" + property, …)` rather than
 I2.Loc directly, which is not among the assemblies the mod compiles against. A
 missing term comes back as `missing: …` rather than null, and that is the test for
@@ -201,7 +207,7 @@ anywhere: `MenuManager.HandleTypingInput` feeds it `Input.inputString` and runs
 before any menu check. `QolTextOption` already implements that interface for the
 settings menu and the search box reuses it.
 
-Two things differ outside a menu:
+Four things differ outside a menu:
 
 - Pair it with `Manager.input.DisableInput()` / `EnableInput()`, or the player walks
   while typing. The pause menu has already frozen them, so the settings row skips it.
