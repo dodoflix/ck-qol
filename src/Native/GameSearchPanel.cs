@@ -476,9 +476,6 @@ namespace CkQol.Native
             if (element.amountNumberShadow != null) amountShadows.Add(element.amountNumberShadow);
             if (element.amountNumberShadow2 != null) amountShadows.Add(element.amountNumberShadow2);
 
-            Silence(element.chestAmountNumber);
-            Silence(element.chestAmountNumberShadow);
-            Silence(element.chestAmountNumberShadow2);
             if (element.chestIcon != null) element.chestIcon.enabled = false;
 
             if (element.container != null)
@@ -520,6 +517,16 @@ namespace CkQol.Native
             clone.transform.localPosition = Vector3.zero;
             clone.SetActive(true);
 
+            // Blanked only now it is active, and all of them, not just the ones this
+            // row leaves unused. PugText drops a render made while its object is
+            // disabled, so silencing in staging is thrown away and the donor's own
+            // ingredient text comes back the moment the row is switched on. Draw
+            // refills the two that carry anything.
+            foreach (var text in clone.GetComponentsInChildren<PugText>(true))
+            {
+                GameMenu.SetLiteral(text, string.Empty);
+            }
+
             return new Row
             {
                 Root = clone,
@@ -530,11 +537,6 @@ namespace CkQol.Native
                 Box = box,
                 Index = -1,
             };
-        }
-
-        private static void Silence(PugText text)
-        {
-            if (text != null) GameMenu.SetLiteral(text, string.Empty);
         }
 
         internal void Choose(int index)
@@ -767,7 +769,6 @@ namespace CkQol.Native
                 if (hint != null)
                 {
                     hint.localize = false;
-                    GameMenu.SetLiteral(hint, "search...");
                 }
 
                 var collider = box.AddComponent<BoxCollider>();
@@ -779,6 +780,11 @@ namespace CkQol.Native
                 box.transform.SetParent(root.transform, false);
                 box.transform.localPosition = new Vector3(1.2f, boxRow, 0f);
                 box.SetActive(true);
+
+                // After activation, for the same reason the rows are: a render made
+                // in staging is dropped, and the donor's "Label..." would come back.
+                if (hint != null) GameMenu.SetLiteral(hint, "search...");
+                GameMenu.SetLiteral(query, string.Empty);
 
                 var picked = Icon(root.transform, donor, new Vector3(0.55f, boxRow, 0f));
 
