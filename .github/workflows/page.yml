@@ -1,0 +1,28 @@
+name: Store page
+
+# The mod.io page on its own, from whatever branch this is run on. The release
+# workflow does the same sync, but only from a tag - and copy, logo and
+# screenshots change far more often than the mod does. Cutting a version just to
+# publish a screenshot would put two different builds behind one number.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  page:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sync the mod.io page
+        env:
+          MODIO_TOKEN: ${{ secrets.MODIO_TOKEN }}
+          MODIO_MOD_ID: ${{ secrets.MODIO_MOD_ID }}
+        run: |
+          if [ -z "$MODIO_TOKEN" ] || [ -z "$MODIO_MOD_ID" ]; then
+            echo "MODIO_TOKEN or MODIO_MOD_ID is not set." >&2
+            exit 1
+          fi
+          ./modio-page.sh
