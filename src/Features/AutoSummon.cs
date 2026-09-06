@@ -111,18 +111,12 @@ namespace CkQol.Features
             _hint.Tint = HintTint;
         }
 
-        /// Just the binding, prefixed with an infinity sign for "keeps going".
-        ///
-        /// Escaped rather than written literally so the in-game compile cannot depend
-        /// on this file's encoding. A font without the glyph renders '?' rather than
-        /// throwing (PugFont.cs:692).
-        private string HintLabel()
-        {
-            string key = AutoSummonState.ToggleModifier == Modifier.None
+        /// Just the binding: the icon carries the meaning, and the row has only room
+        /// for labels the size of the game's own.
+        private string HintLabel() =>
+            AutoSummonState.ToggleModifier == Modifier.None
                 ? _toggleKey.Name
                 : $"{AutoSummonState.ToggleModifier}+{_toggleKey.Name}";
-            return "\u221E " + key;
-        }
 
         /// Shown on the hint. Any item's icon works; a clock reads as "this keeps
         /// happening on its own" better than the weapon did, and the weapon is already
