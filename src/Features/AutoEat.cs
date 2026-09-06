@@ -28,6 +28,10 @@ namespace CkQol.Features
             new BoolSetting("EatCooked", "Eat cooked food", false,
                             "Off leaves cooked dishes alone and eats only raw food.");
 
+        private readonly BoolSetting _useInventory =
+            new BoolSetting("UseInventory", "Eat from inventory", true,
+                            "Off looks only in the hotbar row you have open.");
+
         private readonly BoolSetting _usePouches =
             new BoolSetting("UsePouches", "Eat from pouches", true,
                             "Off looks in the main inventory only.");
@@ -36,6 +40,7 @@ namespace CkQol.Features
         {
             yield return _threshold;
             yield return _eatCooked;
+            yield return _useInventory;
             yield return _usePouches;
         }
 
@@ -59,7 +64,7 @@ namespace CkQol.Features
             _running = true;
             Push();
             Log($"started (threshold={AutoEatState.Threshold}, cooked={_eatCooked.Value}, " +
-                $"pouches={_usePouches.Value})");
+                $"inventory={_useInventory.Value}, pouches={_usePouches.Value})");
         }
 
         public override void Shutdown()
@@ -74,6 +79,7 @@ namespace CkQol.Features
             AutoEatState.Enabled = _running;
             AutoEatState.Threshold = _threshold.Value == Starving ? 25 : 75;
             AutoEatState.AllowCooked = _eatCooked.Value;
+            AutoEatState.UseInventory = _useInventory.Value;
             AutoEatState.UsePouches = _usePouches.Value;
         }
     }
@@ -85,6 +91,7 @@ namespace CkQol.Features
         internal static volatile bool Enabled;
         internal static volatile int Threshold = 75;
         internal static volatile bool AllowCooked;
+        internal static volatile bool UseInventory = true;
         internal static volatile bool UsePouches = true;
     }
 }

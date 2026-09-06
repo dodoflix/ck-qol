@@ -173,12 +173,29 @@ namespace CkQol.Features
 
             int best = -1;
 
-            int count = AutoEatState.UsePouches ? inventories.Length : 1;
+            // With the inventory off, only the hotbar row currently open. That row is a
+            // moving window over these same buffers rather than a fixed range, so the
+            // bounds come from the player rather than being derived here.
+            bool hotbarOnly = !AutoEatState.UseInventory;
+            var local = Manager.main != null ? Manager.main.player : null;
+            if (hotbarOnly && local == null) return -1;
+
+            int count = hotbarOnly ? 1
+                      : AutoEatState.UsePouches ? inventories.Length : 1;
 
             for (int inv = 0; inv < count; inv++)
             {
-                int first = inventories[inv].startIndex;
-                int last = first + inventories[inv].size;
+                int first, last;
+                if (hotbarOnly)
+                {
+                    first = local.hotbarStartIndex;
+                    last = local.hotbarEndIndex;
+                }
+                else
+                {
+                    first = inventories[inv].startIndex;
+                    last = first + inventories[inv].size;
+                }
                 if (last > contained.Length) last = contained.Length;
 
                 for (int i = first; i < last; i++)
