@@ -135,6 +135,16 @@ namespace CkQol.Native
                 var clone = UnityEngine.Object.Instantiate(donor.gameObject, Staging);
                 clone.name = "CkQol_" + debugName;
 
+                // A ranged donor carries one child ButtonUIElement per diamond, wired
+                // in the prefab to call back into the row's script. Swapping the script
+                // leaves those pointing at a destroyed component, and because they sit
+                // in front of the row they win the click raycast and then do nothing -
+                // which is why the diamonds looked dead. QolStepStrip rebuilds them.
+                foreach (var stale in clone.GetComponentsInChildren<ButtonUIElement>(true))
+                {
+                    if (stale != null) UnityEngine.Object.DestroyImmediate(stale.gameObject);
+                }
+
                 var original = clone.GetComponent<RadicalMenuOption>();
                 var fields = OptionFields.From(original);
 

@@ -104,10 +104,11 @@ namespace CkQol.Native
     /// Numeric or multiple-choice row, stepped with left/right.
     ///
     /// Not built on RadicalOptionsMenuOption_Slider - that class is unused in the
-    /// shipped game, so there is no instance to clone. What looks like a slider in
-    /// Audio settings is text: RadicalOptionsMenuOption_Volume renders eight filled
-    /// or hollow diamonds into valueText and steps the value in eighths. Ranged
-    /// settings here draw the same bar the same way.
+    /// shipped game, so there is no instance to clone, and its step count and glyphs
+    /// are private with no setter. What looks like a slider in Audio settings is
+    /// text: RadicalOptionsMenuOption_Volume renders eight filled or hollow diamonds
+    /// into valueText and steps the value in eighths. Ranged settings here draw the
+    /// same bar the same way, with a QolStepStrip over it for per-diamond clicking.
     public class QolNumberOption : RadicalPauseMenuOption
     {
         public IntSetting Int;
@@ -119,12 +120,91 @@ namespace CkQol.Native
         /// rows' valueText has no glyph for those characters and renders '?'.
         public bool CanDrawBar;
 
-        private void Start() => Refresh();
+        /// Diamonds to draw, or zero for a plain numeric or text value.
+        private int _segments;
+
+        /// Step under the pointer, or -1. Shown instead of the stored value so the
+        /// bar previews where a click would land.
+        private int _preview = -1;
+
+        /// Matches the eight steps the game's volume rows use.
+        public const int BarSegments = 8;
+
+        /// How many diamonds a setting is worth, or zero if it should stay numeric.
+        /// A bar cannot show which of twenty values is selected, so wide integer
+        /// ranges are left as text.
+        public static int SegmentsFor(ModSetting setting)
+        {
+            if (setting is FloatSetting) return BarSegments;
+            if (setting is IntSetting i)
+            {
+                int span = i.Max - i.Min;
+                return span > 0 && span <= BarSegments ? span : 0;
+            }
+            return 0;
+        }
+
+        private void Start()
+        {
+            if (CanDrawBar)
+            {
+                if (Float != null) _segments = SegmentsFor(Float);
+                else if (Int != null) _segments = SegmentsFor(Int);
+            }
+            Refresh();
+            if (_segments > 0) QolStepStrip.Build(this, _segments);
+        }
 
         public override void OnActivated()
         {
             base.OnActivated();
             Step(1);
+        }
+
+        public override bool OnSkimRight()
+        {
+            Step(1);
+            return true;
+        }
+
+        public override bool OnSkimLeft()
+        {
+            Step(-1);
+            return true;
+        }
+
+        /// Jumps to the step the pointer clicked. Step 1 is the first diamond, so as
+        /// with the game's volume rows the low end of the range is reachable by
+        /// stepping but not by clicking.
+        public void SetStep(int step)
+        {
+            if (_segments <= 0) return;
+
+            if (Float != null)
+            {
+                Float.Value = Float.Min + (Float.Max - Float.Min) * step / _segments;
+            }
+            else if (Int != null)
+            {
+                Int.Value = Int.Min + step;
+            }
+
+            _preview = -1;
+            Refresh();
+        }
+
+        public void PreviewStep(int step)
+        {
+            if (_segments <= 0 || _preview == step) return;
+            _preview = step;
+            Refresh();
+        }
+
+        public void ClearPreview()
+        {
+            if (_preview < 0) return;
+            _preview = -1;
+            Refresh();
         }
 
         /// Wraps at the ends, so a row can always be changed with one direction and
@@ -153,38 +233,41 @@ namespace CkQol.Native
                 Choice.Value = Choice.Options[(Choice.Index + direction + count) % count];
             }
 
+            _preview = -1;
             Refresh();
         }
 
-        /// Matches the eight steps the game's volume rows use.
-        public const int BarSegments = 8;
+        /// Diamonds currently filled.
+        private int Filled
+        {
+            get
+            {
+                if (Float != null)
+                {
+                    float span = Float.Max - Float.Min;
+                    if (span <= 0f) return 0;
+                    return Mathf.RoundToInt((Float.Value - Float.Min) / span * _segments);
+                }
+                return Int != null ? Int.Value - Int.Min : 0;
+            }
+        }
 
         private void Refresh()
         {
             GameMenu.SetLabel(this, Label);
 
             string value;
-            if (Float != null)
+            if (_segments > 0)
             {
-                if (CanDrawBar)
-                {
-                    float span = Float.Max - Float.Min;
-                    float filled = span > 0f ? (Float.Value - Float.Min) / span : 0f;
-                    value = Bar(Mathf.RoundToInt(filled * BarSegments));
-                }
-                else
-                {
-                    value = Float.Value.ToString("0.00");
-                }
+                value = Bar(_preview >= 0 ? _preview : Filled, _segments);
+            }
+            else if (Float != null)
+            {
+                value = Float.Value.ToString("0.00");
             }
             else if (Int != null)
             {
-                // A bar cannot show which of twenty values is selected, so wide
-                // ranges stay numeric even when a bar could be drawn.
-                int span = Int.Max - Int.Min;
-                value = CanDrawBar && span > 0 && span <= BarSegments
-                    ? Bar(Int.Value - Int.Min)
-                    : Int.Value.ToString();
+                value = Int.Value.ToString();
             }
             else
             {
@@ -194,10 +277,10 @@ namespace CkQol.Native
             GameMenu.SetValue(this, value);
         }
 
-        private static string Bar(int filled)
+        private static string Bar(int filled, int total)
         {
-            var bar = new System.Text.StringBuilder(BarSegments);
-            for (int i = 0; i < BarSegments; i++) bar.Append(i < filled ? '\u2666' : '\u2662');
+            var bar = new System.Text.StringBuilder(total);
+            for (int i = 0; i < total; i++) bar.Append(i < filled ? '\u2666' : '\u2662');
             return bar.ToString();
         }
     }

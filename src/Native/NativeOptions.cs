@@ -208,9 +208,7 @@ namespace CkQol.Native
             // valueText is the only one with the diamond glyphs, but it is also
             // styled differently - a number rendered in it comes out bold and unlike
             // every other row.
-            bool drawsBar = setting is FloatSetting ||
-                            (setting is IntSetting i2 && i2.Max - i2.Min > 0 &&
-                             i2.Max - i2.Min <= QolNumberOption.BarSegments);
+            bool drawsBar = QolNumberOption.SegmentsFor(setting) > 0;
             var donor = drawsBar && barDonor != null ? barDonor : toggleDonor;
 
             var number = GameMenu.CloneAndSwap<QolNumberOption>(donor, RowParent(page), "Number");
