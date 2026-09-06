@@ -31,8 +31,8 @@ namespace CkQol.Features
         private EntityQuery _networkTimeQuery;
         private EntityQuery _tickRateQuery;
 
-        /// World time the player's own reel began, or -1 when they are not reeling.
-        private double _manualHoldStart = -1d;
+        /// World time the reel being timed began, or -1 when none is.
+        private double _holdStart = -1d;
 
         /// Whether the previous frame's button press was ours.
         ///
@@ -71,26 +71,15 @@ namespace CkQol.Features
         /// time the gap until the next reel instead of the reel itself.
         private void Forget()
         {
-            _manualHoldStart = -1d;
+            _holdStart = -1d;
             _pressedLastFrame = false;
-        }
-
-        /// The player has stopped fishing, so the learned timing goes with it.
-        ///
-        /// Safe to key off the Fishing state: the game does not leave it between
-        /// casts - a catch sets queueThrowAgain and throws again from inside the
-        /// state, and PopState only runs in Fishing.OnExitFishing.
-        private void EndSession()
-        {
-            Forget();
-            AutoFishingState.ClearLearnedHold();
         }
 
         protected override void OnUpdate()
         {
             if (!AutoFishingState.ReelEnabled || _playerQuery.IsEmpty)
             {
-                EndSession();
+                Forget();
                 base.OnUpdate();
                 return;
             }
@@ -100,13 +89,13 @@ namespace CkQol.Features
             var slot = EntityManager.GetComponentData<EquipmentSlotCD>(player);
             if (slot.slotType != EquipmentSlotType.FishingRodSlot)
             {
-                EndSession();
+                Forget();
                 base.OnUpdate();
                 return;
             }
 
-            // A menu or inventory pauses the mod but the rod is still out, so the
-            // learned timing survives - unlike putting the rod away.
+            // A menu or inventory pauses the mod; the previous hold time is kept, so
+            // fishing carries on with the same timing when it closes.
             if (Manager.ui.isAnyInventoryShowing || Manager.menu.IsAnyMenuActive())
             {
                 Forget();
@@ -117,7 +106,7 @@ namespace CkQol.Features
             var playerState = EntityManager.GetComponentData<PlayerStateCD>(player);
             if (!playerState.HasAnyState(PlayerStateEnum.Fishing))
             {
-                EndSession();
+                Forget();
                 base.OnUpdate();
                 return;
             }
@@ -147,13 +136,9 @@ namespace CkQol.Features
             if (!state.ReelTimer.isRunning && !_pressedLastFrame &&
                 input.IsButtonStateSet(CommandInputButtonStateNames.SecondInteract_HeldDown))
             {
-                // Time it, so auto reel can use the player's own timing. Only a hold
-                // that started on a bite counts - anything else is not a reel.
-                if (_manualHoldStart < 0d && AutoFishingState.LearnEnabled &&
-                    fishState.fishIsNibbling)
-                {
-                    _manualHoldStart = now;
-                }
+                // Time it, so the next auto reel is as long as this one. While fishing
+                // this button is the reel, so there is nothing else it could be.
+                if (_holdStart < 0d && AutoFishingState.LearnEnabled) _holdStart = now;
 
                 // They beat us to it - drop any pending pull so we do not yank the line
                 // a second time once the delay runs out.
@@ -171,10 +156,10 @@ namespace CkQol.Features
             }
 
             // Not holding any more: whatever was being timed has ended.
-            if (_manualHoldStart >= 0d)
+            if (_holdStart >= 0d)
             {
-                AutoFishingState.ReportLearnedHold((float)(now - _manualHoldStart));
-                _manualHoldStart = -1d;
+                AutoFishingState.ReportHold((float)(now - _holdStart));
+                _holdStart = -1d;
             }
 
             bool pressing = false;
