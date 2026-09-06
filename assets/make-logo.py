@@ -183,58 +183,103 @@ def plate(glyph):
     for x, y in ((2, 2), (last - 2, 2)):
         d.point((x, y), fill=GOLD_DIM)
 
-    # Drawn on its own layer and cropped to its ink, so what gets centred is the
-    # sprite itself rather than the coordinates it happens to be written in.
-    art = Image.new("RGBA", (size * 2, size * 2), (0, 0, 0, 0))
-    glyph(ImageDraw.Draw(art), 0, 0)
-    art = art.crop(art.getbbox())
-    assert max(art.size) == ART, f"sprite is {art.size}, long axis must be {ART}"
-
+    art = sprite(*glyph)
     img.paste(art, ((size - art.width) // 2, (size - art.height) // 2), art)
     return img
 
 
-# Every sprite is drawn to the same 20px long axis. Left to their own devices
-# they came out between 16 and 22, which reads as four icons at four sizes even
-# though each one is centred.
-ART = 20
+# Sprites are hand placed on a 10px grid and doubled, not drawn with ellipses
+# and polygons at 20px. Those calls decide their own edges, and at this size
+# their idea of a curve is a few stray pixels rather than a shape.
+#
+# Every sprite is exactly ART on its long axis. Left to themselves they came out
+# between 16 and 22, which reads as four icons at four sizes however well each
+# one is centred.
+ART = 10
+ART_SCALE = 2
 
 
-def fish(d, x, y):
-    """Auto Fishing."""
-    d.polygon([(x + 9, y + 10), (x + 12, y + 5), (x + 15, y + 10)], fill=FIN)
-    d.polygon([(x + 16, y + 13), (x + 23, y + 7), (x + 23, y + 19)], fill=FIN)
-    d.ellipse([(x + 4, y + 9), (x + 18, y + 18)], fill=SCALE_BLUE)
-    d.point((x + 8, y + 12), fill=DEEP)
-    d.line([(x + 5, y + 14), (x + 6, y + 14)], fill=FIN)
+def sprite(rows, palette):
+    """A pixel map into an image. '.' is a hole."""
+    img = Image.new("RGBA", (len(rows[0]), len(rows)), (0, 0, 0, 0))
+    px = img.load()
+    for y, row in enumerate(rows):
+        for x, key in enumerate(row):
+            if key != ".":
+                px[x, y] = palette[key] + (255,)
+
+    img = img.crop(img.getbbox())
+    assert max(img.size) == ART, f"sprite is {img.size}, long axis must be {ART}"
+    return img.resize((img.width * ART_SCALE, img.height * ART_SCALE), Image.NEAREST)
 
 
-def food(d, x, y):
-    """Auto Eat: a berry with a leaf."""
-    d.ellipse([(x + 5, y + 7), (x + 21, y + 22)], fill=(206, 84, 92))
-    d.ellipse([(x + 8, y + 10), (x + 12, y + 14)], fill=(238, 150, 150))
-    d.line([(x + 13, y + 4), (x + 13, y + 9)], fill=(120, 92, 60))
-    d.ellipse([(x + 14, y + 3), (x + 20, y + 8)], fill=(110, 176, 96))
+FISH = ([
+    "...bbb....",
+    "..bbbbbb.d",
+    ".bbbbbbbdd",
+    "bkbbbbbbdd",
+    ".bbbbbbbdd",
+    "..bbbbbb.d",
+    "...bbb....",
+], {
+    "b": (110, 180, 226),
+    "d": (74, 140, 196),
+    "k": (22, 46, 74),
+})
 
+BERRY = ([
+    ".....s....",
+    "...ggs....",
+    "..rrrrrr..",
+    ".rrrrrrrr.",
+    "rhrrrrrrrr",
+    "rhrrrrrrrr",
+    "rrrrrrrrrr",
+    ".rrrrrrrr.",
+    "..rrrrrr..",
+    "...rr.rr..",
+], {
+    "r": (206, 84, 92),
+    "h": (240, 150, 150),
+    "s": (120, 92, 60),
+    "g": (110, 176, 96),
+})
 
-def demon(d, x, y):
-    """Auto Summon."""
-    d.polygon([(x + 7, y + 9), (x + 5, y + 2), (x + 11, y + 7)], fill=HORN)
-    d.polygon([(x + 19, y + 9), (x + 21, y + 2), (x + 15, y + 7)], fill=HORN)
-    d.ellipse([(x + 5, y + 6), (x + 21, y + 21)], fill=DEMON)
-    d.polygon([(x + 9, y + 12), (x + 12, y + 13), (x + 9, y + 16)], fill=GOLD)
-    d.polygon([(x + 17, y + 12), (x + 14, y + 13), (x + 17, y + 16)], fill=GOLD)
-    d.line([(x + 10, y + 18), (x + 16, y + 18)], fill=HORN)
+DEMON_ART = ([
+    "d........d",
+    "dd......dd",
+    ".dmmmmmmd.",
+    ".mmmmmmmm.",
+    "mmyymmyymm",
+    "mmmmmmmmmm",
+    ".mmmmmmmm.",
+    ".mwmmmmwm.",
+    "..mmmmmm..",
+    "...mmmm...",
+], {
+    "m": (188, 78, 96),
+    "d": (120, 44, 60),
+    "y": (250, 214, 120),
+    "w": (250, 244, 236),
+})
 
-
-def sword(d, x, y):
-    """DPS Tracker."""
-    d.polygon([(x + 13, y + 4), (x + 16, y + 8), (x + 16, y + 16), (x + 10, y + 16),
-               (x + 10, y + 8)], fill=STEEL)
-    d.line([(x + 12, y + 8), (x + 12, y + 15)], fill=STEEL_LIT)
-    d.rectangle([(x + 7, y + 16), (x + 19, y + 18)], fill=GOLD)
-    d.rectangle([(x + 12, y + 19), (x + 14, y + 22)], fill=GRIP)
-    d.rectangle([(x + 11, y + 22), (x + 15, y + 23)], fill=GOLD)
+SWORD = ([
+    "..s..",
+    "..s..",
+    ".sls.",
+    ".sls.",
+    ".sls.",
+    ".sls.",
+    "ggggg",
+    "..b..",
+    "..b..",
+    ".ggg.",
+], {
+    "s": (128, 136, 158),
+    "l": (232, 238, 250),
+    "g": (242, 206, 122),
+    "b": (120, 92, 60),
+})
 
 
 def divider(d, cx, y, half=44):
@@ -262,7 +307,7 @@ def divider(d, cx, y, half=44):
 
 
 def main():
-    glyphs = (fish, food, demon, sword)
+    glyphs = (FISH, BERRY, DEMON_ART, SWORD)
     size = TILE + 1
     gap = 8
 
