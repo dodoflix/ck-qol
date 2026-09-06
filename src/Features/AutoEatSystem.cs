@@ -81,7 +81,8 @@ namespace CkQol.Features
             var hunger = EntityManager.GetComponentData<HungerCD>(player);
             if (hunger.hunger >= AutoEatState.Threshold) return;
 
-            if (Manager.ui.isAnyInventoryShowing || Manager.menu.IsAnyMenuActive()) return;
+            // Only a menu stops it; an open inventory does not (see AutoFishingSystems).
+            if (Manager.menu.IsAnyMenuActive()) return;
 
             // Never while fishing. Eating equips the food, and the game leaves the
             // fishing state as soon as the equipped item is not a rod

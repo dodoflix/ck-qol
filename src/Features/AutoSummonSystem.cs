@@ -100,7 +100,8 @@ namespace CkQol.Features
                 return;
             }
 
-            if (Manager.ui.isAnyInventoryShowing || Manager.menu.IsAnyMenuActive()) return;
+            // Only a menu stops it; an open inventory does not (see AutoFishingSystems).
+            if (Manager.menu.IsAnyMenuActive()) return;
 
             var slotCD = EntityManager.GetComponentData<EquipmentSlotCD>(player);
             CheckToggle(slotCD);

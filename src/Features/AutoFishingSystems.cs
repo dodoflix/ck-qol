@@ -92,7 +92,10 @@ namespace CkQol.Features
                 return;
             }
 
-            if (Manager.ui.isAnyInventoryShowing || Manager.menu.IsAnyMenuActive())
+            // Only a menu stops it. An open inventory does not: the simulation never
+            // checks the UI, and the game guards the cases that matter itself by
+            // refusing to act while an item is held on the cursor.
+            if (Manager.menu.IsAnyMenuActive())
             {
                 Forget();
                 return;
