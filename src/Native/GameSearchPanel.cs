@@ -44,13 +44,13 @@ namespace CkQol.Native
         private const int MaxLength = 24;
 
         /// What fits a row between the icon and the count column.
-        private const int RowCharacters = 10;
+        private const int RowCharacters = 8;
 
         /// The box has the icon and the clear button beside it.
-        private const int InputCharacters = 10;
+        private const int InputCharacters = 8;
 
-        /// Characters a second the highlighted row scrolls by when its name is too
-        /// long to show at once.
+        /// Characters a second a row scrolls by when its name is too long to show at
+        /// once.
         private const float MarqueeRate = 3.5f;
 
         /// Wide enough for RowCharacters plus an icon, and no wider - the panel sits
@@ -60,6 +60,9 @@ namespace CkQol.Native
         /// How far the box sits above the first row. Tight, so the two read as one
         /// panel rather than as two.
         internal const float BoxRow = 1.15f;
+
+        /// Where the count ends, short of the backing's right edge.
+        private const float CountGap = 0.4f;
 
         private class Row
         {
@@ -368,9 +371,10 @@ namespace CkQol.Native
         {
             row.Root.transform.localPosition = new Vector3(0f, -RowStep * index, 0f);
 
-            // The one row being looked at scrolls its name if it does not fit, so a
-            // long name is readable without widening the panel for every row.
-            text = highlighted ? Marquee(text) : Clip(text);
+            // Every row scrolls a name that does not fit, so all of them stay
+            // readable without widening the panel. Offset per row, or they all march
+            // in step and the list reads as one moving block.
+            text = Marquee(text, index);
 
             string shown = text + " " + amount;
             if (row.Shown != shown)
@@ -487,23 +491,24 @@ namespace CkQol.Native
             element.SR.color = Color.white;
 
             // The donor puts the count left of the icon, where it sits on top of it
-            // and runs off the panel. Moved to the right end of the row, its shadows
-            // carried by the same delta so they stay under it.
+            // and runs off the panel. Moved to the right end of the row and aligned
+            // right, so it ends a fixed gap short of the backing however many digits
+            // it has. Shadows carried by the same delta, to stay under it.
             if (element.amountNumber != null)
             {
                 Vector3 was = element.amountNumber.transform.localPosition;
-                var moved = new Vector3(PanelWidth - 1.6f, was.y, was.z);
+                var moved = new Vector3(PanelWidth - CountGap, was.y, was.z);
                 Vector3 shift = moved - was;
 
                 element.amountNumber.transform.localPosition = moved;
                 element.amountNumber.style.horizontalAlignment =
-                    PugTextStyle.HorizontalAlignment.left;
+                    PugTextStyle.HorizontalAlignment.right;
 
                 foreach (var shadow in amountShadows)
                 {
                     shadow.transform.localPosition += shift;
                     shadow.style.horizontalAlignment =
-                        PugTextStyle.HorizontalAlignment.left;
+                        PugTextStyle.HorizontalAlignment.right;
                 }
             }
 
@@ -566,6 +571,10 @@ namespace CkQol.Native
 
             _suggestions.Clear();
             Picked?.Invoke(index);
+
+            // Done typing: the results are what matters now, and holding the keyboard
+            // would keep the player's own keys suppressed for no reason.
+            Blur();
         }
 
         private void Refresh()
@@ -632,11 +641,11 @@ namespace CkQol.Native
             Refresh();
         }
 
+        /// Escape and Enter both land here. Neither clears what was typed - only the
+        /// clear button does, so a search survives looking away from the box.
         public void Deactivate(bool commit)
         {
             if (commit && _suggestions.Count > 0) Commit();
-            else if (!commit) ClearQuery();
-
             Blur();
         }
 
@@ -650,18 +659,10 @@ namespace CkQol.Native
             return text.Length <= MaxLength ? text : text.Substring(0, MaxLength);
         }
 
-        /// Cut rather than wrapped: PugText only wraps above a maxWidth, and wrapping
-        /// would make a row two lines tall and break the stack's spacing.
-        private static string Clip(string text)
-        {
-            if (string.IsNullOrEmpty(text) || text.Length <= RowCharacters) return text;
-            return text.Substring(0, RowCharacters - 1) + ".";
-        }
-
         /// A window that walks to the end of the name and back, pausing at each. In
         /// whole characters, because the glyphs are on a pixel grid and a smooth
         /// slide would land them between columns.
-        private static string Marquee(string text)
+        private static string Marquee(string text, int row)
         {
             if (string.IsNullOrEmpty(text) || text.Length <= RowCharacters) return text;
 
@@ -670,7 +671,7 @@ namespace CkQol.Native
             float pause = 1.2f;
             float cycle = (span + pause) * 2f;
 
-            float at = Mathf.Repeat(Time.unscaledTime, cycle);
+            float at = Mathf.Repeat(Time.unscaledTime + row * 0.4f, cycle);
             float travel = at < span + pause
                 ? Mathf.Min(at, span)
                 : Mathf.Max(0f, span - (at - span - pause));
