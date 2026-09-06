@@ -54,8 +54,8 @@ dotnet build "$WORK/check.csproj" -v q --nologo 2>&1 \
 # first sign is otherwise "a mod failed to load: Compilation failed" in game.
 echo
 banned=0
-for pattern in 'System\.Reflection' '\bGetType()' 'typeof([A-Za-z.]*)\.\(Get\|Invoke\)' \
-               'System\.Diagnostics\.Process' 'DllImport'; do
+for pattern in 'System\.Reflection' '\.GetType\(' 'typeof\([^)]*\)\.[A-Za-z]' \
+               'System\.Diagnostics\.Process' 'DllImport' 'Assembly\.'; do
   # strip comment lines - a doc comment naming the rule is not a violation
   if grep -rnE "$pattern" "$REPO/src" 2>/dev/null | grep -vE ':[0-9]+:[[:space:]]*(//|\*)'; then
     banned=1

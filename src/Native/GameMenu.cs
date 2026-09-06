@@ -117,7 +117,9 @@ namespace CkQol.Native
         /// Clones a row and replaces its script with ours, keeping the inspector
         /// wiring. Returns null rather than throwing so one bad row cannot cost the
         /// whole menu.
-        public static T CloneAndSwap<T>(RadicalMenuOption donor, Transform parent)
+        /// debugName is passed in rather than read from typeof(T).Name: that call
+        /// compiles to MemberInfo.get_Name, which the security verifier rejects.
+        public static T CloneAndSwap<T>(RadicalMenuOption donor, Transform parent, string debugName)
             where T : RadicalMenuOption
         {
             if (donor == null) return null;
@@ -125,7 +127,7 @@ namespace CkQol.Native
             try
             {
                 var clone = UnityEngine.Object.Instantiate(donor.gameObject, Staging);
-                clone.name = "CkQol_" + typeof(T).Name;
+                clone.name = "CkQol_" + debugName;
 
                 var original = clone.GetComponent<RadicalMenuOption>();
                 var fields = OptionFields.From(original);
@@ -142,7 +144,7 @@ namespace CkQol.Native
             }
             catch (Exception e)
             {
-                Debug.LogError($"[CkQol] failed to clone a row as {typeof(T).Name}");
+                Debug.LogError($"[CkQol] failed to clone a row as {debugName}");
                 Debug.LogException(e);
                 return null;
             }

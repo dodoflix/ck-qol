@@ -60,7 +60,7 @@ namespace CkQol.Native
                     var page = BuildFeaturePage(handle, plainDonor, toggleDonor, sliderDonor);
                     if (page == null) continue;
 
-                    var row = GameMenu.CloneAndSwap<QolSubmenuOption>(plainDonor, rootMenu.transform);
+                    var row = GameMenu.CloneAndSwap<QolSubmenuOption>(plainDonor, rootMenu.transform, "Submenu");
                     if (row == null) continue;
                     row.Label = handle.Name;
                     row.Target = page;
@@ -69,7 +69,7 @@ namespace CkQol.Native
                 AddBack(plainDonor, rootMenu);
                 GameMenu.Refresh(rootMenu);
 
-                var entry = GameMenu.CloneAndSwap<QolSubmenuOption>(plainDonor, optionsMenu.transform);
+                var entry = GameMenu.CloneAndSwap<QolSubmenuOption>(plainDonor, optionsMenu.transform, "Entry");
                 if (entry == null)
                 {
                     Debug.LogError("[CkQol] could not add the entry to the Options menu");
@@ -118,7 +118,7 @@ namespace CkQol.Native
 
             if (handle.CanBeDisabled && toggleDonor != null)
             {
-                var row = GameMenu.CloneAndSwap<QolToggleOption>(toggleDonor, page.transform);
+                var row = GameMenu.CloneAndSwap<QolToggleOption>(toggleDonor, page.transform, "Toggle");
                 if (row != null)
                 {
                     row.Label = "Enabled";
@@ -143,7 +143,7 @@ namespace CkQol.Native
             if (setting is BoolSetting b)
             {
                 if (toggleDonor == null) return;
-                var row = GameMenu.CloneAndSwap<QolToggleOption>(toggleDonor, page.transform);
+                var row = GameMenu.CloneAndSwap<QolToggleOption>(toggleDonor, page.transform, "Toggle");
                 if (row != null) { row.Label = b.Label; row.Setting = b; }
                 return;
             }
@@ -170,7 +170,7 @@ namespace CkQol.Native
 
         private static void AddBack(RadicalMenuOption donor, RadicalMenu menu)
         {
-            var back = GameMenu.CloneAndSwap<QolBackOption>(donor, menu.transform);
+            var back = GameMenu.CloneAndSwap<QolBackOption>(donor, menu.transform, "Back");
             if (back != null) back.Label = "Back";
         }
 
