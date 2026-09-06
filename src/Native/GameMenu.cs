@@ -287,6 +287,9 @@ namespace CkQol.Native
         ///
         /// Must run once the menu is open - row visibility cannot be read at startup,
         /// when Manager.sceneHandler is null and everything reports INACTIVE.
+        private static readonly Dictionary<RadicalMenu, float> _pitchCache =
+            new Dictionary<RadicalMenu, float>();
+
         public static void LayoutWithGame(RadicalMenu menu)
         {
             if (menu == null) return;
@@ -314,6 +317,12 @@ namespace CkQol.Native
             }
             if (pitch <= 0f) pitch = (top - bottom) / (ys.Count - 1);
             if (pitch <= 0f) return;
+
+            // Measure once. This runs every time the menu opens, and re-measuring an
+            // already-laid-out column feeds its own output back in - the list visibly
+            // compressed a little further on each visit.
+            if (_pitchCache.TryGetValue(menu, out float cached)) pitch = cached;
+            else _pitchCache[menu] = pitch;
 
             menu.menuEntryVirtualHeight = pitch;
             menu.menuEntryStartPositionY = (top + bottom) * 0.5f - pitch * 0.5f;
@@ -361,7 +370,9 @@ namespace CkQol.Native
         {
             if (target == null) return;
             target.localize = false;
-            target.Render(text ?? string.Empty);
+            // force: Render(string) early-outs via HasCorrectGlyphs when the string is
+            // unchanged, which skips building the glyphs a cloned row still needs.
+            target.Render(text ?? string.Empty, rewindEffectAnims: true, force: true);
         }
 
         public static void SetLabel(RadicalMenuOption option, string text)

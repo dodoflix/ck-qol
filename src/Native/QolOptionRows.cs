@@ -17,20 +17,33 @@ namespace CkQol.Native
         /// Set when this row was appended to a menu that did not have room for it.
         public RadicalMenu Owner;
 
-        /// Called by RadicalMenu.Activate as the menu opens - the only point where
-        /// the row's real visibility state can be observed.
+        private bool _layoutPending;
+
         public override void OnParentMenuActivation()
         {
             base.OnParentMenuActivation();
+            // Defer: this fires part way through Activate, before the menu has
+            // finished setting each row active and before Unity has run Start, so
+            // laying out here both misses rows and reads stale labels.
+            _layoutPending = true;
+        }
 
-            // Re-space here rather than at install: this is the first moment the
-            // real per-row visibility is known.
+        protected override void Update()
+        {
+            base.Update();
+            if (!_layoutPending) return;
+            _layoutPending = false;
+
             if (Owner != null) GameMenu.LayoutWithGame(Owner);
 
             if (!LogState) return;
-            Debug.Log($"[CkQol] on open: state={GetActiveStateInCurrentScene()} " +
+            string render = labelText == null ? "no labelText"
+                : $"textActive={labelText.gameObject.activeInHierarchy} " +
+                  $"enabled={labelText.enabled} dims={labelText.dimensions.size} " +
+                  $"localize={labelText.localize} text='{labelText.GetText()}'";
+            Debug.Log($"[CkQol] after layout: state={GetActiveStateInCurrentScene()} " +
                       $"activeSelf={gameObject.activeSelf} pos={transform.localPosition} " +
-                      $"label='{(labelText != null ? labelText.GetText() : "null")}'");
+                      $"scale={transform.lossyScale} {render}");
         }
 
         private void Start()
