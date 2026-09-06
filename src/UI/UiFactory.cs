@@ -65,34 +65,51 @@ namespace CkQol.UI
             layout.minHeight = height;
             layout.preferredHeight = height;
 
-            var label = Label("Text", go.transform, content, 15f, GameTheme.Text,
+            var label = Label("Text", go.transform, content, GameTheme.Body, GameTheme.Text,
                               TextAlignmentOptions.Center);
+            label.overflowMode = TextOverflowModes.Ellipsis;
+            label.textWrappingMode = TextWrappingModes.NoWrap;
             Stretch(label.rectTransform, 8f, 0f);
             return button;
         }
 
-        /// A row: fixed-width label on the left, caller's widget on the right.
+        /// A row: label on the left, caller's widget on the right.
+        ///
+        /// Driven by a HorizontalLayoutGroup rather than anchors. With anchors the
+        /// label box is a fixed fraction of the row, so a larger font overflows it
+        /// and spills across the widget; a layout group makes the label give way
+        /// and ellipsize instead.
         public static GameObject Row(Transform parent, string label, string tooltip,
                                      float height, out RectTransform slot)
         {
             var go = Node("Row", parent, out RectTransform rect);
-            var layout = go.AddComponent<LayoutElement>();
-            layout.minHeight = height;
-            layout.preferredHeight = height;
 
-            var text = Label("Label", go.transform, label, 14f, GameTheme.Text);
-            var textRect = text.rectTransform;
-            textRect.anchorMin = new Vector2(0f, 0f);
-            textRect.anchorMax = new Vector2(0.45f, 1f);
-            textRect.offsetMin = new Vector2(4f, 0f);
-            textRect.offsetMax = new Vector2(-6f, 0f);
-            if (!string.IsNullOrEmpty(tooltip)) text.text = label;
+            var element = go.AddComponent<LayoutElement>();
+            element.minHeight = height;
+            element.preferredHeight = height;
+            element.flexibleWidth = 1f;
 
-            Node("Slot", go.transform, out slot);
-            slot.anchorMin = new Vector2(0.45f, 0f);
-            slot.anchorMax = new Vector2(1f, 1f);
-            slot.offsetMin = new Vector2(4f, 4f);
-            slot.offsetMax = new Vector2(-4f, -4f);
+            var group = go.AddComponent<HorizontalLayoutGroup>();
+            group.spacing = 8f;
+            group.padding = new RectOffset(6, 6, 2, 2);
+            group.childForceExpandWidth = false;
+            group.childForceExpandHeight = true;
+            group.childControlWidth = true;
+            group.childControlHeight = true;
+            group.childAlignment = TextAnchor.MiddleLeft;
+
+            var text = Label("Label", go.transform, label, GameTheme.Body, GameTheme.Text);
+            text.overflowMode = TextOverflowModes.Ellipsis;
+            text.textWrappingMode = TextWrappingModes.NoWrap;
+            var textElement = text.gameObject.AddComponent<LayoutElement>();
+            textElement.flexibleWidth = 1f;
+            textElement.minWidth = 60f;
+
+            var slotGo = Node("Slot", go.transform, out slot);
+            var slotElement = slotGo.AddComponent<LayoutElement>();
+            slotElement.preferredWidth = 260f;
+            slotElement.minWidth = 160f;
+            slotElement.flexibleWidth = 0f;
             return go;
         }
 
@@ -102,7 +119,8 @@ namespace CkQol.UI
             rect.anchorMin = new Vector2(0f, 0.5f);
             rect.anchorMax = new Vector2(0f, 0.5f);
             rect.pivot = new Vector2(0f, 0.5f);
-            rect.sizeDelta = new Vector2(22f, 22f);
+            float box = Mathf.Ceil(GameTheme.Body * 1.1f);
+            rect.sizeDelta = new Vector2(box, box);
 
             var bg = go.AddComponent<Image>();
             bg.color = GameTheme.SliderTrack;
@@ -130,7 +148,7 @@ namespace CkQol.UI
             rect.anchorMax = new Vector2(1f, 0.5f);
             rect.pivot = new Vector2(0.5f, 0.5f);
             rect.offsetMin = new Vector2(0f, -10f);
-            rect.offsetMax = new Vector2(-62f, 10f);
+            rect.offsetMax = new Vector2(-Mathf.Ceil(GameTheme.Body * 3.2f), 10f);
 
             var bgGo = Node("Track", go.transform, out RectTransform bgRect);
             Stretch(bgRect, 0f, 6f);
@@ -162,12 +180,12 @@ namespace CkQol.UI
 
             readout = Label("Readout", go.transform,
                             wholeNumbers ? value.ToString("0") : value.ToString("0.00"),
-                            13f, GameTheme.TextDim, TextAlignmentOptions.MidlineRight);
+                            GameTheme.Body, GameTheme.TextDim, TextAlignmentOptions.MidlineRight);
             var readoutRect = readout.rectTransform;
             readoutRect.anchorMin = new Vector2(1f, 0.5f);
             readoutRect.anchorMax = new Vector2(1f, 0.5f);
             readoutRect.pivot = new Vector2(0f, 0.5f);
-            readoutRect.sizeDelta = new Vector2(58f, 20f);
+            readoutRect.sizeDelta = new Vector2(Mathf.Ceil(GameTheme.Body * 3f), GameTheme.Body);
             readoutRect.anchoredPosition = new Vector2(4f, 0f);
 
             var captured = readout;
@@ -195,7 +213,7 @@ namespace CkQol.UI
             Stretch(viewportRect, 6f, 2f);
             viewport.AddComponent<RectMask2D>();
 
-            var text = Label("Text", viewport.transform, value, 14f, GameTheme.Text);
+            var text = Label("Text", viewport.transform, value, GameTheme.Body, GameTheme.Text);
             Stretch(text.rectTransform, 0f, 0f);
             text.raycastTarget = true;
 

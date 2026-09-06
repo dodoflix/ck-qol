@@ -136,8 +136,16 @@ namespace CkQol.UI
             return native * Mathf.Max(1f, Mathf.Round(desired / native));
         }
 
-        /// Row height that comfortably fits snapped text.
-        public static float RowHeight => Mathf.Max(30f, Snap(14f) * 1.7f);
+        /// Body text is always exactly 1x native. A pixel font has no legal size
+        /// between 1x and 2x, and 2x is far too large for form rows, so every
+        /// attempt to be clever here just overflows the layout.
+        public static float Body => NativeSize;
+
+        /// Headings only go up a step when the font is small enough to afford it.
+        public static float Heading => NativeSize <= 18f ? NativeSize * 2f : NativeSize;
+
+        /// Row height that comfortably fits one line of body text.
+        public static float RowHeight => Mathf.Ceil(Body * 1.9f);
 
         public static void ApplyText(TextMeshProUGUI text, float size, Color color,
                                      TextAlignmentOptions align = TextAlignmentOptions.MidlineLeft)

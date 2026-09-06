@@ -45,12 +45,37 @@ namespace CkQol.UI
             if (_root == null) return;
             _root.SetActive(open);
 
-            // The game is top-down and mouse-driven, so the cursor is normally free.
-            // Only force it if something else has hidden it.
-            if (open && !Cursor.visible)
+            if (open)
             {
-                Cursor.visible = true;
-                Cursor.lockState = CursorLockMode.None;
+                RaiseAboveGameUi();
+                if (!Cursor.visible)
+                {
+                    Cursor.visible = true;
+                    Cursor.lockState = CursorLockMode.None;
+                }
+            }
+        }
+
+        /// Core Keeper draws its own cursor as a UI element, so a fixed sortingOrder
+        /// is a guess that loses whenever the game's cursor canvas sits higher.
+        /// Measured on open instead - the game can add canvases at any time.
+        private void RaiseAboveGameUi()
+        {
+            if (_canvas == null) return;
+
+            int highest = 0;
+            foreach (var other in Resources.FindObjectsOfTypeAll<Canvas>())
+            {
+                if (other == null || other == _canvas) continue;
+                if (!other.isRootCanvas) continue;
+                if (other.sortingOrder > highest) highest = other.sortingOrder;
+            }
+
+            int wanted = Mathf.Min(highest + 100, short.MaxValue);
+            if (_canvas.sortingOrder != wanted)
+            {
+                _canvas.sortingOrder = wanted;
+                Debug.Log($"[CkQol] menu canvas sortingOrder={wanted} (highest game canvas={highest})");
             }
         }
 
@@ -65,10 +90,13 @@ namespace CkQol.UI
             // Above the game's own HUD, below nothing we care about.
             _canvas.sortingOrder = 32000;
 
+            // Constant pixel size with a whole-number factor. ScaleWithScreenSize
+            // produces a fractional scale on any resolution that is not exactly the
+            // reference, and a fractional scale re-corrupts the pixel font no matter
+            // how carefully its point size was snapped.
             var scaler = canvasGo.AddComponent<CanvasScaler>();
-            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1920f, 1080f);
-            scaler.matchWidthOrHeight = 0.5f;
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ConstantPixelSize;
+            scaler.scaleFactor = _mod.UiScaleFactor;
             canvasGo.AddComponent<GraphicRaycaster>();
 
             // Everything lives under one root so showing/hiding is a single SetActive.
@@ -94,7 +122,16 @@ namespace CkQol.UI
             windowRect.anchorMin = new Vector2(0.5f, 0.5f);
             windowRect.anchorMax = new Vector2(0.5f, 0.5f);
             windowRect.pivot = new Vector2(0.5f, 0.5f);
-            windowRect.sizeDelta = new Vector2(Width, Height);
+
+            // Sized from the font, not hardcoded: with a large native font size a
+            // fixed 820x520 window cannot fit its own rows. Capped to the screen so
+            // it never grows off-display at high UI scale.
+            float scale = Mathf.Max(1f, _mod.UiScaleFactor);
+            float wanted = Mathf.Max(Width, GameTheme.Body * 34f);
+            float wantedHeight = Mathf.Max(Height, GameTheme.RowHeight * 13f);
+            windowRect.sizeDelta = new Vector2(
+                Mathf.Min(wanted, Screen.width / scale - 40f),
+                Mathf.Min(wantedHeight, Screen.height / scale - 40f));
 
             var outline = window.gameObject.AddComponent<Outline>();
             outline.effectColor = GameTheme.PanelBorder;
@@ -102,7 +139,7 @@ namespace CkQol.UI
 
             // Title bar
             var title = UiFactory.Label("Title", window.transform,
-                                        "Core Keeper QoL", 20f, GameTheme.Accent);
+                                        "Core Keeper QoL", GameTheme.Heading, GameTheme.Accent);
             var titleRect = title.rectTransform;
             titleRect.anchorMin = new Vector2(0f, 1f);
             titleRect.anchorMax = new Vector2(1f, 1f);
@@ -112,7 +149,7 @@ namespace CkQol.UI
             titleRect.offsetMin = new Vector2(16f, titleRect.offsetMin.y);
 
             var hint = UiFactory.Label("Hint", window.transform,
-                                       "changes apply immediately", 12f, GameTheme.TextDim,
+                                       "changes apply immediately", GameTheme.Body, GameTheme.TextDim,
                                        TextAlignmentOptions.MidlineRight);
             var hintRect = hint.rectTransform;
             hintRect.anchorMin = new Vector2(0f, 1f);
@@ -197,7 +234,7 @@ namespace CkQol.UI
             UiFactory.Stretch(pageRect, 0f, 0f);
             MakeScroll(pageGo.transform, out RectTransform content);
 
-            var header = UiFactory.Label("Desc", content, feature.Description, 13f, GameTheme.TextDim);
+            var header = UiFactory.Label("Desc", content, feature.Description, GameTheme.Body, GameTheme.TextDim);
             header.textWrappingMode = TextWrappingModes.Normal;
             var headerLayout = header.gameObject.AddComponent<LayoutElement>();
             headerLayout.minHeight = GameTheme.RowHeight * 1.2f;

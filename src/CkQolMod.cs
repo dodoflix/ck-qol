@@ -20,6 +20,17 @@ namespace CkQol
 
         public IReadOnlyList<FeatureHandle> Features => _features;
 
+        /// Whole-number canvas scale. Fractional scaling re-corrupts the pixel font.
+        public int UiScaleFactor
+        {
+            get
+            {
+                if (_general == null) return 1;
+                return int.TryParse(_general.UiScale.Value, out int scale)
+                    ? Mathf.Clamp(scale, 1, 4) : 1;
+            }
+        }
+
         /// Register features here. Order is tab order.
         private static IEnumerable<IQolFeature> BuildFeatures()
         {
@@ -52,6 +63,10 @@ namespace CkQol
                 handle.Apply();
             }
 
+            // Scale is baked into the canvas at build time, so drop the menu and let
+            // it rebuild at the new scale on next open.
+            _general.UiScale.Changed += _ => DestroyMenu();
+
             API.Client.OnWorldCreated += OnWorldCreated;
             API.Client.OnWorldDestroyed += OnWorldDestroyed;
 
@@ -65,12 +80,14 @@ namespace CkQol
             API.Client.OnWorldDestroyed -= OnWorldDestroyed;
 
             foreach (var handle in _features) handle.Shutdown();
+            DestroyMenu();
+        }
 
-            if (_menu != null)
-            {
-                UnityEngine.Object.Destroy(_menu.gameObject);
-                _menu = null;
-            }
+        private void DestroyMenu()
+        {
+            if (_menu == null) return;
+            UnityEngine.Object.Destroy(_menu.gameObject);
+            _menu = null;
         }
 
         public void ModObjectLoaded(UnityEngine.Object obj) { }
@@ -136,6 +153,13 @@ namespace CkQol
             new KeySetting("MenuKey", "Menu hotkey", KeyCode.F1,
                            "Key that opens this window. Use Unity KeyCode names, eg F1, F4, Insert.");
 
+        public readonly ChoiceSetting UiScale =
+            new ChoiceSetting("UiScale", "Menu scale",
+                              new[] { "1", "2", "3" }, "1",
+                              "Whole-number zoom for this menu. Only whole steps are offered " +
+                              "because the game's pixel font blurs at fractional scale. " +
+                              "Reopen the menu to apply.");
+
         public readonly BoolSetting DumpAssets =
             new BoolSetting("LogUiAssets", "Log UI assets on open", false,
                             "Writes the game's available fonts and sliced sprites to the log. " +
@@ -144,6 +168,7 @@ namespace CkQol
         public override IEnumerable<ModSetting> GetSettings()
         {
             yield return MenuKey;
+            yield return UiScale;
             yield return DumpAssets;
         }
 
