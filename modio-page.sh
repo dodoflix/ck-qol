@@ -1,7 +1,7 @@
 #!/bin/bash
-# Push the mod.io page from this repo: copy, logo and tags. The release workflow
-# runs it on every tag, so the store page is generated from source rather than
-# edited in a web form and then forgotten.
+# Push the mod.io page from this repo: copy, logo, screenshots and tags. The
+# release workflow runs it on every tag, so the store page is generated from
+# source rather than edited in a web form and then forgotten.
 #
 #   MODIO_TOKEN=<write-scoped PAT> ./modio-page.sh                  # create, hidden
 #   MODIO_TOKEN=... MODIO_MOD_ID=6363554 ./modio-page.sh            # update
@@ -78,6 +78,53 @@ else
     -F "logo=@$REPO/assets/logo.png" \
     -o "$WORK/media.json"
   check "logo" "$WORK/media.json"
+fi
+
+# The gallery, from assets/screenshots. Same add-and-remove shape as the tags:
+# uploading never replaces, so anything dropped from the folder has to be deleted
+# by name. Matching is by filename only - editing a shot in place and keeping its
+# name will not update the page, so rename it (shot-3b.png) to push a new one.
+SHOTS="$REPO/assets/screenshots"
+if [ -d "$SHOTS" ]; then
+  mapfile -t LOCAL < <(find "$SHOTS" -maxdepth 1 -type f \
+    \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' \) -printf '%f\n' | sort)
+
+  curl -sS "$API/$MODIO_MOD_ID" "${auth[@]}" -o "$WORK/gallery.json"
+  check "read media" "$WORK/gallery.json"
+
+  mapfile -t REMOTE < <(python3 - "$WORK/gallery.json" <<'PY'
+import json, sys
+for image in json.load(open(sys.argv[1])).get("media", {}).get("images", []):
+    print(image["filename"])
+PY
+)
+
+  # Deleted first: a name being reused for a different shot then lands as an add
+  # rather than being silently kept.
+  args=()
+  for name in "${REMOTE[@]}"; do
+    [ -n "$name" ] || continue
+    printf '%s\n' "${LOCAL[@]}" | grep -qxF "$name" || args+=(--data-urlencode "images[]=$name")
+  done
+  if [ "${#args[@]}" -gt 0 ]; then
+    echo "removing ${#args[@]} stale screenshot(s)"
+    curl -sS -X DELETE "$API/$MODIO_MOD_ID/media" "${auth[@]}" "${args[@]}" \
+      -o "$WORK/unmedia.json"
+  fi
+
+  # One zip, which is what the endpoint takes for more than a single image.
+  add=()
+  for name in "${LOCAL[@]}"; do
+    printf '%s\n' "${REMOTE[@]}" | grep -qxF "$name" || add+=("$name")
+  done
+  if [ "${#add[@]}" -gt 0 ]; then
+    echo "uploading ${#add[@]} screenshot(s): ${add[*]}"
+    (cd "$SHOTS" && zip -q "$WORK/images.zip" "${add[@]}")
+    curl -sS --retry 3 --retry-all-errors --retry-delay 2 \
+      -X POST "$API/$MODIO_MOD_ID/media" "${auth[@]}" \
+      -F "images=@$WORK/images.zip" -o "$WORK/addmedia.json"
+    check "screenshots" "$WORK/addmedia.json"
+  fi
 fi
 
 # Tags are added and removed, never replaced, so stale ones have to go

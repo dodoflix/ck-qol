@@ -344,6 +344,10 @@ to drift. Core Keeper is game `5289` and the mod is `6363554`.
   release's game-version tag stays on the page forever. That version is a constant in
   the script and needs bumping when the mod is verified against a newer build.
 - The tag endpoints answer 13006 to a multipart body: urlencoded only.
+- Gallery images go up as **one zip** on the media endpoint, and come off by filename
+  through `DELETE /media`. Uploading never replaces, so the sync is add-and-remove
+  like the tags — and it matches on filename alone, so a shot edited in place under
+  the same name is treated as already there. Rename it to push a new one.
 - `ModManifest.json` goes at the **root** of the zip. The game unpacks a download
   flat, so a wrapping folder installs a mod it then cannot find.
 

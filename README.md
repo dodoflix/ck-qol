@@ -53,11 +53,12 @@ git push origin v1.0.0
 ```
 
 That builds the zip, attaches it to a GitHub release, and syncs the mod.io page —
-copy, logo, tags and the download — from this repo. The tag message becomes the
-changelog. Needs two repository secrets: `MODIO_TOKEN` (a **write**-scoped token
-from <https://mod.io/me/access>) and `MODIO_MOD_ID`.
+copy, logo, screenshots, tags and the download — from this repo. The tag message
+becomes the changelog. Needs two repository secrets: `MODIO_TOKEN` (a
+**write**-scoped token from <https://mod.io/me/access>) and `MODIO_MOD_ID`.
 
-`assets/make-logo.py` draws the store logo.
+`assets/make-logo.py` draws the store logo; `assets/screenshots/` is the store
+gallery, one file per image.
 
 ## Development
 
