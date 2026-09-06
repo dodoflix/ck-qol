@@ -157,8 +157,12 @@ namespace CkQol.Features
             base.OnUpdate();
         }
 
-        /// The smallest edible thing in the main inventory, so a big dish is not spent
+        /// The smallest edible thing the player is carrying, so a big dish is not spent
         /// on a small gap. Returns -1 when there is nothing to eat.
+        ///
+        /// Covers the pouches as well as the main inventory: they are sub-ranges of the
+        /// same buffer, and the game equips out of them too - a non-empty pouch is one
+        /// of the hotbar rows (ItemSlotsBarUI.cs:264-289).
         private int FindFood(Entity player, out int restores, out ObjectID picked)
         {
             restores = 0;
@@ -166,39 +170,40 @@ namespace CkQol.Features
 
             var contained = EntityManager.GetBuffer<ContainedObjectsBuffer>(player, true);
             var inventories = EntityManager.GetBuffer<InventoryBuffer>(player, true);
-            if (inventories.Length == 0) return -1;
-
-            // Index 0 is the main inventory; 1..4 are pouches. The hotbar is a moving
-            // window into this same range, not a separate one.
-            InventoryBuffer main = inventories[0];
-            int first = main.startIndex;
-            int last = first + main.size;
-            if (last > contained.Length) last = contained.Length;
 
             int best = -1;
 
-            for (int i = first; i < last; i++)
+            for (int inv = 0; inv < inventories.Length; inv++)
             {
-                var objectData = contained[i].objectData;
-                if (objectData.objectID == ObjectID.None || objectData.amount <= 0) continue;
+                int first = inventories[inv].startIndex;
+                int last = first + inventories[inv].size;
+                if (last > contained.Length) last = contained.Length;
 
-                bool cooked = PugDatabase.HasComponent<CookedFoodCD>(objectData);
-                if (cooked && !AutoEatState.AllowCooked) continue;
-
-                int value = HungerValue(objectData, cooked);
-                if (value <= 0) continue;
-
-                if (best < 0 || value < restores)
+                for (int i = first; i < last; i++)
                 {
-                    best = i;
-                    restores = value;
-                    picked = objectData.objectID;
+                    // equippedSlotIndex is a byte, and SelectedEquipmentChangeSystem
+                    // indexes the buffer with it and no bounds check.
+                    if (i < 0 || i > byte.MaxValue) continue;
+
+                    var objectData = contained[i].objectData;
+                    if (objectData.objectID == ObjectID.None || objectData.amount <= 0) continue;
+
+                    bool cooked = PugDatabase.HasComponent<CookedFoodCD>(objectData);
+                    if (cooked && !AutoEatState.AllowCooked) continue;
+
+                    int value = HungerValue(objectData, cooked);
+                    if (value <= 0) continue;
+
+                    if (best < 0 || value < restores)
+                    {
+                        best = i;
+                        restores = value;
+                        picked = objectData.objectID;
+                    }
                 }
             }
 
-            // ClientInput.equippedSlotIndex is a byte and SelectedEquipmentChangeSystem
-            // indexes the buffer with no bounds check.
-            return best > byte.MaxValue ? -1 : best;
+            return best;
         }
 
         /// Hunger an item restores, or 0 if it restores none - which is also how
