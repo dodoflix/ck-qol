@@ -679,9 +679,9 @@ namespace CkQol.Native
             Refresh();
         }
 
-        public void MoveCharMarker(int relativeChange)
+        public void MoveCharMarker(int n)
         {
-            _caret = Mathf.Clamp(_caret + relativeChange, 0, _typed.Length);
+            _caret = Mathf.Clamp(_caret + n, 0, _typed.Length);
         }
 
         public void RemoveCharAtMarker()

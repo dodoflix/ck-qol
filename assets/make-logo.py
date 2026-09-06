@@ -140,7 +140,7 @@ def ground(clear=()):
 
         seam = rng.random() < 0.65
         body, glint = (STONE, STONE_LIT) if seam else (
-            (rng.choice([GOLD, TEAL]), (238, 234, 246)))
+            rng.choice([GOLD, TEAL]), (238, 234, 246))
 
         cells = [(0, 0)] + rng.sample(
             [(1, 0), (0, 1), (1, 1), (-1, 0), (0, -1)], rng.randint(1, 3))

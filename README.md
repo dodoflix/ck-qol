@@ -1,3 +1,5 @@
+![Core Keeper QoL](assets/logo.png)
+
 # Core Keeper QoL
 
 Client-side quality-of-life tweaks, bundled as one PugMod mod. Other players do not
