@@ -43,11 +43,7 @@ namespace CkQol.Features
         /// player's own.
         private ObjectID _justSummoned = ObjectID.None;
 
-        private bool _resetHeld;
-
-        /// Set by a reset: the next census is recorded without learning from it.
-        /// Minions still alive are not the player asking for them again.
-        private bool _reseed;
+        private bool _toggleHeld;
 
         protected override void OnCreate()
         {
@@ -103,7 +99,8 @@ namespace CkQol.Features
             if (Manager.ui.isAnyInventoryShowing || Manager.menu.IsAnyMenuActive()) return;
 
             var slotCD = EntityManager.GetComponentData<EquipmentSlotCD>(player);
-            CheckReset(slotCD);
+            CheckToggle(slotCD);
+            if (!AutoSummonState.Armed) return;
 
             // Equipping a staff mid-cast would cancel the cast: the game leaves the
             // fishing state as soon as the equipped item is not a rod
@@ -156,31 +153,42 @@ namespace CkQol.Features
                 $"[CkQol/Auto Summon] summoning {missing} ({Alive()}/{cap} alive)");
         }
 
-        /// Forgets what was learned, so the player can drop a loadout or move to a
-        /// different weapon. Only with a summoning weapon in hand, so the binding does
-        /// not fire during unrelated play.
-        private void CheckReset(EquipmentSlotCD slotCD)
+        /// Switches the feature on and off for this session, without touching the
+        /// saved setting. Only with a summoning weapon in hand, so the binding does not
+        /// fire during unrelated play.
+        private void CheckToggle(EquipmentSlotCD slotCD)
         {
             var keyboard = KeySetting.Keyboard;
             if (keyboard == null) return;
 
-            var key = (KeyCode)AutoSummonState.ResetKey;
+            var key = (KeyCode)AutoSummonState.ToggleKey;
             bool down = key != KeyCode.None &&
                         slotCD.slotType == EquipmentSlotType.SummoningWeaponSlot &&
                         ModifierHeld(keyboard) &&
                         keyboard.GetKey(key);
 
-            // Edge-triggered: the key is held, so without this it would clear every
-            // frame and swallow a summon made straight after.
-            if (down && !_resetHeld)
+            // Edge-triggered: the key is held, so without this it would flip every frame.
+            if (down && !_toggleHeld)
             {
-                AutoSummonState.Forget();
-                _justSummoned = ObjectID.None;
-                _reseed = true;
-                Say("Minions forgotten");
-                UnityEngine.Debug.Log("[CkQol/Auto Summon] forgot the learned minions");
+                bool armed = !AutoSummonState.Armed;
+                AutoSummonState.Armed = armed;
+
+                if (armed)
+                {
+                    // Adopt whatever is alive: the player switched it back on with the
+                    // minions they want already out.
+                    _previous.Clear();
+                    _justSummoned = ObjectID.None;
+                }
+                else
+                {
+                    AutoSummonState.Forget();
+                }
+
+                Say(armed ? "Auto summon on" : "Auto summon off");
+                UnityEngine.Debug.Log($"[CkQol/Auto Summon] armed={armed}");
             }
-            _resetHeld = down;
+            _toggleHeld = down;
         }
 
         /// Floats a line over the player, the way the game acknowledges a skill
@@ -197,7 +205,7 @@ namespace CkQol.Features
 
         private static bool ModifierHeld(Rewired.Keyboard keyboard)
         {
-            switch (AutoSummonState.ResetModifier)
+            switch (AutoSummonState.ToggleModifier)
             {
                 case Modifier.None: return true;
                 case Modifier.Shift:
@@ -235,13 +243,6 @@ namespace CkQol.Features
         /// detecting a held button and misreading summons that failed on mana.
         private void Learn()
         {
-            if (_reseed)
-            {
-                _reseed = false;
-                Remember();
-                return;
-            }
-
             foreach (var entry in _census)
             {
                 _previous.TryGetValue(entry.Key, out int before);

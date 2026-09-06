@@ -19,6 +19,7 @@ namespace CkQol.Native
         private SpriteRenderer[] _sprites;
         private bool _active;
         private bool _initialized;
+        private bool _loggedVisible;
         private string _shown;
         private Vector3 _scale;
 
@@ -53,6 +54,13 @@ namespace CkQol.Native
                     GameMenu.SetLiteral(_text, label);
                     _shown = label;
                 }
+            }
+
+            if (visible && !_loggedVisible)
+            {
+                _loggedVisible = true;
+                Debug.Log($"[CkQol] hint '{name}' visible, label '{_shown}', " +
+                          $"active={gameObject.activeInHierarchy} scale={_scale}");
             }
 
             if (visible != _active || !_initialized)
@@ -152,6 +160,14 @@ namespace CkQol.Native
                 clone.SetActive(true);
                 row.buttons.Add(hint);
 
+                var report = new System.Text.StringBuilder();
+                report.Append("[CkQol] hint donor '").Append(donor.name)
+                      .Append("' texts=").Append(texts.Length)
+                      .Append(" sprites=").Append(sprites.Length).Append(" |");
+                foreach (var text in texts) report.Append(" T:").Append(Path(text.transform, clone.transform));
+                foreach (var sprite in sprites) report.Append(" S:").Append(Path(sprite.transform, clone.transform));
+                Debug.Log(report.ToString());
+
                 Debug.Log("[CkQol] added a key hint to the HUD");
                 return hint;
             }
@@ -161,6 +177,18 @@ namespace CkQol.Native
                 Debug.LogException(e);
                 return null;
             }
+        }
+
+        /// Hierarchy path of a child relative to the hint root, for the one-off
+        /// structure log - the donor's layout is authored, not visible in code.
+        private static string Path(Transform child, Transform root)
+        {
+            string path = child.name;
+            for (var at = child.parent; at != null && at != root; at = at.parent)
+            {
+                path = at.name + "/" + path;
+            }
+            return path;
         }
 
         /// Instantiating into an active parent would run the donor's Awake, which reads

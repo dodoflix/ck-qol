@@ -33,26 +33,28 @@ namespace CkQol.Features
         private const string Alt = "Alt";
         private const string NoModifier = "None";
 
-        private readonly KeySetting _resetKey =
-            new KeySetting("ResetKey", "Reset key", KeyCode.R,
-                           "With a summoning weapon in hand, forgets what it learned.");
+        private readonly KeySetting _toggleKey =
+            new KeySetting("ToggleKey", "Toggle key", KeyCode.R,
+                           "With a summoning weapon in hand, switches auto summon on " +
+                           "and off for this session. Switching it off also forgets " +
+                           "the minions it learned. Never changes the setting above.");
 
-        private readonly ChoiceSetting _resetModifier =
-            new ChoiceSetting("ResetModifier", "Reset modifier",
+        private readonly ChoiceSetting _toggleModifier =
+            new ChoiceSetting("ToggleModifier", "Toggle modifier",
                               new[] { Ctrl, Shift, Alt, NoModifier }, Ctrl,
-                              "Held alongside the reset key.");
+                              "Held alongside the toggle key.");
 
         public override IEnumerable<ModSetting> GetSettings()
         {
             yield return _mode;
-            yield return _resetKey;
-            yield return _resetModifier;
+            yield return _toggleKey;
+            yield return _toggleModifier;
         }
 
         public override void Init()
         {
             base.Init();
-            Log($"started (mode={_mode.Value}, reset={_resetModifier.Value}+{_resetKey.Name})");
+            Log($"started (mode={_mode.Value}, toggle={_toggleModifier.Value}+{_toggleKey.Name})");
         }
 
         public override void Shutdown()
@@ -71,15 +73,18 @@ namespace CkQol.Features
             _hint = GameHints.Install(HintLabel, HintVisible);
         }
 
-        private string HintLabel() =>
-            AutoSummonState.ResetModifier == Modifier.None
-                ? $"{_resetKey.Name}  Forget minions"
-                : $"{AutoSummonState.ResetModifier}+{_resetKey.Name}  Forget minions";
+        private string HintLabel()
+        {
+            string key = AutoSummonState.ToggleModifier == Modifier.None
+                ? _toggleKey.Name
+                : $"{AutoSummonState.ToggleModifier}+{_toggleKey.Name}";
+            return $"{key}  Auto summon: {(AutoSummonState.Armed ? "on" : "off")}";
+        }
 
         /// Only with a summoning weapon in hand, which is also when the binding works.
         private bool HintVisible()
         {
-            if (!AutoSummonState.Enabled || _resetKey.Value == KeyCode.None) return false;
+            if (!AutoSummonState.Enabled || _toggleKey.Value == KeyCode.None) return false;
 
             var player = Manager.main != null ? Manager.main.player : null;
             if (player == null || player.guestMode) return false;
@@ -96,13 +101,14 @@ namespace CkQol.Features
                                  : _mode.Value == Split ? SummonMode.SplitHotbar
                                                         : SummonMode.KeepMix;
 
-            AutoSummonState.ResetKey = (int)_resetKey.Value;
-            AutoSummonState.ResetModifier =
-                _resetModifier.Value == Shift ? Modifier.Shift :
-                _resetModifier.Value == Alt ? Modifier.Alt :
-                _resetModifier.Value == NoModifier ? Modifier.None : Modifier.Ctrl;
+            AutoSummonState.ToggleKey = (int)_toggleKey.Value;
+            AutoSummonState.ToggleModifier =
+                _toggleModifier.Value == Shift ? Modifier.Shift :
+                _toggleModifier.Value == Alt ? Modifier.Alt :
+                _toggleModifier.Value == NoModifier ? Modifier.None : Modifier.Ctrl;
 
             if (!Running) AutoSummonState.Forget();
+            else AutoSummonState.Armed = true;
         }
     }
 
@@ -116,8 +122,12 @@ namespace CkQol.Features
     {
         internal static volatile bool Enabled;
         internal static volatile SummonMode Mode = SummonMode.KeepMix;
-        internal static volatile int ResetKey;
-        internal static volatile Modifier ResetModifier = Modifier.Ctrl;
+        internal static volatile int ToggleKey;
+        internal static volatile Modifier ToggleModifier = Modifier.Ctrl;
+
+        /// Session switch, separate from the Enabled setting so it can be flipped
+        /// mid-fight without writing config. Reset to on whenever the feature starts.
+        internal static volatile bool Armed = true;
 
         /// The mix to keep alive, in the order learned. Session only.
         internal static readonly List<ObjectID> Wanted = new List<ObjectID>();
