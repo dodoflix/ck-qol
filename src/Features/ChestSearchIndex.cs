@@ -20,6 +20,7 @@ namespace CkQol.Features
     /// One container holding what was searched for.
     internal struct ContainerHit
     {
+        internal Entity Entity;
         internal float3 Position;
         internal int Count;
         internal ObjectID ContainerId;
@@ -159,6 +160,7 @@ namespace CkQol.Features
 
                 into.Add(new ContainerHit
                 {
+                    Entity = entities[i],
                     Position = at,
                     Count = count,
                     ContainerId = em.HasComponent<ObjectDataCD>(entities[i])

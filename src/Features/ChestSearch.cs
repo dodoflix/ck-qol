@@ -30,11 +30,17 @@ namespace CkQol.Features
             new BoolSetting("SearchSelf", "Search my inventory", true,
                             "Also report what you are already carrying.");
 
+        private readonly BoolSetting _point =
+            new BoolSetting("PointAtChests", "Point at chests", true,
+                            "Float the count over each container that has it, so you " +
+                            "can see which one is which.");
+
         public override IEnumerable<ModSetting> GetSettings()
         {
             yield return _radius;
             yield return _minimum;
             yield return _self;
+            yield return _point;
         }
 
         public override void Init()
@@ -63,6 +69,7 @@ namespace CkQol.Features
             ChestSearchState.Radius = _radius.Value;
             ChestSearchState.MinimumCharacters = _minimum.Value;
             ChestSearchState.SearchSelf = _self.Value;
+            ChestSearchState.Point = _point.Value;
 
             if (!Running) Clear();
         }
@@ -70,7 +77,7 @@ namespace CkQol.Features
         private CkQolSearchPanel _panel;
 
         private readonly List<ItemEntry> _matches = new List<ItemEntry>();
-        private readonly List<string> _names = new List<string>();
+        private readonly List<SearchRow> _names = new List<SearchRow>();
         private readonly List<ContainerHit> _hits = new List<ContainerHit>();
         private readonly List<SearchRow> _rows = new List<SearchRow>();
 
@@ -118,7 +125,7 @@ namespace CkQol.Features
 
         /// Names to offer for what has been typed so far, or nothing while it is
         /// too short to be worth a list.
-        private List<string> Suggest(string query)
+        private List<SearchRow> Suggest(string query)
         {
             _names.Clear();
             _matches.Clear();
@@ -129,7 +136,14 @@ namespace CkQol.Features
             }
 
             ChestSearchIndex.Match(query, _matches, MaxSuggestions);
-            for (int i = 0; i < _matches.Count; i++) _names.Add(_matches[i].Name);
+            for (int i = 0; i < _matches.Count; i++)
+            {
+                _names.Add(new SearchRow
+                {
+                    Icon = IconFor(_matches[i].Id),
+                    Text = _matches[i].Name,
+                });
+            }
             return _names;
         }
 
@@ -179,6 +193,38 @@ namespace CkQol.Features
             }
 
             if (_panel != null) _panel.SetRows(_wantedName, _rows);
+            Point();
+        }
+
+        private double _nextPoint;
+
+        /// Floats the count over each container that has it, the way the game
+        /// acknowledges anything else worth noticing. Slower than the rescan: the
+        /// text drifts and fades, so re-spawning it every scan would smear.
+        private void Point()
+        {
+            if (!ChestSearchState.Point || _hits.Count == 0) return;
+
+            double now = Time.timeAsDouble;
+            if (now < _nextPoint) return;
+            _nextPoint = now + 1.6;
+
+            for (int i = 0; i < _hits.Count && i < MaxRows; i++)
+            {
+                if (_hits[i].Entity == Unity.Entities.Entity.Null) continue;
+
+                var mono = Manager.memory != null
+                    ? Manager.memory.GetEntityMono(_hits[i].Entity)
+                    : null;
+                if (mono == null) continue;
+
+                CombatText.SpawnCombatText("x" + _hits[i].Count,
+                                           CombatText.NumberColor.Yellow,
+                                           mono.RenderPosition + Vector3.up * 0.8f,
+                                           isDamageNumber: false,
+                                           isCrit: false,
+                                           localize: false);
+            }
         }
 
         /// Letters rather than arrow glyphs: the game's font is a sprite sheet and
@@ -225,5 +271,6 @@ namespace CkQol.Features
         internal static volatile int Radius = 10;
         internal static volatile int MinimumCharacters = 3;
         internal static volatile bool SearchSelf = true;
+        internal static volatile bool Point = true;
     }
 }

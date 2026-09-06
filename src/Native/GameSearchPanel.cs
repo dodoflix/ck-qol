@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace CkQol.Native
 {
-    /// One line of results: a container icon, where it is, and how many.
+    /// One line of the panel: an icon, a label, and a number on the right.
     public struct SearchRow
     {
         public Sprite Icon;
@@ -22,14 +22,22 @@ namespace CkQol.Native
     public class CkQolSearchPanel : MonoBehaviour, InputManager.TextInputInterface
     {
         public Func<bool> Visible;
-        public Func<string, List<string>> Suggest;
+        public Func<string, List<SearchRow>> Suggest;
         public Action<int> Picked;
         public Action Cleared;
 
         /// 15px, the step the HUD stacks its own widgets by.
         private const float RowStep = 0.9375f;
+
+        /// Clear of the inventory window's own frame.
+        private const float FromInventory = 11.5f;
+
         private const int MaxRows = 10;
         private const int MaxLength = 32;
+
+        /// Row index sentinels for the parts that are not suggestions.
+        internal const int FocusTarget = -1;
+        internal const int ClearTarget = -2;
 
         private class Row
         {
@@ -39,6 +47,7 @@ namespace CkQol.Native
             public PugText Amount;
             public PugText[] AmountShadows;
             public CkQolSearchPick Pick;
+            public BoxCollider Box;
             public string Shown;
         }
 
@@ -46,9 +55,12 @@ namespace CkQol.Native
         private Transform _anchor;
 
         private PugText _query;
+        private PugText _hint;
+        private PugText _clear;
+        private SpriteRenderer _listPanel;
 
         private readonly List<Row> _pool = new List<Row>();
-        private readonly List<string> _suggestions = new List<string>();
+        private readonly List<SearchRow> _suggestions = new List<SearchRow>();
         private readonly List<SearchRow> _results = new List<SearchRow>();
 
         private string _typed = string.Empty;
@@ -59,11 +71,20 @@ namespace CkQol.Native
         private string _title;
         private string _shownQuery;
 
-        internal void Bind(HoverRequiredMaterialUIElement donor, Transform anchor, PugText query)
+        /// Stamped by any of our own clickable parts, so a click anywhere else can
+        /// be told apart from one on the panel.
+        internal int ClickedFrame;
+
+        internal void Bind(HoverRequiredMaterialUIElement donor, Transform anchor,
+                           PugText query, PugText hint, PugText clear,
+                           SpriteRenderer listPanel)
         {
             _donor = donor;
             _anchor = anchor;
             _query = query;
+            _hint = hint;
+            _clear = clear;
+            _listPanel = listPanel;
         }
 
         /// Handed the current results by the feature.
@@ -97,6 +118,15 @@ namespace CkQol.Native
                 Manager.input.SetActiveInputField(null);
             }
             Manager.input.EnableInput();
+        }
+
+        internal void ClearQuery()
+        {
+            _typed = string.Empty;
+            _caret = 0;
+            _suggestions.Clear();
+            _highlight = 0;
+            Cleared?.Invoke();
         }
 
         private void Update()
@@ -133,14 +163,42 @@ namespace CkQol.Native
             transform.localScale = Manager.ui.CalcGameplayUITargetScaleMultiplier();
             Place();
 
-            string shownQuery = _typed + (_focused ? "_" : string.Empty);
-            if (shownQuery != _shownQuery)
+            // The game only auto-deactivates a real TextInputField on an outside
+            // click (UIMouse.cs:593-595), and this is deliberately not one. Checked
+            // in LateUpdate, so a click UIMouse handled in Update has already
+            // stamped ClickedFrame.
+            if (_focused && Input.GetMouseButtonDown(0) && ClickedFrame != Time.frameCount)
             {
-                GameMenu.SetLiteral(_query, shownQuery);
-                _shownQuery = shownQuery;
+                Blur();
             }
 
+            DrawQuery();
+
+            int used = DrawRows();
+            for (int i = used; i < _pool.Count; i++) Blank(_pool[i]);
+
+            Frame(used);
+        }
+
+        private void DrawQuery()
+        {
+            string shown = _typed + (_focused ? "_" : string.Empty);
+            if (shown != _shownQuery)
+            {
+                GameMenu.SetLiteral(_query, shown);
+                _shownQuery = shown;
+            }
+
+            // The donor's hint reads "Label...", and nothing hides it any more: the
+            // script that did was destroyed with the rest of the chest field.
+            if (_hint != null) _hint.gameObject.SetActive(_typed.Length == 0);
+            if (_clear != null) _clear.gameObject.SetActive(_typed.Length > 0);
+        }
+
+        private int DrawRows()
+        {
             int used = 0;
+
             if (_suggestions.Count > 0)
             {
                 for (int i = 0; i < _suggestions.Count && used < MaxRows; i++, used++)
@@ -149,35 +207,32 @@ namespace CkQol.Native
                     if (row == null) break;
 
                     row.Pick.Index = i;
-                    Draw(row, used, null,
-                         (i == _highlight ? "> " : "  ") + _suggestions[i],
-                         string.Empty);
+                    Draw(row, used, _suggestions[i].Icon, _suggestions[i].Text,
+                         string.Empty, i == _highlight);
                 }
+                return used;
             }
-            else
+
+            if (_title != null && used < MaxRows)
             {
-                if (_title != null && used < MaxRows)
+                var head = RowAt(used);
+                if (head != null)
                 {
-                    var head = RowAt(used);
-                    if (head != null)
-                    {
-                        head.Pick.Index = -1;
-                        Draw(head, used, null, _title, string.Empty);
-                        used++;
-                    }
-                }
-
-                for (int i = 0; i < _results.Count && used < MaxRows; i++, used++)
-                {
-                    var row = RowAt(used);
-                    if (row == null) break;
-
-                    row.Pick.Index = -1;
-                    Draw(row, used, _results[i].Icon, _results[i].Text, _results[i].Amount);
+                    head.Pick.Index = FocusTarget;
+                    Draw(head, used, null, _title, string.Empty, false);
+                    used++;
                 }
             }
 
-            for (int i = used; i < _pool.Count; i++) Blank(_pool[i]);
+            for (int i = 0; i < _results.Count && used < MaxRows; i++, used++)
+            {
+                var row = RowAt(used);
+                if (row == null) break;
+
+                row.Pick.Index = FocusTarget;
+                Draw(row, used, _results[i].Icon, _results[i].Text, _results[i].Amount, false);
+            }
+            return used;
         }
 
         /// Beside the inventory, following it rather than a screen corner - the HUD
@@ -187,10 +242,28 @@ namespace CkQol.Native
             if (_anchor == null) return;
 
             Vector3 at = _anchor.position;
-            transform.position = new Vector3(at.x + 7f, at.y, at.z);
+            float scale = transform.localScale.x;
+            transform.position = new Vector3(at.x + FromInventory * scale, at.y, at.z);
         }
 
-        private void Draw(Row row, int index, Sprite icon, string text, string amount)
+        /// The backing panel, grown to whatever is showing.
+        private void Frame(int rows)
+        {
+            if (_listPanel == null) return;
+
+            _listPanel.enabled = rows > 0;
+            if (rows == 0) return;
+
+            float height = rows * RowStep + 0.5f;
+            _listPanel.size = new Vector2(_listPanel.size.x, height);
+            _listPanel.transform.localPosition = new Vector3(
+                _listPanel.transform.localPosition.x,
+                RowStep * 0.5f - height / 2f,
+                _listPanel.transform.localPosition.z);
+        }
+
+        private void Draw(Row row, int index, Sprite icon, string text, string amount,
+                          bool highlighted)
         {
             row.Root.transform.localPosition = new Vector3(0f, -RowStep * index, 0f);
 
@@ -198,15 +271,36 @@ namespace CkQol.Native
             if (row.Shown != shown)
             {
                 GameMenu.SetLiteral(row.Text, text);
-
                 GameMenu.SetLiteral(row.Amount, amount);
                 foreach (var shadow in row.AmountShadows) GameMenu.SetLiteral(shadow, amount);
-
                 row.Shown = shown;
             }
 
             row.Icon.sprite = icon;
             row.Icon.enabled = icon != null;
+
+            // Recoloured every frame: Render rebuilds the glyphs from the style and
+            // loses any colour put on them.
+            Recolour(row.Text, highlighted || row.Pick.Hovered
+                ? PugTextEffectMenuOption.SELECTED_VALUE_COLOR
+                : Color.white);
+
+            // Sized from the text actually drawn, the way QolStepStrip places its
+            // boxes: a guessed collider misses the row at some UI scales.
+            float width = Mathf.Max(row.Text.dimensions.width, 4f);
+            row.Box.size = new Vector3(width, RowStep, 0.4f);
+            row.Box.center = new Vector3(width * 0.5f, 0f, 0f);
+        }
+
+        private static void Recolour(PugText text, Color tint)
+        {
+            if (text == null) return;
+
+            var glyphs = text.glyphs;
+            for (int i = 0; i < glyphs.Count; i++)
+            {
+                if (glyphs[i] != null) glyphs[i].color = tint;
+            }
         }
 
         private void Blank(Row row)
@@ -218,7 +312,8 @@ namespace CkQol.Native
             foreach (var shadow in row.AmountShadows) GameMenu.SetLiteral(shadow, string.Empty);
 
             row.Icon.enabled = false;
-            row.Pick.Index = -1;
+            row.Pick.Index = FocusTarget;
+            row.Box.size = Vector3.zero;
             row.Shown = string.Empty;
         }
 
@@ -272,8 +367,6 @@ namespace CkQol.Native
                 text.maxWidth = 0f;
             }
 
-            // The row draws the name on the left and the count on the right, which is
-            // what the hover window uses these two for as well.
             var amountShadows = new List<PugText>();
             if (element.amountNumberShadow != null) amountShadows.Add(element.amountNumberShadow);
             if (element.amountNumberShadow2 != null) amountShadows.Add(element.amountNumberShadow2);
@@ -291,15 +384,16 @@ namespace CkQol.Native
 
             element.SR.color = Color.white;
 
+            // The click raycast is masked to the UI layer and takes the UIelement off
+            // whatever collider it hits, so both have to sit on the row's root.
+            clone.layer = _anchor.gameObject.layer;
+
             var pick = clone.AddComponent<CkQolSearchPick>();
             pick.Panel = this;
-            pick.Index = -1;
-            pick.gameObject.layer = _anchor != null ? _anchor.gameObject.layer : clone.layer;
+            pick.Index = FocusTarget;
 
             var box = clone.AddComponent<BoxCollider>();
             box.isTrigger = true;
-            box.size = new Vector3(6f, RowStep, 0.1f);
-            box.center = new Vector3(2.5f, 0f, 0f);
 
             clone.transform.SetParent(transform, false);
             clone.transform.localPosition = Vector3.zero;
@@ -313,6 +407,7 @@ namespace CkQol.Native
                 Amount = element.amountNumber,
                 AmountShadows = amountShadows.ToArray(),
                 Pick = pick,
+                Box = box,
             };
         }
 
@@ -405,13 +500,7 @@ namespace CkQol.Native
         public void Deactivate(bool commit)
         {
             if (commit && _suggestions.Count > 0) Commit();
-            else if (!commit)
-            {
-                _typed = string.Empty;
-                _caret = 0;
-                _suggestions.Clear();
-                Cleared?.Invoke();
-            }
+            else if (!commit) ClearQuery();
 
             Blur();
         }
@@ -427,13 +516,15 @@ namespace CkQol.Native
         }
     }
 
-    /// A clickable row. Same mechanism as QolStepStrip: a collider plus a
-    /// ButtonUIElement subclass, because a prefab's persistent call cannot be
+    /// A clickable part of the panel. Same mechanism as QolStepStrip: a collider
+    /// plus a ButtonUIElement subclass, because a prefab's persistent call cannot be
     /// re-pointed at runtime.
     public class CkQolSearchPick : ButtonUIElement
     {
         public CkQolSearchPanel Panel;
-        public int Index = -1;
+        public int Index = CkQolSearchPanel.FocusTarget;
+
+        internal bool Hovered;
 
         protected override void Awake()
         {
@@ -443,12 +534,27 @@ namespace CkQol.Native
             base.Awake();
         }
 
+        public override void OnSelected()
+        {
+            base.OnSelected();
+            Hovered = true;
+        }
+
+        public override void OnDeselected(bool playEffect = true)
+        {
+            base.OnDeselected(playEffect);
+            Hovered = false;
+        }
+
         public override void OnLeftClicked(bool mod1, bool mod2)
         {
             base.OnLeftClicked(mod1, mod2);
             if (Panel == null) return;
 
+            Panel.ClickedFrame = Time.frameCount;
+
             if (Index >= 0) Panel.Choose(Index);
+            else if (Index == CkQolSearchPanel.ClearTarget) Panel.ClearQuery();
             else Panel.Focus();
         }
     }
@@ -480,14 +586,22 @@ namespace CkQol.Native
             try
             {
                 var anchor = ui.playerInventoryUI.transform;
+                int layer = anchor.gameObject.layer;
 
                 var root = new GameObject("CkQolSearchPanel");
-                root.layer = anchor.gameObject.layer;
+                root.layer = layer;
                 root.transform.SetParent(anchor.parent, false);
 
+                var panel = root.AddComponent<CkQolSearchPanel>();
+
+                // Behind everything else, so it is added first.
+                var listPanel = Backing(root.transform, ui, new Vector3(3f, 0f, 0.2f), 8f, 1f);
+                Backing(root.transform, ui, new Vector3(3f, 1.6f, 0.2f), 8f, 1.3f);
+
                 // The donor's own script implements this same interface and would
-                // fight for the active field; only its text and backing sprites are
-                // wanted.
+                // fight for the active field. Destroying it also takes
+                // onInputFieldDone with it, whose prefab listener renames whatever
+                // chest the player has open.
                 var box = UnityEngine.Object.Instantiate(field.gameObject, GameMenu.Staging);
                 box.name = "CkQolSearchBox";
                 foreach (var stale in box.GetComponentsInChildren<TextInputField>(true))
@@ -503,23 +617,43 @@ namespace CkQol.Native
                     text.maxWidth = 0f;
                 }
 
-                var query = box.GetComponentInChildren<PugText>(true);
+                PugText query = field.pugText != null
+                    ? box.GetComponentInChildren<PugText>(true)
+                    : null;
 
-                var panel = root.AddComponent<CkQolSearchPanel>();
+                // Whatever is not the value text is the donor's hint, which still
+                // reads "Label...".
+                PugText hint = null;
+                foreach (var text in box.GetComponentsInChildren<PugText>(true))
+                {
+                    if (text == query) continue;
+                    hint = text;
+                    break;
+                }
+                if (hint != null)
+                {
+                    hint.localize = false;
+                    GameMenu.SetLiteral(hint, "search...");
+                }
 
+                box.layer = layer;
                 var focus = box.AddComponent<CkQolSearchPick>();
                 focus.Panel = panel;
-                focus.Index = -1;
+                focus.Index = CkQolSearchPanel.FocusTarget;
+
                 var collider = box.AddComponent<BoxCollider>();
                 collider.isTrigger = true;
-                collider.size = new Vector3(6f, 1f, 0.1f);
-                collider.center = new Vector3(2.5f, 0f, 0f);
+                collider.size = new Vector3(7f, 1f, 0.4f);
+                collider.center = new Vector3(3f, 0f, 0f);
 
                 box.transform.SetParent(root.transform, false);
-                box.transform.localPosition = new Vector3(0f, 1.5f, 0f);
+                box.transform.localPosition = new Vector3(0f, 1.6f, 0f);
                 box.SetActive(true);
 
-                panel.Bind(donor, anchor, query);
+                var clear = Clear(root.transform, layer, panel, query,
+                                  new Vector3(7.4f, 1.6f, 0f));
+
+                panel.Bind(donor, anchor, query, hint, clear, listPanel);
 
                 Debug.Log("[CkQol] added the search panel to the HUD");
                 return panel;
@@ -530,6 +664,63 @@ namespace CkQol.Native
                 Debug.LogException(e);
                 return null;
             }
+        }
+
+        /// A backing panel cloned from the inventory window's own, which is a sliced
+        /// sprite and so takes any size.
+        private static SpriteRenderer Backing(Transform parent, UIManager ui,
+                                              Vector3 at, float width, float height)
+        {
+            var donor = ui.playerInventoryUI.backgroundSR;
+            if (donor == null) return null;
+
+            var clone = UnityEngine.Object.Instantiate(donor.gameObject, GameMenu.Staging);
+            clone.name = "CkQolSearchBacking";
+
+            var sr = clone.GetComponent<SpriteRenderer>();
+            if (sr == null)
+            {
+                UnityEngine.Object.DestroyImmediate(clone);
+                return null;
+            }
+
+            sr.color = donor.color;
+            sr.size = new Vector2(width, height);
+
+            clone.transform.SetParent(parent, false);
+            clone.transform.localPosition = at;
+            clone.SetActive(true);
+            return sr;
+        }
+
+        /// The clear button: the query's own text object cloned, so it matches, with
+        /// a collider over it.
+        private static PugText Clear(Transform parent, int layer, CkQolSearchPanel panel,
+                                     PugText style, Vector3 at)
+        {
+            if (style == null) return null;
+
+            var clone = UnityEngine.Object.Instantiate(style.gameObject, GameMenu.Staging);
+            clone.name = "CkQolSearchClear";
+            clone.layer = layer;
+
+            var pug = clone.GetComponent<PugText>();
+            pug.maxWidth = 0f;
+            GameMenu.SetLiteral(pug, "[x]");
+
+            var pick = clone.AddComponent<CkQolSearchPick>();
+            pick.Panel = panel;
+            pick.Index = CkQolSearchPanel.ClearTarget;
+
+            var box = clone.AddComponent<BoxCollider>();
+            box.isTrigger = true;
+            box.size = new Vector3(1.2f, 1f, 0.4f);
+            box.center = new Vector3(0.5f, 0f, 0f);
+
+            clone.transform.SetParent(parent, false);
+            clone.transform.localPosition = at;
+            clone.SetActive(true);
+            return pug;
         }
     }
 }
