@@ -164,7 +164,20 @@ namespace CkQol.Features
 
             bool pressing = false;
 
-            if (state.ReelTimer.isRunning)
+            // Charging the next cast. Fishing.ThrowFishingRod sets the distance from
+            // castTimer's elapsed ratio at the moment the button comes up, and
+            // Fishing's update throws as soon as it is not held - so letting go early
+            // is what makes an automatic recast land right at the player's feet.
+            // Holding until the timer elapses throws at the full ratio, and the game
+            // then throws for us without needing a release.
+            if (AutoFishingState.FullRangeCast &&
+                fishState.castTimer.isRunning &&
+                !fishState.castTimer.IsTimerElapsed(tick))
+            {
+                input.SetButtonState(CommandInputButtonStateNames.SecondInteract_HeldDown, true);
+                pressing = true;
+            }
+            else if (state.ReelTimer.isRunning)
             {
                 if (!state.ReelTimer.IsTimerElapsed(tick))
                 {

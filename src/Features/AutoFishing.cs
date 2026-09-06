@@ -30,8 +30,14 @@ namespace CkQol.Features
                             "reel you do by hand sets it. Not saved - Reel hold below " +
                             "is used again after a restart.");
 
+        private readonly BoolSetting _fullRangeCast =
+            new BoolSetting("FullRangeCast", "Full range casts", true,
+                            "Charge every cast to the end so the line lands as far out " +
+                            "as it can. Off casts at whatever range the rod happens to " +
+                            "throw at.");
+
         private readonly FloatSetting _reelHold =
-            new FloatSetting("ReelHoldSeconds", "Reel hold", 0.2f, 0.1f, 1f,
+            new FloatSetting("ReelHoldSeconds", "Reel hold", 0.2f, 0.1f, 2f,
                              "How long the reel button is held for each catch. Raise " +
                              "it if bites are being missed on a high-latency server. " +
                              "Ignored while Learn reel hold is on and you have reeled " +
@@ -51,6 +57,7 @@ namespace CkQol.Features
         public override IEnumerable<ModSetting> GetSettings()
         {
             yield return _autoReel;
+            yield return _fullRangeCast;
             yield return _learnHold;
             yield return _reelHold;
             yield return _pullDelay;
@@ -78,7 +85,8 @@ namespace CkQol.Features
 
             _running = true;
             Push();
-            Log($"started (reel={_autoReel.Value}, hold={_reelHold.Value:0.00}s, " +
+            Log($"started (reel={_autoReel.Value}, cast={_fullRangeCast.Value}, " +
+                $"hold={_reelHold.Value:0.00}s, " +
                 $"learn={_learnHold.Value}, delay={_pullDelay.Value:0.00}s, " +
                 $"shoal={_infiniteShoal.Value})");
         }
@@ -97,6 +105,7 @@ namespace CkQol.Features
             AutoFishingState.ReelHoldSeconds = _reelHold.Value;
             AutoFishingState.LearnEnabled = _learnHold.Value;
             AutoFishingState.PullDelaySeconds = _pullDelay.Value;
+            AutoFishingState.FullRangeCast = _running && _fullRangeCast.Value;
         }
     }
 
@@ -112,6 +121,7 @@ namespace CkQol.Features
         internal static volatile float ReelHoldSeconds = 0.2f;
         internal static volatile bool LearnEnabled;
         internal static volatile float PullDelaySeconds;
+        internal static volatile bool FullRangeCast;
 
         /// How long the previous reel lasted, or -1 before there has been one.
         ///
@@ -126,7 +136,7 @@ namespace CkQol.Features
         /// Clamped so a stuck button or a paused frame cannot produce a hold that
         /// jams fishing.
         internal static void ReportHold(float seconds) =>
-            _lastHold = UnityEngine.Mathf.Clamp(seconds, 0.05f, 1.5f);
+            _lastHold = UnityEngine.Mathf.Clamp(seconds, 0.05f, 2f);
 
         /// What the reeler holds for: the previous reel's length once there has been
         /// one, otherwise the configured value.
