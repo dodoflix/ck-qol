@@ -49,16 +49,16 @@ def font(size, bold):
     return ImageFont.load_default()
 
 
-def centre(d, text, f, y, fill, spacing=0):
+def centre(d, text, f, y, fill, spacing=0, width=SW):
     if spacing:
         widths = [d.textlength(c, font=f) + spacing for c in text]
-        x = (W - (sum(widths) - spacing)) / 2
+        x = (width - (sum(widths) - spacing)) / 2
         for c, w in zip(text, widths):
             d.text((x, y), c, font=f, fill=fill)
             x += w
         return
     box = d.textbbox((0, 0), text, font=f)
-    d.text(((W - (box[2] - box[0])) / 2 - box[0], y), text, font=f, fill=fill)
+    d.text(((width - (box[2] - box[0])) / 2 - box[0], y), text, font=f, fill=fill)
 
 
 def ground():
@@ -83,7 +83,7 @@ def ground():
         d.rectangle([(x, y), (x + size - 1, y + size - 1)],
                     fill=rng.choice([STONE, STONE, STONE_LIT, GOLD, TEAL]))
 
-    return img.resize((W, H), Image.NEAREST)
+    return img
 
 
 def plate(glyph):
@@ -93,7 +93,7 @@ def plate(glyph):
     d.rectangle([(0, 0), (TILE, 0)], fill=STONE_LIT)
     d.rectangle([(0, 0), (0, TILE)], fill=STONE_LIT)
     glyph(d, 0, 0)
-    return img.resize(((TILE + 1) * SCALE, (TILE + 1) * SCALE), Image.NEAREST)
+    return img
 
 
 def fish(d, x, y):
@@ -137,18 +137,23 @@ def main():
     img = ground()
 
     glyphs = (fish, food, demon, sword)
-    size = (TILE + 1) * SCALE
-    gap = 32
-    left = (W - (len(glyphs) * size + (len(glyphs) - 1) * gap)) // 2
+    size = TILE + 1
+    gap = 8
+    left = (SW - (len(glyphs) * size + (len(glyphs) - 1) * gap)) // 2
     for i, glyph in enumerate(glyphs):
-        img.paste(plate(glyph), (left + i * (size + gap), 437))
+        img.paste(plate(glyph), (left + i * (size + gap), 109))
 
     d = ImageDraw.Draw(img)
-    centre(d, "CORE KEEPER", font(36, False), 165, DIM, spacing=11)
-    centre(d, "QUALITY OF LIFE", font(104, True), 223, TEXT)
-    d.rectangle([(W / 2 - 160, 383), (W / 2 + 160, 388)], fill=GOLD)
 
-    img.save(os.path.join(HERE, "logo.png"))
+    # 1-bit, at pixel scale, the way the game's own font is drawn. Antialiasing
+    # is what made the earlier attempt look like a low resolution photograph:
+    # its soft edge pixels became 4x4 grey blocks on the way up.
+    d.fontmode = "1"
+    centre(d, "CORE KEEPER", font(9, False), 41, DIM, spacing=3)
+    centre(d, "QUALITY OF LIFE", font(26, True), 56, TEXT)
+    d.rectangle([(SW / 2 - 40, 96), (SW / 2 + 40, 97)], fill=GOLD)
+
+    img.resize((W, H), Image.NEAREST).save(os.path.join(HERE, "logo.png"))
     print(f"wrote logo.png at {W}x{H}")
 
 
