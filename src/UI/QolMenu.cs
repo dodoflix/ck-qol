@@ -212,10 +212,15 @@ namespace CkQol.UI
         private void BuildCursor(Transform parent)
         {
             var go = UiFactory.Node("Cursor", parent, out _cursorRect);
+            var sprite = GameTheme.CursorSprite;
             var image = go.AddComponent<Image>();
-            image.sprite = GameTheme.CursorSprite;
+            image.sprite = sprite;
+            image.type = Image.Type.Simple;
             image.raycastTarget = false;
-            image.SetNativeSize();
+            // Sized from the sprite's pixel rect rather than SetNativeSize, which
+            // depends on the sprite/canvas pixels-per-unit ratio. The canvas scale
+            // factor still applies, so the pointer tracks the Menu scale setting.
+            _cursorRect.sizeDelta = new Vector2(sprite.rect.width, sprite.rect.height);
 
             // Anchored to the canvas centre so ScreenPointToLocalPointInRectangle's
             // result can be used as anchoredPosition directly. Pivot at the top-left

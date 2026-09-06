@@ -150,7 +150,10 @@ namespace CkQol.UI
                 }
                 tex.Apply();
 
-                _cursor = Sprite.Create(tex, new Rect(0f, 0f, w, h), new Vector2(0f, 1f), 1f);
+                // pixelsPerUnit must match Canvas.referencePixelsPerUnit (100) or the
+                // sprite's native size is scaled by the ratio between them - at 1 the
+                // 12x19 arrow comes out 1200x1900.
+                _cursor = Sprite.Create(tex, new Rect(0f, 0f, w, h), new Vector2(0f, 1f), 100f);
                 _cursor.hideFlags = HideFlags.HideAndDontSave;
                 return _cursor;
             }
