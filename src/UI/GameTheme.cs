@@ -64,10 +64,6 @@ namespace CkQol.UI
 
         private static Dictionary<string, Sprite> _index;
 
-        /// Whether to use the game's own sprites. Off falls back to flat colours,
-        /// which is the escape hatch if a game update renames or changes them.
-        public static bool UseGameSprites = true;
-
         /// Every loaded sprite by name. Built once - the game has thousands, and
         /// FindObjectsOfTypeAll is far too slow to call per widget.
         private static Dictionary<string, Sprite> Index
@@ -86,19 +82,10 @@ namespace CkQol.UI
             }
         }
 
-        /// Forces the next lookup to re-resolve, after the use-game-sprites toggle.
-        public static void ResetSpriteCache()
-        {
-            _panelSprite = null; _panelSearched = false;
-            _buttonSprite = null; _buttonSearched = false;
-            _cursor = null;
-        }
-
         /// First of these names that is loaded. Names come from the game's own
         /// resources.assets, so they are exact rather than guessed by keyword.
         public static Sprite FindSprite(params string[] names)
         {
-            if (!UseGameSprites) return null;
             foreach (var name in names)
             {
                 if (Index.TryGetValue(name, out var sprite) && sprite != null) return sprite;
@@ -141,6 +128,61 @@ namespace CkQol.UI
                 _buttonSprite = found;
                 if (_buttonSprite != null) Debug.Log($"[CkQol] button sprite '{_buttonSprite.name}'");
                 return _buttonSprite;
+            }
+        }
+
+        private static Sprite _tabSprite, _checkboxSprite, _checkmarkSprite, _knobSprite;
+        private static bool _tabSearched, _checkboxSearched, _checkmarkSearched, _knobSearched;
+
+        /// Tab buttons. The game styles tabs differently from ordinary buttons, so
+        /// reusing the button face here would look subtly wrong.
+        public static Sprite TabSprite
+        {
+            get
+            {
+                if (_tabSearched) return _tabSprite;
+                _tabSearched = true;
+                _tabSprite = FindSprite("tab_ui", "tab_ui_0", "tab_ui_2");
+                if (_tabSprite != null) Debug.Log($"[CkQol] tab sprite '{_tabSprite.name}'");
+                return _tabSprite;
+            }
+        }
+
+        /// Checkbox frame. An icon, not a 9-slice, so it is drawn Simple at a fixed
+        /// square size rather than stretched.
+        public static Sprite CheckboxSprite
+        {
+            get
+            {
+                if (_checkboxSearched) return _checkboxSprite;
+                _checkboxSearched = true;
+                _checkboxSprite = FindSprite("checkBox_0", "checkBox_1");
+                if (_checkboxSprite != null) Debug.Log($"[CkQol] checkbox sprite '{_checkboxSprite.name}'");
+                return _checkboxSprite;
+            }
+        }
+
+        public static Sprite CheckmarkSprite
+        {
+            get
+            {
+                if (_checkmarkSearched) return _checkmarkSprite;
+                _checkmarkSearched = true;
+                _checkmarkSprite = FindSprite("checkmark_icon", "checkmarkIcon", "Checkmark", "checkBox_1");
+                if (_checkmarkSprite != null) Debug.Log($"[CkQol] checkmark sprite '{_checkmarkSprite.name}'");
+                return _checkmarkSprite;
+            }
+        }
+
+        public static Sprite KnobSprite
+        {
+            get
+            {
+                if (_knobSearched) return _knobSprite;
+                _knobSearched = true;
+                _knobSprite = FindSprite("knob_1", "knob_2", "handle");
+                if (_knobSprite != null) Debug.Log($"[CkQol] knob sprite '{_knobSprite.name}'");
+                return _knobSprite;
             }
         }
 

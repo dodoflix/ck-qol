@@ -286,7 +286,8 @@ namespace CkQol.UI
             {
                 int index = _pages.Count;
                 var button = UiFactory.FlatButton("Tab_" + feature.Name, _tabList,
-                                                  feature.Name, GameTheme.RowHeight, () => Select(index));
+                                                  feature.Name, GameTheme.RowHeight, () => Select(index),
+                                                  GameTheme.TabSprite);
                 _tabButtons.Add(button);
                 _pages.Add(BuildPage(feature));
             }

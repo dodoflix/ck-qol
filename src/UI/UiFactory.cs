@@ -51,7 +51,7 @@ namespace CkQol.UI
         }
 
         public static Button FlatButton(string name, Transform parent, string content,
-                                        float height, Action onClick)
+                                        float height, Action onClick, Sprite face = null)
         {
             var go = Node(name, parent, out RectTransform rect);
             var image = go.AddComponent<Image>();
@@ -129,15 +129,34 @@ namespace CkQol.UI
             rect.sizeDelta = new Vector2(box, box);
 
             var bg = go.AddComponent<Image>();
-            bg.color = GameTheme.SliderTrack;
+            var frame = GameTheme.CheckboxSprite;
+            if (frame != null)
+            {
+                bg.sprite = frame;
+                bg.color = Color.white;
+            }
+            else
+            {
+                bg.color = GameTheme.SliderTrack;
+            }
 
             var toggle = go.AddComponent<Toggle>();
             toggle.targetGraphic = bg;
 
             var checkGo = Node("Check", go.transform, out RectTransform checkRect);
-            Stretch(checkRect, 4f, 4f);
+            var mark = GameTheme.CheckmarkSprite;
+            // The game's checkmark overhangs its box slightly; a plain fill does not.
+            Stretch(checkRect, mark != null ? 0f : 4f, mark != null ? 0f : 4f);
             var check = checkGo.AddComponent<Image>();
-            check.color = GameTheme.Accent;
+            if (mark != null)
+            {
+                check.sprite = mark;
+                check.color = Color.white;
+            }
+            else
+            {
+                check.color = GameTheme.Accent;
+            }
             toggle.graphic = check;
 
             toggle.isOn = value;
@@ -173,7 +192,17 @@ namespace CkQol.UI
             var handleGo = Node("Handle", handleArea.transform, out RectTransform handleRect);
             handleRect.sizeDelta = new Vector2(12f, 20f);
             var handleImage = handleGo.AddComponent<Image>();
-            handleImage.color = GameTheme.Text;
+            var knob = GameTheme.KnobSprite;
+            if (knob != null)
+            {
+                handleImage.sprite = knob;
+                handleImage.color = Color.white;
+                handleRect.sizeDelta = new Vector2(knob.rect.width, knob.rect.height);
+            }
+            else
+            {
+                handleImage.color = GameTheme.Text;
+            }
 
             var slider = go.AddComponent<Slider>();
             slider.fillRect = fillRect;
