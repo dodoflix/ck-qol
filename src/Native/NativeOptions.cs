@@ -81,6 +81,7 @@ namespace CkQol.Native
 
                 AddBack(plainDonor, rootMenu);
                 GameMenu.Refresh(rootMenu);
+                AttachRefresher(rootMenu);
 
                 var entry = GameMenu.CloneAndSwap<QolSubmenuOption>(plainDonor, optionsMenu.transform, "Entry");
                 if (entry == null)
@@ -91,6 +92,7 @@ namespace CkQol.Native
                 entry.Label = "Core Keeper QoL";
                 entry.Target = rootMenu;
                 GameMenu.Refresh(optionsMenu);
+                AttachRefresher(optionsMenu);
 
                 _installed = true;
                 Debug.Log($"[CkQol] added to the game's Options menu after {_attempts} attempt(s)");
@@ -148,6 +150,7 @@ namespace CkQol.Native
 
             AddBack(plainDonor, page);
             GameMenu.Refresh(page);
+            AttachRefresher(page);
             return page;
         }
 
@@ -181,6 +184,14 @@ namespace CkQol.Native
                 UnityEngine.Object.DestroyImmediate(slider.gameObject);
                 Debug.Log($"[CkQol] '{setting.Label}' has no native row, edit it in the config file");
             }
+        }
+
+        /// Menus we touch re-lay themselves out when shown; see QolMenuRefresher.
+        private static void AttachRefresher(RadicalMenu menu)
+        {
+            if (menu == null || menu.GetComponent<QolMenuRefresher>() != null) return;
+            var refresher = menu.gameObject.AddComponent<QolMenuRefresher>();
+            refresher.Menu = menu;
         }
 
         private static void AddBack(RadicalMenuOption donor, RadicalMenu menu)

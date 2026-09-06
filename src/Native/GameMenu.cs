@@ -231,14 +231,32 @@ namespace CkQol.Native
             menu.UpdatePosition();
         }
 
+        /// PugText.Render treats its argument as a localization key when the text
+        /// object has localize set - the donor rows do, which is why our labels came
+        /// out as "missing: Enabled". Our strings are already literal.
+        public static void SetLiteral(PugText target, string text)
+        {
+            if (target == null) return;
+            target.localize = false;
+            target.Render(text ?? string.Empty);
+        }
+
         public static void SetLabel(RadicalMenuOption option, string text)
         {
-            if (option != null && option.labelText != null) option.labelText.Render(text);
+            if (option != null) SetLiteral(option.labelText, text);
         }
 
         public static void SetValue(RadicalMenuOption option, string text)
         {
-            if (option != null && option.valueText != null) option.valueText.Render(text);
+            if (option != null) SetLiteral(option.valueText, text);
+        }
+
+        /// Clears a donor's leftover value text. A cloned row keeps whatever the
+        /// original had rendered - cloning the Language row left "english" sitting in
+        /// the value column of our submenu entry.
+        public static void ClearValue(RadicalMenuOption option)
+        {
+            if (option != null) SetLiteral(option.valueText, string.Empty);
         }
     }
 }
