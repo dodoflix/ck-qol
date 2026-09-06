@@ -116,6 +116,12 @@ namespace CkQol.Features
             // with the inventory closed. Clearing the search stops it.
             if (_wanted == ObjectID.None || !ChestSearchState.Enabled) return;
 
+            // Every frame, not only on a rescan: the game drives the outline of
+            // whatever is closest to the player, and putting that one back resets the
+            // colour for every container sharing its prefab - which takes ours with
+            // it. Re-applying wins it back the same frame.
+            Light();
+
             double now = Time.timeAsDouble;
             if (now < _nextScan) return;
             _nextScan = now + RescanSeconds;
@@ -231,7 +237,6 @@ namespace CkQol.Features
                     : null;
                 if (mono == null) continue;
 
-                mono.UpdateOutline(OutlineType.ClosestInteractable);
                 _lit.Add(mono);
 
                 if (!say) continue;
@@ -242,6 +247,18 @@ namespace CkQol.Features
                                            isDamageNumber: false,
                                            isCrit: false,
                                            localize: false);
+            }
+
+            Light();
+        }
+
+        private void Light()
+        {
+            if (!ChestSearchState.Point) return;
+
+            for (int i = 0; i < _lit.Count; i++)
+            {
+                if (_lit[i] != null) _lit[i].UpdateOutline(OutlineType.ClosestInteractable);
             }
         }
 

@@ -74,6 +74,7 @@ namespace CkQol.Native
             public BoxCollider Box;
             public int Index;
             public string Shown;
+            public string ShownAmount;
         }
 
         private HoverRequiredMaterialUIElement _donor;
@@ -431,13 +432,20 @@ namespace CkQol.Native
             // in step and the list reads as one moving block.
             text = Marquee(text, index);
 
-            string shown = text + " " + amount;
-            if (row.Shown != shown)
+            if (row.Shown != text)
             {
                 GameMenu.SetLiteral(row.Text, text);
+                row.Shown = text;
+            }
+
+            // Tracked apart from the name, which changes several times a second as it
+            // scrolls. Re-rendering the count with it made SetLiteral rebuild glyphs
+            // it already had, and the number flickered against its own shadow.
+            if (row.ShownAmount != amount)
+            {
                 GameMenu.SetLiteral(row.Amount, amount);
                 foreach (var shadow in row.AmountShadows) GameMenu.SetLiteral(shadow, amount);
-                row.Shown = shown;
+                row.ShownAmount = amount;
             }
 
             row.Icon.sprite = icon;
@@ -479,13 +487,18 @@ namespace CkQol.Native
             row.Index = -1;
             row.Box.size = Vector3.zero;
             row.Shown = string.Empty;
+            row.ShownAmount = string.Empty;
         }
 
         private void Show(bool visible)
         {
             // PugText releases its glyphs to the pool when disabled, so everything
             // has to be rendered again on the way back in.
-            foreach (var row in _pool) row.Shown = null;
+            foreach (var row in _pool)
+            {
+                row.Shown = null;
+                row.ShownAmount = null;
+            }
             _shownQuery = null;
 
             for (int i = 0; i < transform.childCount; i++)
@@ -963,10 +976,12 @@ namespace CkQol.Native
             var pug = clone.GetComponent<PugText>();
             pug.maxWidth = 0f;
 
+            // Just the letter. The text is left aligned, so the box starts at its
+            // transform and is only as wide as the glyph.
             var box = clone.AddComponent<BoxCollider>();
             box.isTrigger = true;
-            box.size = new Vector3(1.2f, 1f, 0.4f);
-            box.center = new Vector3(0.5f, 0f, 0f);
+            box.size = new Vector3(0.55f, 1f, 0.4f);
+            box.center = new Vector3(0.25f, 0f, 0f);
             hit = box;
 
             clone.transform.SetParent(parent, false);
