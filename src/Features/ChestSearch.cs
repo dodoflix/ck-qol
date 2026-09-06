@@ -90,6 +90,9 @@ namespace CkQol.Features
         /// refreshed while the panel is open rather than frozen at the pick.
         private const double RescanSeconds = 0.5;
 
+        /// Stands in for the player's own pockets, which have no container icon.
+        private const ObjectID CarriedIcon = ObjectID.ExplorerBackpack;
+
         /// The HUD only exists in game, and not on the first frame of it, so the
         /// panel is added on the first update that finds it.
         public override void Update()
@@ -186,12 +189,13 @@ namespace CkQol.Features
                 float dz = hit.Position.z - here.z;
                 float away = Mathf.Sqrt(dx * dx + dz * dz);
 
+                bool carried = hit.ContainerId == ObjectID.None;
+
                 _rows.Add(new SearchRow
                 {
-                    Icon = IconFor(hit.ContainerId),
-                    Text = hit.Label ?? (hit.ContainerId == ObjectID.None
-                        ? "carried"
-                        : $"{Compass(dx, dz)} {away:0.#}m"),
+                    Icon = IconFor(carried ? CarriedIcon : hit.ContainerId),
+                    Text = carried ? "Inventory"
+                         : hit.Label ?? $"{Compass(dx, dz)} {away:0.#}m",
                     Amount = "x" + hit.Count,
                 });
             }

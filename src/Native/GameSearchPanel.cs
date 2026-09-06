@@ -43,8 +43,8 @@ namespace CkQol.Native
         private const int MaxRows = 10;
         private const int MaxLength = 24;
 
-        /// What fits a row before it runs past the backing panel.
-        private const int RowCharacters = 20;
+        /// What fits a row between the icon and the count column.
+        private const int RowCharacters = 15;
 
         /// The box is narrower than a row: it has the icon and the clear button
         /// beside it.
@@ -490,6 +490,27 @@ namespace CkQol.Native
 
             element.SR.color = Color.white;
 
+            // The donor puts the count left of the icon, where it sits on top of it
+            // and runs off the panel. Moved to the right end of the row, its shadows
+            // carried by the same delta so they stay under it.
+            if (element.amountNumber != null)
+            {
+                Vector3 was = element.amountNumber.transform.localPosition;
+                var moved = new Vector3(PanelWidth - 1.6f, was.y, was.z);
+                Vector3 shift = moved - was;
+
+                element.amountNumber.transform.localPosition = moved;
+                element.amountNumber.style.horizontalAlignment =
+                    PugTextStyle.HorizontalAlignment.left;
+
+                foreach (var shadow in amountShadows)
+                {
+                    shadow.transform.localPosition += shift;
+                    shadow.style.horizontalAlignment =
+                        PugTextStyle.HorizontalAlignment.left;
+                }
+            }
+
             // A collider with no UIelement on it: UIMouse takes GetComponent<UIelement>
             // off whatever it hits and ignores a null, so this stays out of the
             // game's selection entirely while still giving bounds to hit test.
@@ -730,6 +751,13 @@ namespace CkQol.Native
                     text.maxWidth = 0f;
                 }
 
+                // The donor's own frame is as wide as a chest window and ran most of
+                // the way across the screen. The panel draws its own backing.
+                foreach (var sprite in box.GetComponentsInChildren<SpriteRenderer>(true))
+                {
+                    sprite.enabled = false;
+                }
+
                 if (query == null)
                 {
                     UnityEngine.Object.DestroyImmediate(box);
@@ -804,13 +832,13 @@ namespace CkQol.Native
             sr.color = donor.color;
             sr.size = new Vector2(width, height);
 
-            // Lifted to just under our own text. The donor's order is the inventory
-            // window's, which leaves every other UI element drawing between this and
-            // the text on top of it.
+            // One below our own text, on its layer. The donor's order is the
+            // inventory window's, which left the item tooltip drawing between this
+            // and the text above it - the panel half covered and half not.
             if (over != null)
             {
                 sr.sortingLayerID = over.style.sortingLayer;
-                sr.sortingOrder = over.style.orderInLayer - 2;
+                sr.sortingOrder = over.style.orderInLayer - 1;
             }
 
             clone.transform.SetParent(parent, false);
