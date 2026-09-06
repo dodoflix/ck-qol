@@ -60,16 +60,32 @@ def font(size, bold):
     return ImageFont.truetype(os.path.join(HERE, "fonts", name), size)
 
 
-def centre(d, text, f, y, fill, spacing=0, width=SW):
+def ink(text, f, spacing=0):
+    """The text as a mask cropped to the pixels it actually marks.
+
+    Drawing straight to the canvas centres the font's advance box, not its marks,
+    so a line lands up to a pixel off and no two lines land off by the same
+    amount. Measuring first is the only way to get them to agree.
+    """
+    pad = 40
+    mask = Image.new("L", (SW + pad * 2, f.size * 3 + pad))
+    d = ImageDraw.Draw(mask)
+    d.fontmode = "1"
+
     if spacing:
-        widths = [d.textlength(c, font=f) + spacing for c in text]
-        x = (width - (sum(widths) - spacing)) / 2
-        for c, w in zip(text, widths):
-            d.text((x, y), c, font=f, fill=fill)
-            x += w
-        return
-    box = d.textbbox((0, 0), text, font=f)
-    d.text(((width - (box[2] - box[0])) / 2 - box[0], y), text, font=f, fill=fill)
+        x = float(pad)
+        for ch in text:
+            d.text((x, pad // 2), ch, font=f, fill=255)
+            x += d.textlength(ch, font=f) + spacing
+    else:
+        d.text((pad, pad // 2), text, font=f, fill=255)
+
+    return mask.crop(mask.getbbox())
+
+
+def stamp(img, mask, top, fill):
+    """Centres a mask horizontally at an integer offset."""
+    img.paste(fill, ((SW - mask.width) // 2, top), mask)
 
 
 # Five steps rather than a smooth ramp: a continuous gradient at this size bands
@@ -87,8 +103,11 @@ BAYER = [
 ]
 
 
-def ground():
-    """The pixel layer: a cave wall lit from where the title sits, with ore in it."""
+def ground(clear=()):
+    """The pixel layer: a cave wall lit from where the title sits, with ore in it.
+
+    `clear` are rectangles the composition occupies, which ore keeps out of.
+    """
     img = Image.new("RGB", (SW, SH))
     px = img.load()
 
@@ -116,9 +135,7 @@ def ground():
     for _ in range(48):
         x, y = rng.randrange(4, SW - 6), rng.randrange(4, SH - 6)
 
-        on_type = 34 < y < 100
-        on_tiles = 104 < y < 142 and 88 < x < 232
-        if on_type or on_tiles:
+        if any(x0 <= x <= x1 and y0 <= y <= y1 for x0, y0, x1, y1 in clear):
             continue
 
         seam = rng.random() < 0.65
@@ -232,25 +249,45 @@ def divider(d, cx, y, half=44):
 
 
 def main():
-    img = ground()
-
     glyphs = (fish, food, demon, sword)
     size = TILE + 1
-    gap = 7
-    left = (SW - (len(glyphs) * size + (len(glyphs) - 1) * gap)) // 2
+    gap = 8
+
+    # Even, so the row divides onto the 320px grid without a half pixel.
+    span = len(glyphs) * size + (len(glyphs) - 1) * gap
+    assert span % 2 == 0, "odd tile row cannot be centred exactly"
+    left = (SW - span) // 2
+
+    # 1-bit type at pixel scale, the way the game's own font is drawn.
+    # Antialiasing is what made an earlier attempt look like a low resolution
+    # photograph: its soft edge pixels became 4x4 grey blocks on the way up.
+    kicker = ink("CORE KEEPER", font(8, False), spacing=3)
+    title = ink("QUALITY OF LIFE", font(24, True))
+
+    # Measured rather than guessed, so the whole block sits on the canvas centre
+    # instead of drifting up as the parts change.
+    gem = 3
+    block = kicker.height + 8 + title.height + 10 + gem * 2 + 12 + size
+    start = (SH - block) // 2
+
+    rule = start + kicker.height + 8 + title.height + 10 + gem
+    top = rule + gem + 12
+
+    img = ground(clear=[
+        (0, start - 2, SW, start + kicker.height + 8 + title.height + 2),
+        (left - 6, rule - 5, left + span + 6, rule + 5),
+        (left - 3, top - 3, left + span + 3, top + size + 3),
+    ])
+
+    stamp(img, kicker, start, DIM)
+    stamp(img, title, start + kicker.height + 8, TEXT)
+
+    # The rule ends on the tile row's own edges, so the two read as one block.
+    divider(ImageDraw.Draw(img), SW // 2, rule, half=span // 2 - 3)
+
     for i, glyph in enumerate(glyphs):
         slot = plate(glyph)
-        img.paste(slot, (left + i * (size + gap), 109), slot)
-
-    d = ImageDraw.Draw(img)
-
-    # 1-bit, at pixel scale, the way the game's own font is drawn. Antialiasing
-    # is what made an earlier attempt look like a low resolution photograph: its
-    # soft edge pixels became 4x4 grey blocks on the way up.
-    d.fontmode = "1"
-    centre(d, "CORE KEEPER", font(8, False), 44, DIM, spacing=3)
-    centre(d, "QUALITY OF LIFE", font(24, True), 60, TEXT)
-    divider(d, SW // 2, 95)
+        img.paste(slot, (left + i * (size + gap), top), slot)
 
     img.resize((W, H), Image.NEAREST).save(os.path.join(HERE, "logo.png"))
     print(f"wrote logo.png at {W}x{H}")
