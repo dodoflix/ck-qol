@@ -346,3 +346,22 @@ to drift. Core Keeper is game `5289` and the mod is `6363554`.
 - The tag endpoints answer 13006 to a multipart body: urlencoded only.
 - `ModManifest.json` goes at the **root** of the zip. The game unpacks a download
   flat, so a wrapping folder installs a mod it then cannot find.
+
+The release is not atomic, and the page is updated before the file. A transient
+`curl: (56)` on the logo upload took the run down under `set -e` with the copy already
+saying the new version and the store still serving the old one — that upload is
+retried now, but the shape of the failure stands for any step. Re-running the failed
+job is safe: the GitHub release uses `--clobber` and the mod.io steps are writes of
+the same values. `workflow_dispatch` takes an existing tag, for a run that cannot be
+re-run.
+
+**Pulling a release** takes three things, none of which the workflow does:
+
+- `gh release delete v1.2.3 --cleanup-tag` removes the GitHub release, its zip and the
+  tag. The commits stay, so the tag can be recreated on the same one.
+- The mod.io file has to go by hand, from the mod's Files page. Nothing here deletes
+  one, deliberately — a store rollback while people are downloading is not a thing to
+  automate.
+- Ship the fix under a **new patch number**. A yanked version is still in someone's
+  install and in mod.io's history, so reusing it means two different builds answering
+  to one version.
