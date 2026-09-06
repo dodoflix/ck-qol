@@ -116,42 +116,25 @@ namespace CkQol.Features
                 ? _toggleKey.Name
                 : $"{AutoSummonState.ToggleModifier}+{_toggleKey.Name}";
 
-        private ObjectID _iconFor = ObjectID.None;
-        private int _iconVariation;
+        /// Shown on the hint. Any item's icon works; a clock reads as "this keeps
+        /// happening on its own" better than the weapon did, and the weapon is already
+        /// in the player's hand when the hint is up.
+        private const ObjectID HintIconItem = ObjectID.SeismicClock;
 
-        /// The equipped weapon's own icon, the way the secondary-use hint shows the
-        /// held item (UseWeaponSecondaryButton.CheckAndUpdateSprite) - including the
-        /// cache, since this is called every update and the gradient map is not free.
+        private Sprite _iconSprite;
+        private bool _iconResolved;
+
+        /// Resolved once: unlike the held item, this never changes.
         private void HintIcon(SpriteRenderer renderer)
         {
-            var player = Manager.main != null ? Manager.main.player : null;
-            var slot = player != null ? player.GetEquippedSlot() : null;
-            var objectData = slot != null ? slot.objectData : default;
-
-            if (objectData.objectID == _iconFor && objectData.variation == _iconVariation) return;
-
-            _iconFor = objectData.objectID;
-            _iconVariation = objectData.variation;
-            renderer.sprite = null;
-
-            if (objectData.objectID == ObjectID.None) return;
-
-            var over = Manager.ui.itemOverridesTable.GetIconOverride(objectData, getSmallIcon: false);
-            if (over != null)
+            if (!_iconResolved)
             {
-                renderer.sprite = over;
-            }
-            else
-            {
-                var info = PugDatabase.GetObjectInfo(objectData.objectID, objectData.variation);
-                if (info == null) return;
-                renderer.sprite = info.icon;
+                _iconResolved = true;
+                var info = PugDatabase.GetObjectInfo(HintIconItem);
+                _iconSprite = info != null ? info.icon : null;
             }
 
-            if (renderer.sprite != null)
-            {
-                Manager.ui.ApplyAnyIconGradientMap(slot.containedObject, renderer);
-            }
+            renderer.sprite = _iconSprite;
         }
 
         /// Only with a summoning weapon in hand, which is also when the binding works.
