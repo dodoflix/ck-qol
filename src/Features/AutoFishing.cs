@@ -58,12 +58,25 @@ namespace CkQol.Features
         }
 
 
+        /// Whether the feature is switched on. Settings can still be edited while it
+        /// is off, and without this the change handler would push them straight into
+        /// the systems and quietly restart them.
+        private bool _running;
+
+        private bool _subscribed;
+
         public override void Init()
         {
-            foreach (var setting in GetSettings())
+            if (!_subscribed)
             {
-                setting.Changed += _ => Push();
+                _subscribed = true;
+                foreach (var setting in GetSettings())
+                {
+                    setting.Changed += _ => Push();
+                }
             }
+
+            _running = true;
             Push();
             Log($"started (reel={_autoReel.Value}, hold={_reelHold.Value:0.00}s, " +
                 $"learn={_learnHold.Value}, delay={_pullDelay.Value:0.00}s, " +
@@ -72,15 +85,15 @@ namespace CkQol.Features
 
         public override void Shutdown()
         {
-            AutoFishingState.ReelEnabled = false;
-            AutoFishingState.ShoalEnabled = false;
+            _running = false;
+            Push();
             Log("stopped");
         }
 
         private void Push()
         {
-            AutoFishingState.ReelEnabled = _autoReel.Value;
-            AutoFishingState.ShoalEnabled = _infiniteShoal.Value;
+            AutoFishingState.ReelEnabled = _running && _autoReel.Value;
+            AutoFishingState.ShoalEnabled = _running && _infiniteShoal.Value;
             AutoFishingState.ReelHoldSeconds = _reelHold.Value;
             AutoFishingState.LearnEnabled = _learnHold.Value;
             AutoFishingState.PullDelaySeconds = _pullDelay.Value;
