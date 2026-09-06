@@ -47,10 +47,6 @@ namespace CkQol.Native
         /// against the right of the screen.
         internal const float PanelWidth = 6f;
 
-        /// Row index sentinels for the parts that are not suggestions.
-        internal const int FocusTarget = -1;
-        internal const int ClearTarget = -2;
-
         private class Row
         {
             public GameObject Root;
@@ -58,8 +54,8 @@ namespace CkQol.Native
             public PugText Text;
             public PugText Amount;
             public PugText[] AmountShadows;
-            public CkQolSearchPick Pick;
             public BoxCollider Box;
+            public int Index;
             public string Shown;
         }
 
@@ -85,6 +81,7 @@ namespace CkQol.Native
         private bool _focused;
         private bool _active;
         private string _shownQuery;
+        private int _hovered = -1;
 
         internal void Bind(HoverRequiredMaterialUIElement donor, Transform anchor,
                            PugText query, PugText hint, PugText clear,
@@ -174,17 +171,34 @@ namespace CkQol.Native
             _highlight = (_highlight + by + _suggestions.Count) % _suggestions.Count;
         }
 
+        /// The suggestion the pointer is over, or -1. Also used for the hover tint.
+        ///
+        /// Hit tested here rather than through UIMouse, which would need our parts to
+        /// be UIelements with colliders. Being selectable at all was enough to leave
+        /// the crafting hover's material rows stuck on screen, and clicks would not
+        /// arrive anyway: UIMouse drives them from UI_INTERACT, which is off while
+        /// typing.
+        private int Over()
+        {
+            var pointer = Manager.ui.mouse != null ? Manager.ui.mouse.pointer : null;
+            if (pointer == null) return -1;
+
+            Vector3 at = pointer.position;
+            for (int i = 0; i < _pool.Count; i++)
+            {
+                if (_pool[i].Index >= 0 && Covers(_pool[i].Box, at)) return _pool[i].Index;
+            }
+            return -1;
+        }
+
         /// Acts on whichever of our own parts the pointer is over, and says whether
-        /// it found one. World space against the colliders, because the click never
-        /// reaches UIMouse while input is disabled.
+        /// it found one.
         private bool Hit()
         {
             var pointer = Manager.ui.mouse != null ? Manager.ui.mouse.pointer : null;
             if (pointer == null) return false;
 
             Vector3 at = pointer.position;
-
-            if (_boxHit != null && Covers(_boxHit, at)) return true;
 
             if (_clearHit != null && _clear != null && _clear.gameObject.activeSelf &&
                 Covers(_clearHit, at))
@@ -193,12 +207,16 @@ namespace CkQol.Native
                 return true;
             }
 
-            for (int i = 0; i < _pool.Count; i++)
+            int over = Over();
+            if (over >= 0)
             {
-                var row = _pool[i];
-                if (row.Pick.Index < 0 || !Covers(row.Box, at)) continue;
+                Choose(over);
+                return true;
+            }
 
-                Choose(row.Pick.Index);
+            if (_boxHit != null && Covers(_boxHit, at))
+            {
+                Focus();
                 return true;
             }
 
@@ -225,14 +243,14 @@ namespace CkQol.Native
             transform.localScale = Manager.ui.CalcGameplayUITargetScaleMultiplier();
             Place();
 
-            // UIMouse only routes clicks it sees through UI_INTERACT, which is off
-            // while typing, so the panel resolves its own. It also has to close
-            // itself on a click elsewhere: the game does that only for a real
-            // TextInputField (UIMouse.cs:593-595), which this deliberately is not.
-            if (_focused && Input.GetMouseButtonDown(0) && !Hit())
+            // Closing on a click elsewhere is ours to do too: the game does that only
+            // for a real TextInputField (UIMouse.cs:593-595).
+            if (Input.GetMouseButtonDown(0) && !Hit() && _focused)
             {
                 Blur();
             }
+
+            _hovered = Over();
 
             DrawQuery();
 
@@ -268,9 +286,9 @@ namespace CkQol.Native
                     var row = RowAt(used);
                     if (row == null) break;
 
-                    row.Pick.Index = i;
+                    row.Index = i;
                     Draw(row, used, _suggestions[i].Icon, _suggestions[i].Text,
-                         string.Empty, i == _highlight);
+                         string.Empty, i == _highlight || i == _hovered);
                 }
                 return used;
             }
@@ -281,7 +299,7 @@ namespace CkQol.Native
                 var row = RowAt(used);
                 if (row == null) break;
 
-                row.Pick.Index = FocusTarget;
+                row.Index = -1;
                 Draw(row, used, _results[i].Icon, _results[i].Text, _results[i].Amount, false);
             }
             return used;
@@ -341,7 +359,7 @@ namespace CkQol.Native
 
             // Recoloured every frame: Render rebuilds the glyphs from the style and
             // loses any colour put on them.
-            Recolour(row.Text, highlighted || row.Pick.Hovered
+            Recolour(row.Text, highlighted
                 ? PugTextEffectMenuOption.SELECTED_VALUE_COLOR
                 : Color.white);
 
@@ -372,7 +390,7 @@ namespace CkQol.Native
             foreach (var shadow in row.AmountShadows) GameMenu.SetLiteral(shadow, string.Empty);
 
             row.Icon.enabled = false;
-            row.Pick.Index = FocusTarget;
+            row.Index = -1;
             row.Box.size = Vector3.zero;
             row.Shown = string.Empty;
         }
@@ -444,14 +462,9 @@ namespace CkQol.Native
 
             element.SR.color = Color.white;
 
-            // The click raycast is masked to the UI layer and takes the UIelement off
-            // whatever collider it hits, so both have to sit on the row's root.
-            clone.layer = _anchor.gameObject.layer;
-
-            var pick = clone.AddComponent<CkQolSearchPick>();
-            pick.Panel = this;
-            pick.Index = FocusTarget;
-
+            // A collider with no UIelement on it: UIMouse takes GetComponent<UIelement>
+            // off whatever it hits and ignores a null, so this stays out of the
+            // game's selection entirely while still giving bounds to hit test.
             var box = clone.AddComponent<BoxCollider>();
             box.isTrigger = true;
 
@@ -466,8 +479,8 @@ namespace CkQol.Native
                 Text = element.text,
                 Amount = element.amountNumber,
                 AmountShadows = amountShadows.ToArray(),
-                Pick = pick,
                 Box = box,
+                Index = -1,
             };
         }
 
@@ -596,47 +609,6 @@ namespace CkQol.Native
         }
     }
 
-    /// A clickable part of the panel. Same mechanism as QolStepStrip: a collider
-    /// plus a ButtonUIElement subclass, because a prefab's persistent call cannot be
-    /// re-pointed at runtime.
-    public class CkQolSearchPick : ButtonUIElement
-    {
-        public CkQolSearchPanel Panel;
-        public int Index = CkQolSearchPanel.FocusTarget;
-
-        internal bool Hovered;
-
-        protected override void Awake()
-        {
-            // Awake walks both lists; a runtime-added component has them null.
-            if (spritesShownUnpressed == null) spritesShownUnpressed = new List<SpriteRenderer>();
-            if (spritesShownPressed == null) spritesShownPressed = new List<SpriteRenderer>();
-            base.Awake();
-        }
-
-        public override void OnSelected()
-        {
-            base.OnSelected();
-            Hovered = true;
-        }
-
-        public override void OnDeselected(bool playEffect = true)
-        {
-            base.OnDeselected(playEffect);
-            Hovered = false;
-        }
-
-        public override void OnLeftClicked(bool mod1, bool mod2)
-        {
-            base.OnLeftClicked(mod1, mod2);
-            if (Panel == null) return;
-
-            if (Index >= 0) Panel.Choose(Index);
-            else if (Index == CkQolSearchPanel.ClearTarget) Panel.ClearQuery();
-            else Panel.Focus();
-        }
-    }
-
     public static class GameSearchPanel
     {
         /// Returns null while the HUD does not exist yet, so callers should keep
@@ -727,11 +699,6 @@ namespace CkQol.Native
                     GameMenu.SetLiteral(hint, "search...");
                 }
 
-                box.layer = layer;
-                var focus = box.AddComponent<CkQolSearchPick>();
-                focus.Panel = panel;
-                focus.Index = CkQolSearchPanel.FocusTarget;
-
                 var collider = box.AddComponent<BoxCollider>();
                 collider.isTrigger = true;
                 collider.size = new Vector3(width - 1f, 1f, 0.4f);
@@ -744,7 +711,7 @@ namespace CkQol.Native
 
                 var picked = Icon(root.transform, donor, new Vector3(0.4f, 1.6f, 0f));
 
-                var clear = Clear(root.transform, layer, panel, query,
+                var clear = Clear(root.transform, query,
                                   new Vector3(width - 0.7f, 1.6f, 0f),
                                   out BoxCollider clearHit);
 
@@ -810,24 +777,19 @@ namespace CkQol.Native
         }
 
         /// The clear button: the query's own text object cloned, so it matches, with
-        /// a collider over it.
-        private static PugText Clear(Transform parent, int layer, CkQolSearchPanel panel,
-                                     PugText style, Vector3 at, out BoxCollider hit)
+        /// a collider over it for the panel to hit test.
+        private static PugText Clear(Transform parent, PugText style, Vector3 at,
+                                     out BoxCollider hit)
         {
             hit = null;
             if (style == null) return null;
 
             var clone = UnityEngine.Object.Instantiate(style.gameObject, GameMenu.Staging);
             clone.name = "CkQolSearchClear";
-            clone.layer = layer;
 
             var pug = clone.GetComponent<PugText>();
             pug.maxWidth = 0f;
             GameMenu.SetLiteral(pug, "[x]");
-
-            var pick = clone.AddComponent<CkQolSearchPick>();
-            pick.Panel = panel;
-            pick.Index = CkQolSearchPanel.ClearTarget;
 
             var box = clone.AddComponent<BoxCollider>();
             box.isTrigger = true;
