@@ -641,11 +641,14 @@ namespace CkQol.Native
             Refresh();
         }
 
-        /// Escape and Enter both land here. Neither clears what was typed - only the
-        /// clear button does, so a search survives looking away from the box.
+        /// Escape and Enter both land here, and only while the box has the keyboard -
+        /// picking a suggestion lets go of it, so an Escape after that never reaches
+        /// this and the search stands.
         public void Deactivate(bool commit)
         {
             if (commit && _suggestions.Count > 0) Commit();
+            else if (!commit) ClearQuery();
+
             Blur();
         }
 
