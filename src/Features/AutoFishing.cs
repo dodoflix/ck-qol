@@ -25,7 +25,7 @@ namespace CkQol.Features
                             "if another fishing mod is doing the same job.");
 
         private readonly BoolSetting _learnHold =
-            new BoolSetting("LearnReelHold", "Learn reel hold", true,
+            new BoolSetting("LearnReelHold", "Learn reel hold", false,
                             "Copy your own timing: after you reel by hand, auto reel " +
                             "holds for as long as you did. Not saved - Reel hold below " +
                             "is used again after a restart.");
