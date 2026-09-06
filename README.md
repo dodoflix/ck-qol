@@ -39,6 +39,33 @@ Deploys to `CoreKeeper_Data/StreamingAssets/Mods/CkQol/`. Set `CK_GAME_DIR` if t
 install lives elsewhere. Steam wipes `StreamingAssets/` on updates and on Verify
 Integrity — re-run `install.sh` if the mod stops loading.
 
+## Releasing
+
+Releases are manual: tagging is the trigger.
+
+```sh
+./check.sh                       # CI cannot compile - no game assemblies on a runner
+git tag -a v1.0.0 -m "what changed"
+git push origin v1.0.0
+```
+
+That packages `ModManifest.json` + `src/` into a zip, attaches it to a GitHub
+release, and uploads it to mod.io as the active version. An annotated tag's
+message becomes the changelog; a lightweight tag falls back to the commit
+subjects since the previous tag.
+
+The mod.io step needs two repository secrets, and skips itself with a warning if
+either is missing:
+
+| secret | |
+|---|---|
+| `MODIO_TOKEN` | a **write**-scoped access token from <https://mod.io/me/access> |
+| `MODIO_MOD_ID` | printed by `modio-page.sh` when the page is created |
+
+`modio-page.sh` owns the mod.io page itself, so the store copy lives in
+`assets/` rather than only in a web form. Core Keeper is game `5289`, and
+`api.mod.io` is retired — everything uses `g-5289.modapi.io`.
+
 Config is one JSON per setting under
 `…/Pugstorm/Core Keeper/Steam/<id>/mods/CkQol/`. Deleting that directory resets
 everything to defaults.

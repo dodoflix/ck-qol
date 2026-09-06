@@ -1,0 +1,98 @@
+name: Release
+
+# Manual by design: push a tag when a build is worth shipping.
+#   git tag -a v1.0.0 -m "what changed"
+#   git push origin v1.0.0
+# workflow_dispatch re-runs a tag that already exists, for a failed upload.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to release
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  MODIO_GAME_ID: '5289'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      - name: Read the tag
+        id: tag
+        run: |
+          TAG="${{ inputs.tag || github.ref_name }}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+          # An annotated tag's own message is the changelog; a lightweight tag
+          # falls back to the subjects since the previous one.
+          NOTES="$(git tag -l --format='%(contents)' "$TAG")"
+          if [ -z "$(printf '%s' "$NOTES" | tr -d '[:space:]')" ]; then
+            PREVIOUS="$(git describe --tags --abbrev=0 "$TAG^" 2>/dev/null || true)"
+            RANGE="${PREVIOUS:+$PREVIOUS..}$TAG"
+            NOTES="$(git log --no-merges --format='- %s' "$RANGE")"
+          fi
+          {
+            echo 'notes<<CHANGELOG_EOF'
+            printf '%s\n' "$NOTES"
+            echo 'CHANGELOG_EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      # No compile step: check.sh builds against the game's own assemblies in
+      # CoreKeeper_Data/Managed, which a runner does not have. PugMod ships
+      # source and compiles it in-process at startup, so there is nothing to
+      # build here either - run ./check.sh locally before tagging.
+      - name: Package
+        run: |
+          ./package.sh dist/CkQol
+          cd dist && zip -r "CkQol-${{ steps.tag.outputs.version }}.zip" CkQol
+
+      - name: GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.tag.outputs.tag }}" \
+            --title "${{ steps.tag.outputs.tag }}" \
+            --notes "${{ steps.tag.outputs.notes }}" \
+            "dist/CkQol-${{ steps.tag.outputs.version }}.zip" \
+            || gh release upload "${{ steps.tag.outputs.tag }}" \
+                 "dist/CkQol-${{ steps.tag.outputs.version }}.zip" --clobber
+
+      - name: Upload to mod.io
+        env:
+          MODIO_TOKEN: ${{ secrets.MODIO_TOKEN }}
+          MODIO_MOD_ID: ${{ secrets.MODIO_MOD_ID }}
+        run: |
+          if [ -z "$MODIO_TOKEN" ] || [ -z "$MODIO_MOD_ID" ]; then
+            echo "MODIO_TOKEN or MODIO_MOD_ID is not set - skipping the mod.io upload." >&2
+            exit 0
+          fi
+
+          # The game-specific domain: api.mod.io is deprecated and answers 11001.
+          # active=true makes this the version players download.
+          HTTP=$(curl -sS -o response.json -w '%{http_code}' \
+            -X POST "https://g-$MODIO_GAME_ID.modapi.io/v1/games/$MODIO_GAME_ID/mods/$MODIO_MOD_ID/files" \
+            -H "Authorization: Bearer $MODIO_TOKEN" \
+            -H 'Accept: application/json' \
+            -F "filedata=@dist/CkQol-${{ steps.tag.outputs.version }}.zip" \
+            -F "version=${{ steps.tag.outputs.version }}" \
+            -F "changelog=${{ steps.tag.outputs.notes }}" \
+            -F 'active=true')
+
+          if [ "$HTTP" -ge 300 ]; then
+            echo "mod.io rejected the upload (HTTP $HTTP):" >&2
+            cat response.json >&2
+            exit 1
+          fi
+          echo "uploaded version ${{ steps.tag.outputs.version }} to mod.io"
