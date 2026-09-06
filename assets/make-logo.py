@@ -228,9 +228,9 @@ FISH = ([
 # Seven wide, not eight: an even sprite has no centre column, so the dip in the
 # crown and the stem above it can never sit on the body's axis.
 BERRY = ([
+    "...s...",
     "...sgg.",
-    ".rr.rr.",
-    "rrrrrrr",
+    ".rrrrr.",
     "rrrrrrr",
     "rrrrrrr",
     "rrrrrrr",
