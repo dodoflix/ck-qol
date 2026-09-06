@@ -119,121 +119,12 @@ namespace CkQol.Native
         /// rows' valueText has no glyph for those characters and renders '?'.
         public bool CanDrawBar;
 
-        /// Covers the bar so clicks land on it.
-        ///
-        /// The row's own collider is sized by RadicalMenuOption from the label and
-        /// value text, but in practice it does not reach the diamonds - clicking
-        /// them did nothing at all. A second collider on the same GameObject is
-        /// enough: UIMouse resolves a hit by calling GetComponent<UIelement>() on
-        /// the collider's object, which is this row either way.
-        private BoxCollider _barCollider;
-
         private void Start() => Refresh();
-
-        protected override void Update()
-        {
-            base.Update();
-            if (!CanDrawBar || valueText == null) return;
-
-            if (_barCollider == null)
-            {
-                _barCollider = gameObject.AddComponent<BoxCollider>();
-                _barCollider.isTrigger = true;
-            }
-
-            Rect bounds = valueText.dimensions;
-            Vector2 centre = (Vector2)valueText.transform.position + bounds.center;
-            _barCollider.size = new Vector3(Mathf.Max(bounds.size.x, 0.1f),
-                                            Mathf.Max(bounds.size.y, 0.1f), 0.5f);
-            _barCollider.center = centre - (Vector2)transform.position;
-            _barCollider.enabled = GetActiveStateInCurrentScene() == OptionActiveState.ACTIVE;
-        }
 
         public override void OnActivated()
         {
             base.OnActivated();
-
-            // Clicking a specific diamond sets that level, as the volume rows do.
-            // There are no per-glyph colliders, so the segment comes from the pointer
-            // position against the glyph positions.
-            if (CanDrawBar && TryGetClickedSegment(out int segment)) SetSegment(segment);
-            else Step(1);
-        }
-
-        private bool TryGetClickedSegment(out int segment)
-        {
-            segment = 0;
-            if (valueText == null || valueText.glyphs == null || valueText.glyphs.Count == 0) return false;
-            if (Manager.ui == null || Manager.ui.mouse == null || Manager.ui.mouse.pointer == null) return false;
-            if (!Manager.input.SystemIsUsingMouse()) return false;
-
-            float pointerX = Manager.ui.mouse.pointer.position.x;
-
-            float first = float.MaxValue;
-            float last = float.MinValue;
-            foreach (var glyph in valueText.glyphs)
-            {
-                if (glyph == null) continue;
-                float x = glyph.transform.position.x;
-                if (x < first) first = x;
-                if (x > last) last = x;
-            }
-            if (first > last) return false;
-
-            // Only a click on the bar itself selects a level. Without this the
-            // nearest glyph to a click on the label is always the first one, so
-            // clicking the label jumped the value to its minimum.
-            int count = valueText.glyphs.Count;
-            float pitch = count > 1 ? (last - first) / (count - 1) : 1f;
-            if (pointerX < first - pitch * 0.5f || pointerX > last + pitch * 0.5f) return false;
-
-            int nearest = -1;
-            float nearestDistance = float.MaxValue;
-            for (int i = 0; i < count; i++)
-            {
-                var glyph = valueText.glyphs[i];
-                if (glyph == null) continue;
-                float distance = Mathf.Abs(glyph.transform.position.x - pointerX);
-                if (distance < nearestDistance)
-                {
-                    nearestDistance = distance;
-                    nearest = i;
-                }
-            }
-
-            if (nearest < 0) return false;
-            segment = nearest + 1;
-            return true;
-        }
-
-        /// segment is 1..BarSegments, so clicking the first diamond is the lowest
-        /// setting a click can reach - matching the volume rows, where zero is only
-        /// reachable by muting.
-        private void SetSegment(int segment)
-        {
-            if (Float != null)
-            {
-                float span = Float.Max - Float.Min;
-                Float.Value = Float.Min + span * segment / BarSegments;
-            }
-            else if (Int != null)
-            {
-                Int.Value = Mathf.Clamp(Int.Min + segment, Int.Min, Int.Max);
-            }
-
-            Refresh();
-        }
-
-        public override bool OnSkimRight()
-        {
             Step(1);
-            return true;
-        }
-
-        public override bool OnSkimLeft()
-        {
-            Step(-1);
-            return true;
         }
 
         /// Wraps at the ends, so a row can always be changed with one direction and
