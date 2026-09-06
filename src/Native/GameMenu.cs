@@ -256,6 +256,80 @@ namespace CkQol.Native
         /// PugText.Render treats its argument as a localization key when the text
         /// object has localize set - the donor rows do, which is why our labels came
         /// out as "missing: Enabled". Our strings are already literal.
+        /// Places a row one slot below the lowest existing row.
+        ///
+        /// Necessary because the Settings menu has autoPositioning off: every stock
+        /// row sits at its authored prefab position and UpdatePosition does nothing,
+        /// so a clone keeps the donor's position and lands on top of it. Spacing is
+        /// measured from the existing rows rather than assumed.
+        public static void PlaceBelowLast(RadicalMenu menu, RadicalMenuOption ours)
+        {
+            if (menu == null || ours == null) return;
+
+            var ys = new List<float>();
+            float x = ours.transform.localPosition.x;
+            float z = ours.transform.localPosition.z;
+
+            foreach (var option in RowsOf(menu))
+            {
+                if (option == null || option == ours) continue;
+                var local = option.transform.localPosition;
+                ys.Add(local.y);
+                x = local.x;
+                z = local.z;
+            }
+
+            if (ys.Count == 0) return;
+            ys.Sort();
+
+            // Smallest positive gap between rows is the row pitch; duplicates and
+            // any stray row sharing a position are ignored.
+            float pitch = 0f;
+            for (int i = 1; i < ys.Count; i++)
+            {
+                float gap = ys[i] - ys[i - 1];
+                if (gap > 0.0001f && (pitch <= 0f || gap < pitch)) pitch = gap;
+            }
+            if (pitch <= 0f) pitch = Mathf.Abs(menu.menuEntryVirtualHeight);
+            if (pitch <= 0f) pitch = 1f;
+
+            ours.transform.localPosition = new Vector3(x, ys[0] - pitch, z);
+        }
+
+        /// Stacks rows down a menu we built ourselves, reusing the slot positions the
+        /// template's own rows occupied so spacing matches the game exactly.
+        public static void PlaceInSlots(RadicalMenu menu, List<Vector3> slots)
+        {
+            if (menu == null || slots == null || slots.Count == 0) return;
+
+            float pitch = slots.Count > 1 ? slots[0].y - slots[1].y : 1f;
+            if (pitch <= 0f) pitch = 1f;
+
+            int index = 0;
+            foreach (var option in RowsOf(menu))
+            {
+                if (option == null) continue;
+                Vector3 slot = index < slots.Count
+                    ? slots[index]
+                    : new Vector3(slots[0].x, slots[slots.Count - 1].y - pitch * (index - slots.Count + 1),
+                                  slots[0].z);
+                option.transform.localPosition = slot;
+                index++;
+            }
+        }
+
+        /// The positions a menu's rows occupy, top to bottom.
+        public static List<Vector3> CaptureSlots(RadicalMenu menu)
+        {
+            var slots = new List<Vector3>();
+            foreach (var option in RowsOf(menu))
+            {
+                if (option != null) slots.Add(option.transform.localPosition);
+            }
+            slots.Sort((a, b) => b.y.CompareTo(a.y));
+            return slots;
+        }
+
         public static void SetLiteral(PugText target, string text)
         {
             if (target == null) return;

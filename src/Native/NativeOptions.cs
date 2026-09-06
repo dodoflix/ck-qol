@@ -85,6 +85,7 @@ namespace CkQol.Native
 
                 AddBack(plainDonor, rootMenu);
                 GameMenu.Refresh(rootMenu);
+                LayoutOwnMenu(rootMenu);
 
                 var entry = GameMenu.CloneAndSwap<QolSubmenuOption>(plainDonor, optionsMenu.transform, "Entry");
                 if (entry == null)
@@ -95,9 +96,11 @@ namespace CkQol.Native
                 entry.Label = "Core Keeper QoL";
                 entry.Target = rootMenu;
                 GameMenu.Refresh(optionsMenu);
+                GameMenu.PlaceBelowLast(optionsMenu, entry);
 
                 _installed = true;
                 Debug.Log($"[CkQol] added to the game's Options menu after {_attempts} attempt(s)");
+                Report(optionsMenu, entry);
             }
             catch (Exception e)
             {
@@ -107,8 +110,32 @@ namespace CkQol.Native
             }
         }
 
+        /// Dumps which layout list the menu actually uses and whether our row is in
+        /// it. The row was rendering but never getting a slot, and guessing between
+        /// menuOptions and autoPositioningOverride was not converging.
+        private static void Report(RadicalMenu menu, RadicalMenuOption ours)
+        {
+            int overrideCount = menu.autoPositioningOverride != null
+                ? menu.autoPositioningOverride.Count : -1;
+            bool inOptions = menu.menuOptions != null && menu.menuOptions.Contains(ours);
+            bool inOverride = menu.autoPositioningOverride != null &&
+                              menu.autoPositioningOverride.Contains(ours);
+            Debug.Log($"[CkQol] layout: menuOptions={menu.menuOptions?.Count ?? -1} " +
+                      $"(ours in it: {inOptions}), autoPositioningOverride={overrideCount} " +
+                      $"(ours in it: {inOverride}), autoPositioning={menu.autoPositioning}, " +
+                      $"parent={ours.transform.parent?.name}, state={ours.GetActiveStateInCurrentScene()}, " +
+                      $"activeInTitle={ours.activeInTitle}, activeInSP={ours.activeInSPStage}");
+        }
+
         /// A fresh page cloned from a stock options page, emptied of its rows, so it
         /// keeps the page's background, layout metrics and title wiring.
+        /// Slot positions of each page we build, captured from the template before
+        /// its rows are removed. Needed because these menus do not auto-position.
+        private static readonly System.Collections.Generic.Dictionary<RadicalMenu,
+            System.Collections.Generic.List<Vector3>> _slots =
+            new System.Collections.Generic.Dictionary<RadicalMenu,
+                System.Collections.Generic.List<Vector3>>();
+
         private static RadicalMenu BuildMenu(RadicalMenu template, string name)
         {
             if (template == null) return null;
@@ -119,6 +146,11 @@ namespace CkQol.Native
             UnityEngine.Object.DontDestroyOnLoad(clone);
 
             var menu = clone.GetComponent<RadicalMenu>();
+
+            // Record where the template's rows sat before deleting them, so our rows
+            // can occupy the same slots and match the game's spacing exactly.
+            _slots[menu] = GameMenu.CaptureSlots(menu);
+
             foreach (var option in clone.GetComponentsInChildren<RadicalMenuOption>(true))
             {
                 UnityEngine.Object.DestroyImmediate(option.gameObject);
@@ -152,6 +184,7 @@ namespace CkQol.Native
 
             AddBack(plainDonor, page);
             GameMenu.Refresh(page);
+            LayoutOwnMenu(page);
             return page;
         }
 
@@ -184,6 +217,14 @@ namespace CkQol.Native
                 // config file rather than being shown as something they are not.
                 UnityEngine.Object.DestroyImmediate(slider.gameObject);
                 Debug.Log($"[CkQol] '{setting.Label}' has no native row, edit it in the config file");
+            }
+        }
+
+        private static void LayoutOwnMenu(RadicalMenu menu)
+        {
+            if (menu != null && _slots.TryGetValue(menu, out var slots))
+            {
+                GameMenu.PlaceInSlots(menu, slots);
             }
         }
 
