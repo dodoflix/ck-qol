@@ -1,5 +1,7 @@
 using System.Collections.Generic;
 using CkQol.Config;
+using CkQol.Native;
+using PlayerEquipment;
 using UnityEngine;
 
 namespace CkQol.Features
@@ -57,6 +59,33 @@ namespace CkQol.Features
         {
             base.Shutdown();
             Log("stopped");
+        }
+
+        private CkQolHint _hint;
+
+        /// The HUD only exists in game, and not on the first frame of it, so the hint
+        /// is added on the first update that finds it.
+        public override void Update()
+        {
+            if (_hint != null || Manager.main == null || Manager.main.player == null) return;
+            _hint = GameHints.Install(HintLabel, HintVisible);
+        }
+
+        private string HintLabel() =>
+            AutoSummonState.ResetModifier == Modifier.None
+                ? $"{_resetKey.Name}  Forget minions"
+                : $"{AutoSummonState.ResetModifier}+{_resetKey.Name}  Forget minions";
+
+        /// Only with a summoning weapon in hand, which is also when the binding works.
+        private bool HintVisible()
+        {
+            if (!AutoSummonState.Enabled || _resetKey.Value == KeyCode.None) return false;
+
+            var player = Manager.main != null ? Manager.main.player : null;
+            if (player == null || player.guestMode) return false;
+
+            var slot = player.GetEquippedSlot();
+            return slot != null && slot.GetSlotType() == EquipmentSlotType.SummoningWeaponSlot;
         }
 
         protected override void Apply()
