@@ -119,7 +119,7 @@ namespace CkQol.Features
         /// Shown on the hint. Any item's icon works; a clock reads as "this keeps
         /// happening on its own" better than the weapon did, and the weapon is already
         /// in the player's hand when the hint is up.
-        private const ObjectID HintIconItem = ObjectID.SeismicClock;
+        private const ObjectID HintIconItem = ObjectID.TimelessHourglass;
 
         private Sprite _iconSprite;
         private bool _iconResolved;
