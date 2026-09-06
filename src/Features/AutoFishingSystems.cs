@@ -92,10 +92,11 @@ namespace CkQol.Features
                 return;
             }
 
-            // Only a menu stops it. An open inventory does not: the simulation never
-            // checks the UI, and the game guards the cases that matter itself by
-            // refusing to act while an item is held on the cursor.
-            if (Manager.menu.IsAnyMenuActive())
+            // An open inventory does not stop it: the simulation never checks the UI,
+            // and vanilla only blocks because the client withholds the button, which
+            // does not apply to a press written after SendClientInputSystem. A menu, or
+            // an item held on the cursor, does stop it.
+            if (Manager.menu.IsAnyMenuActive() || PlayerSlots.DragInProgress())
             {
                 Forget();
                 return;

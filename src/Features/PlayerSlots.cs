@@ -44,6 +44,20 @@ namespace CkQol.Features
             entityManager.SetComponentData(player, inputData);
         }
 
+        /// True while an item is held on the cursor.
+        ///
+        /// The game refuses to eat or summon then anyway (EatableSlot.cs:19,
+        /// SummoningWeaponSlot.cs:19), and moving items around is not the moment to be
+        /// swapping the equipped slot underneath the player.
+        internal static bool DragInProgress()
+        {
+            var player = Manager.main != null ? Manager.main.player : null;
+            var mouse = player != null ? player.mouseInventoryHandler : null;
+            if (mouse == null) return false;
+
+            return mouse.GetContainedObjectData(0).objectID != ObjectID.None;
+        }
+
         /// Whether an index can be used as ClientInput.equippedSlotIndex, which is a
         /// byte that SelectedEquipmentChangeSystem indexes the buffer with and no
         /// bounds check.
