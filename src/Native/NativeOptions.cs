@@ -126,10 +126,15 @@ namespace CkQol.Native
         {
             if (template == null) return null;
 
-            var clone = UnityEngine.Object.Instantiate(template.gameObject);
+            // Instantiated as a sibling of the template rather than moved to
+            // DontDestroyOnLoad. Menu clicks are a physics raycast
+            // (UIMouse -> Manager.physics.RaycastNonAlloc on the UI layer), and
+            // colliders in the DontDestroyOnLoad scene are not hit by it - the page
+            // rendered and worked by keyboard, but nothing on it could be clicked.
+            var clone = UnityEngine.Object.Instantiate(template.gameObject,
+                                                       template.transform.parent);
             clone.name = name;
             clone.SetActive(false);
-            UnityEngine.Object.DontDestroyOnLoad(clone);
 
             var menu = clone.GetComponent<RadicalMenu>();
 
@@ -140,17 +145,9 @@ namespace CkQol.Native
             var firstRow = clone.GetComponentInChildren<RadicalMenuOption>(true);
             if (firstRow != null) _rowParents[menu] = firstRow.transform.parent;
 
-            // The only PugText not belonging to a row is the page heading, which
-            // otherwise still reads whatever the cloned template was called.
-            foreach (var text in clone.GetComponentsInChildren<PugText>(true))
-            {
-                if (text.GetComponentInParent<RadicalMenuOption>() != null) continue;
-                GameMenu.SetLiteral(text, title);
-                break;
-            }
-
             var init = clone.AddComponent<QolPageInit>();
             init.Menu = menu;
+            init.Title = title;
 
             foreach (var option in clone.GetComponentsInChildren<RadicalMenuOption>(true))
             {

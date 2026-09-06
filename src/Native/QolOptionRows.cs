@@ -213,10 +213,32 @@ namespace CkQol.Native
     public class QolPageInit : MonoBehaviour
     {
         public RadicalMenu Menu;
+        public string Title;
 
-        private void OnEnable()
+        private bool _pending;
+
+        private void OnEnable() => _pending = true;
+
+        private void Update()
         {
-            if (Menu != null) GameMenu.Refresh(Menu);
+            if (!_pending || Menu == null) return;
+            _pending = false;
+
+            GameMenu.Refresh(Menu);
+
+            // Applied here rather than at build time: RadicalMenu.OnEnable re-renders
+            // every descendant PugText when the menu is shown, which overwrote a
+            // title set earlier and left the cloned template's heading.
+            var heading = GameMenu.FindHeading(Menu);
+            if (heading != null) GameMenu.SetLiteral(heading, Title);
+
+            int selectable = 0;
+            foreach (var row in Menu.menuOptions)
+            {
+                if (row != null && row.IsSelectionEnabled()) selectable++;
+            }
+            Debug.Log($"[CkQol] page '{Title}': rows={Menu.menuOptions.Count} " +
+                      $"selectable={selectable} heading={(heading != null ? "found" : "missing")}");
         }
     }
 }

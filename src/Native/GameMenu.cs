@@ -351,6 +351,20 @@ namespace CkQol.Native
             return slots;
         }
 
+        /// The menu's heading: the only PugText that is not part of a row.
+        public static PugText FindHeading(RadicalMenu menu)
+        {
+            if (menu == null) return null;
+            foreach (var text in menu.GetComponentsInChildren<PugText>(true))
+            {
+                if (text != null && text.GetComponentInParent<RadicalMenuOption>() == null)
+                {
+                    return text;
+                }
+            }
+            return null;
+        }
+
         public static void SetLiteral(PugText target, string text)
         {
             if (target == null) return;
