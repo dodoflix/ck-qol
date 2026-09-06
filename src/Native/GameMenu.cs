@@ -218,8 +218,13 @@ namespace CkQol.Native
             return null;
         }
 
-        /// Re-scans children into menuOptions and re-lays them out. RadicalMenu only
-        /// collects options in Awake, so anything added later is invisible until this.
+        /// Re-scans children into menuOptions.
+        ///
+        /// Deliberately does NOT call UpdatePosition. RadicalMenu.Activate lays the
+        /// menu out itself every time it is shown; running a second pass afterwards
+        /// collapsed all of the stock rows onto one line. All that is needed is for
+        /// our rows to be in the list before the game's own pass runs - Awake only
+        /// collects them once, and may already have run before we parented ours.
         public static void Refresh(RadicalMenu menu)
         {
             if (menu == null) return;
@@ -228,7 +233,6 @@ namespace CkQol.Native
             {
                 if (option != null) option.SetParentMenu(menu);
             }
-            menu.UpdatePosition();
         }
 
         /// PugText.Render treats its argument as a localization key when the text

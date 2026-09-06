@@ -138,26 +138,4 @@ namespace CkQol.Native
             }
         }
     }
-
-    /// Re-collects and re-lays out a menu the first frame after it is shown.
-    ///
-    /// RadicalMenu fills menuOptions in Awake only. If Awake already ran before our
-    /// rows were parented, they render but are absent from the layout list, so
-    /// UpdatePosition never moves them off the donor's slot and they sit on top of
-    /// a stock row. Deferred by a frame rather than done in OnEnable because the
-    /// menu is mid-iteration over menuOptions while activating.
-    public class QolMenuRefresher : MonoBehaviour
-    {
-        public RadicalMenu Menu;
-        private bool _pending;
-
-        private void OnEnable() => _pending = true;
-
-        private void Update()
-        {
-            if (!_pending) return;
-            _pending = false;
-            GameMenu.Refresh(Menu);
-        }
-    }
 }
