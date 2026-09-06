@@ -82,8 +82,9 @@ namespace CkQol.Features
         private const int MaxRows = 8;
         private const int MaxSuggestions = 8;
 
-        /// Two letters match most of the item table, which is a list nobody reads.
-        private const int MinimumCharacters = 3;
+        /// One letter is enough: a suggestion pass stops at MaxSuggestions, and what
+        /// is nearby is offered before what is not, so the short list is still useful.
+        private const int MinimumCharacters = 1;
 
         /// Containers do not move, but their contents change, so the answer is
         /// refreshed while the panel is open rather than frozen at the pick.

@@ -21,7 +21,7 @@ Ctrl+R with a summoning weapon in hand toggles it for the session.
 **DPS Tracker** — your damage per second, under the minion counter. Detailed mode
 breaks it down by source, each with its icon.
 
-**Chest Search** — type three letters in the box beside the inventory and every
+**Chest Search** — start typing in the box beside the inventory and every
 nearby chest, station, pouch and dropped stack holding that item is listed with a
 count, and outlined in the world in a colour for how much is in there.
 
