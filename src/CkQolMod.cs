@@ -22,6 +22,7 @@ namespace CkQol
         {
             yield return new Features.AutoFishing();
             yield return new Features.AutoEat();
+            yield return new Features.AutoSummon();
         }
 
         public void EarlyInit() { }

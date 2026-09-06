@@ -81,6 +81,9 @@ namespace CkQol.Features
         internal static volatile bool Enabled;
         internal static volatile int Threshold = 75;
         internal static volatile bool AllowCooked;
+        /// True while a press is being held, so Auto Summon stays off the button.
+        internal static volatile bool Busy;
+
         internal static volatile bool UseHotbar = true;
         internal static volatile bool UseInventory = true;
         internal static volatile bool UsePouches = true;

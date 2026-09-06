@@ -61,7 +61,7 @@ namespace CkQol.Features
         {
             if (!AutoEatState.Enabled || _playerQuery.IsEmpty)
             {
-                _slot = -1;
+                Release();
                 return;
             }
 
@@ -71,8 +71,8 @@ namespace CkQol.Features
             // Mid-press: keep the food equipped and the button down until it elapses.
             if (_slot >= 0)
             {
-                if (now < _pressUntil) Press(player, _slot);
-                else _slot = -1;
+                if (now < _pressUntil) PlayerSlots.Press(EntityManager, player, _slot);
+                else Release();
                 return;
             }
 
@@ -112,23 +112,17 @@ namespace CkQol.Features
 
             _slot = slot;
             _pressUntil = now + PressSeconds;
-            Press(player, slot);
+            AutoEatState.Busy = true;
+            PlayerSlots.Press(EntityManager, player, slot);
 
             UnityEngine.Debug.Log(
                 $"[CkQol/Auto Eat] eating {picked} (+{restores}) at hunger {hunger.hunger}");
         }
 
-        /// Equips the slot and holds the use button, for this frame.
-        private void Press(Entity player, int slot)
+        private void Release()
         {
-            var inputData = EntityManager.GetComponentData<ClientInputData>(player);
-            ClientInput input = UnsafeUtility.As<ClientInputData, ClientInput>(ref inputData);
-
-            input.equippedSlotIndex = (byte)slot;
-            input.SetButtonState(CommandInputButtonStateNames.SecondInteract_HeldDown, true);
-
-            inputData = UnsafeUtility.As<ClientInput, ClientInputData>(ref input);
-            EntityManager.SetComponentData(player, inputData);
+            _slot = -1;
+            AutoEatState.Busy = false;
         }
 
         /// The smallest edible thing in scope, so a big dish is not spent on a small
@@ -154,15 +148,11 @@ namespace CkQol.Features
 
             for (int inv = 0; inv < inventories.Length; inv++)
             {
-                int first = inventories[inv].startIndex;
-                int last = first + inventories[inv].size;
-                if (last > contained.Length) last = contained.Length;
+                int last = PlayerSlots.End(inventories[inv], contained.Length);
 
-                for (int i = first; i < last; i++)
+                for (int i = inventories[inv].startIndex; i < last; i++)
                 {
-                    // equippedSlotIndex is a byte, and SelectedEquipmentChangeSystem
-                    // indexes the buffer with it and no bounds check.
-                    if (i < 0 || i > byte.MaxValue) continue;
+                    if (!PlayerSlots.Usable(i)) continue;
 
                     bool inHotbar = i >= hotbarFirst && i < hotbarLast;
                     bool allowed = inHotbar ? AutoEatState.UseHotbar
