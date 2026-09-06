@@ -143,6 +143,12 @@ namespace CkQol.Native
                 // visibility depend on which stock row happened to be cloned: once a
                 // row is in menuOptions, Activate hides it whenever
                 // GetActiveStateInCurrentScene is not ACTIVE.
+                // Donor rows use extraVerticalSpacing to open a gap before a group.
+                // UpdatePosition subtracts it before placing the row, so inheriting it
+                // pushed our row far below the list - the layout was placing it
+                // correctly and then shifting it out of view.
+                replacement.extraVerticalSpacing = 0f;
+
                 replacement.activeInSPStage = true;
                 replacement.activeInTitle = true;
                 replacement.activeInDebugOnly = false;
@@ -368,7 +374,8 @@ namespace CkQol.Native
                       $"oursIncluded={oursIncluded} menuOptions={menu.menuOptions.Count} " +
                       $"override={(menu.autoPositioningOverride != null ? menu.autoPositioningOverride.Count : -1)} " +
                       $"pitch={pitch} startY={menu.menuEntryStartPositionY} " +
-                      $"oursState={(ours != null ? ours.GetActiveStateInCurrentScene().ToString() : "n/a")}");
+                      $"oursState={(ours != null ? ours.GetActiveStateInCurrentScene().ToString() : "n/a")} " +
+                      $"oursExtraSpacing={(ours != null ? ours.extraVerticalSpacing : -1f)}");
         }
 
         /// Stacks rows down a menu we built ourselves, reusing the slot positions the
