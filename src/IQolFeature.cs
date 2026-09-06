@@ -1,33 +1,41 @@
+using System.Collections.Generic;
+using CkQol.Config;
+
 namespace CkQol
 {
-    /// One self-contained quality-of-life tweak. Add a class implementing this and
-    /// register it in CkQolMod.BuildFeatures; everything else is wired up for you.
+    /// One self-contained quality-of-life tweak. Add a class extending
+    /// QolFeatureBase and register it in CkQolMod.BuildFeatures; the on/off toggle,
+    /// config persistence, menu tab and crash isolation are wired up for you.
     public interface IQolFeature
     {
-        /// Config key and log prefix. Keep it short and stable - renaming it orphans
-        /// the user's existing on/off setting.
+        /// Config section name, menu tab label, log prefix. Keep it short and stable -
+        /// renaming it orphans the user's existing settings.
         string Name { get; }
 
-        /// Shown next to the toggle in the config file.
+        /// Shown at the top of the feature's tab.
         string Description { get; }
 
-        /// Whether this feature starts enabled on a fresh install.
+        /// Whether this starts enabled on a fresh install.
         bool EnabledByDefault { get; }
 
-        /// Called once at mod load, only if the feature is enabled.
+        /// Settings to expose in the menu. Return an empty list for none.
+        /// Called once at construction, before Bind.
+        IEnumerable<ModSetting> GetSettings();
+
+        /// Called when the feature starts - at load if enabled, or the moment the
+        /// user switches it on in the menu.
         void Init();
 
-        /// Called when the client world appears. May be called again if the player
-        /// returns to the menu and loads another world.
+        /// Client world appeared. Also fired on enable if a world is already loaded.
         void OnWorldCreated();
 
-        /// Called when the client world goes away.
+        /// Client world went away.
         void OnWorldDestroyed();
 
-        /// Per-frame. Keep it cheap - this runs every frame the game does.
+        /// Per-frame while enabled. Keep it cheap.
         void Update();
 
-        /// Called at mod unload. Undo anything global you touched.
+        /// Called on disable or mod unload. Undo anything global you touched.
         void Shutdown();
     }
 }

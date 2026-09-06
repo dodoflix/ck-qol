@@ -1,67 +1,62 @@
 using System;
 using System.Collections.Generic;
+using CkQol.Config;
+using CkQol.UI;
 using PugMod;
 using UnityEngine;
 
 namespace CkQol
 {
-    /// Entry point. Owns the feature list, their config toggles, and forwards the
-    /// PugMod lifecycle to whichever features are enabled.
-    ///
-    /// A feature that throws is disabled rather than allowed to take the mod (or the
-    /// game) down with it - one broken tweak should not cost you the other ten.
+    /// Entry point. Builds the feature list, binds their config, spawns the menu and
+    /// forwards the PugMod lifecycle.
     public class CkQolMod : IMod
     {
         public const string ModName = "CkQol";
 
-        private readonly List<IQolFeature> _active = new List<IQolFeature>();
+        private readonly List<FeatureHandle> _features = new List<FeatureHandle>();
+        private GeneralSettings _general;
+        private QolMenu _menu;
+        private bool _menuFailed;
 
-        /// Register features here. Order is load order.
+        public IReadOnlyList<FeatureHandle> Features => _features;
+
+        /// Register features here. Order is tab order.
         private static IEnumerable<IQolFeature> BuildFeatures()
         {
             yield return new Features.LoadProbe();
         }
 
-        public void EarlyInit()
-        {
-        }
+        public void EarlyInit() { }
 
         public void Init()
         {
+            _general = new GeneralSettings();
+            _features.Add(new FeatureHandle(_general, canBeDisabled: false));
+
             foreach (var feature in BuildFeatures())
             {
-                bool enabled;
+                _features.Add(new FeatureHandle(feature));
+            }
+
+            foreach (var handle in _features)
+            {
                 try
                 {
-                    enabled = API.Config
-                        .Register(ModName, "Features", feature.Description,
-                                  feature.Name, feature.EnabledByDefault)
-                        .Value;
+                    handle.Bind(ModName);
                 }
                 catch (Exception e)
                 {
-                    LogError($"config registration failed for {feature.Name}, using default", e);
-                    enabled = feature.EnabledByDefault;
+                    Debug.LogError($"[{ModName}] config bind failed for {handle.Name}");
+                    Debug.LogException(e);
                 }
-
-                if (!enabled)
-                {
-                    Log($"{feature.Name}: disabled by config");
-                    continue;
-                }
-
-                if (Guard(feature, "Init", feature.Init))
-                {
-                    _active.Add(feature);
-                }
+                handle.Apply();
             }
 
             API.Client.OnWorldCreated += OnWorldCreated;
             API.Client.OnWorldDestroyed += OnWorldDestroyed;
 
-            Log(_active.Count == 0
-                ? "loaded with no active features"
-                : $"loaded with {_active.Count} feature(s): {string.Join(", ", _active.ConvertAll(f => f.Name))}");
+            Debug.Log($"[{ModName}] loaded, {_features.Count - 1} feature(s), " +
+                      $"press {_general.MenuKey.Value} for the menu");
         }
 
         public void Shutdown()
@@ -69,74 +64,92 @@ namespace CkQol
             API.Client.OnWorldCreated -= OnWorldCreated;
             API.Client.OnWorldDestroyed -= OnWorldDestroyed;
 
-            foreach (var feature in _active)
+            foreach (var handle in _features) handle.Shutdown();
+
+            if (_menu != null)
             {
-                Guard(feature, "Shutdown", feature.Shutdown);
+                UnityEngine.Object.Destroy(_menu.gameObject);
+                _menu = null;
             }
-            _active.Clear();
         }
 
-        public void ModObjectLoaded(UnityEngine.Object obj)
-        {
-        }
+        public void ModObjectLoaded(UnityEngine.Object obj) { }
 
         public void Update()
         {
-            // Reverse so a feature that faults can drop itself mid-iteration.
-            for (int i = _active.Count - 1; i >= 0; i--)
+            if (Input.GetKeyDown(_general.MenuKey.Value))
             {
-                var feature = _active[i];
-                if (!Guard(feature, "Update", feature.Update))
+                ToggleMenu();
+            }
+
+            for (int i = 0; i < _features.Count; i++)
+            {
+                _features[i].Update();
+            }
+        }
+
+        private void ToggleMenu()
+        {
+            if (_menuFailed) return;
+
+            // Built lazily: at Init the game's fonts and sprites are not loaded yet,
+            // so a menu constructed then would come out unstyled.
+            if (_menu == null)
+            {
+                try
                 {
-                    _active.RemoveAt(i);
+                    _menu = QolMenu.Create(this);
+                }
+                catch (Exception e)
+                {
+                    _menuFailed = true;
+                    Debug.LogError($"[{ModName}] menu failed to build, disabling it");
+                    Debug.LogException(e);
+                    return;
                 }
             }
+            _menu.Toggle();
         }
 
         private void OnWorldCreated()
         {
-            foreach (var feature in _active)
-            {
-                Guard(feature, "OnWorldCreated", feature.OnWorldCreated);
-            }
+            foreach (var handle in _features) handle.WorldCreated();
         }
 
         private void OnWorldDestroyed()
         {
-            foreach (var feature in _active)
-            {
-                Guard(feature, "OnWorldDestroyed", feature.OnWorldDestroyed);
-            }
+            foreach (var handle in _features) handle.WorldDestroyed();
+        }
+    }
+
+    /// Mod-wide settings. Always present, cannot be switched off - it is the tab the
+    /// menu hotkey itself lives on.
+    public class GeneralSettings : QolFeatureBase
+    {
+        public override string Name => "General";
+
+        public override string Description =>
+            "Settings for the mod itself. Every change here and on the other tabs " +
+            "applies immediately and is saved automatically.";
+
+        public readonly KeySetting MenuKey =
+            new KeySetting("MenuKey", "Menu hotkey", KeyCode.F1,
+                           "Key that opens this window. Use Unity KeyCode names, eg F1, F4, Insert.");
+
+        public readonly BoolSetting DumpAssets =
+            new BoolSetting("LogUiAssets", "Log UI assets on open", false,
+                            "Writes the game's available fonts and sliced sprites to the log. " +
+                            "Only useful when restyling the menu for a new game version.");
+
+        public override IEnumerable<ModSetting> GetSettings()
+        {
+            yield return MenuKey;
+            yield return DumpAssets;
         }
 
-        /// Runs a feature callback, reporting and reporting-once on failure.
-        /// Returns false if the feature threw and should be dropped.
-        private static bool Guard(IQolFeature feature, string stage, Action action)
+        public override void Init()
         {
-            try
-            {
-                action();
-                return true;
-            }
-            catch (Exception e)
-            {
-                LogError($"{feature.Name}.{stage} threw, disabling feature", e);
-                return false;
-            }
-        }
-
-        private static void Log(string message)
-        {
-            Debug.Log($"[{ModName}] {message}");
-        }
-
-        private static void LogError(string message, Exception e = null)
-        {
-            Debug.LogError($"[{ModName}] {message}");
-            if (e != null)
-            {
-                Debug.LogException(e);
-            }
+            if (DumpAssets.Value) GameTheme.DumpAssets();
         }
     }
 }

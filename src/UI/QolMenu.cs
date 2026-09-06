@@ -1,0 +1,302 @@
+using System.Collections.Generic;
+using CkQol.Config;
+using TMPro;
+using UnityEngine;
+using UnityEngine.UI;
+
+namespace CkQol.UI
+{
+    /// The in-game config window: feature tabs down the left, that feature's live
+    /// settings on the right. Built once, then shown/hidden - rebuilding the whole
+    /// tree on every toggle would drop slider drags and input-field focus.
+    public class QolMenu : MonoBehaviour
+    {
+        private const float Width = 720f;
+        private const float Height = 460f;
+        private const float TabColumn = 180f;
+
+        private CkQolMod _mod;
+        private Canvas _canvas;
+        private GameObject _root;
+        private RectTransform _tabList;
+        private RectTransform _pageHost;
+
+        private readonly List<Button> _tabButtons = new List<Button>();
+        private readonly List<GameObject> _pages = new List<GameObject>();
+        private int _current = -1;
+
+        public bool IsOpen => _root != null && _root.activeSelf;
+
+        public static QolMenu Create(CkQolMod mod)
+        {
+            var host = new GameObject("CkQolMenu");
+            DontDestroyOnLoad(host);
+            var menu = host.AddComponent<QolMenu>();
+            menu._mod = mod;
+            menu.Build();
+            menu.SetOpen(false);
+            return menu;
+        }
+
+        public void Toggle() => SetOpen(!IsOpen);
+
+        public void SetOpen(bool open)
+        {
+            if (_root == null) return;
+            _root.SetActive(open);
+
+            // The game is top-down and mouse-driven, so the cursor is normally free.
+            // Only force it if something else has hidden it.
+            if (open && !Cursor.visible)
+            {
+                Cursor.visible = true;
+                Cursor.lockState = CursorLockMode.None;
+            }
+        }
+
+        private void Build()
+        {
+            UiFactory.EnsureEventSystem();
+
+            var canvasGo = new GameObject("Canvas");
+            canvasGo.transform.SetParent(transform, false);
+            _canvas = canvasGo.AddComponent<Canvas>();
+            _canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            // Above the game's own HUD, below nothing we care about.
+            _canvas.sortingOrder = 32000;
+
+            var scaler = canvasGo.AddComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920f, 1080f);
+            scaler.matchWidthOrHeight = 0.5f;
+            canvasGo.AddComponent<GraphicRaycaster>();
+
+            // Window
+            var window = UiFactory.Panel("Window", canvasGo.transform, GameTheme.PanelBg,
+                                         out RectTransform windowRect);
+            _root = window.gameObject;
+            windowRect.anchorMin = new Vector2(0.5f, 0.5f);
+            windowRect.anchorMax = new Vector2(0.5f, 0.5f);
+            windowRect.pivot = new Vector2(0.5f, 0.5f);
+            windowRect.sizeDelta = new Vector2(Width, Height);
+
+            var outline = window.gameObject.AddComponent<Outline>();
+            outline.effectColor = GameTheme.PanelBorder;
+            outline.effectDistance = new Vector2(2f, -2f);
+
+            // Title bar
+            var title = UiFactory.Label("Title", window.transform,
+                                        "Core Keeper QoL", 20f, GameTheme.Accent);
+            var titleRect = title.rectTransform;
+            titleRect.anchorMin = new Vector2(0f, 1f);
+            titleRect.anchorMax = new Vector2(1f, 1f);
+            titleRect.pivot = new Vector2(0.5f, 1f);
+            titleRect.sizeDelta = new Vector2(0f, 36f);
+            titleRect.anchoredPosition = new Vector2(0f, -6f);
+            titleRect.offsetMin = new Vector2(16f, titleRect.offsetMin.y);
+
+            var hint = UiFactory.Label("Hint", window.transform,
+                                       "changes apply immediately", 12f, GameTheme.TextDim,
+                                       TextAlignmentOptions.MidlineRight);
+            var hintRect = hint.rectTransform;
+            hintRect.anchorMin = new Vector2(0f, 1f);
+            hintRect.anchorMax = new Vector2(1f, 1f);
+            hintRect.pivot = new Vector2(0.5f, 1f);
+            hintRect.sizeDelta = new Vector2(0f, 36f);
+            hintRect.anchoredPosition = new Vector2(0f, -8f);
+            hintRect.offsetMax = new Vector2(-16f, hintRect.offsetMax.y);
+
+            // Tab column
+            var tabPanel = UiFactory.Panel("Tabs", window.transform, GameTheme.TabIdle * 0.6f,
+                                           out RectTransform tabPanelRect);
+            tabPanelRect.anchorMin = new Vector2(0f, 0f);
+            tabPanelRect.anchorMax = new Vector2(0f, 1f);
+            tabPanelRect.pivot = new Vector2(0f, 0.5f);
+            tabPanelRect.sizeDelta = new Vector2(TabColumn, -52f);
+            tabPanelRect.anchoredPosition = new Vector2(10f, -10f);
+
+            var tabScroll = MakeScroll(tabPanel.transform, out _tabList);
+
+            // Page host
+            var pagePanel = UiFactory.Panel("Pages", window.transform, new Color(0f, 0f, 0f, 0.16f),
+                                            out RectTransform pagePanelRect);
+            pagePanelRect.anchorMin = new Vector2(0f, 0f);
+            pagePanelRect.anchorMax = new Vector2(1f, 1f);
+            pagePanelRect.offsetMin = new Vector2(TabColumn + 20f, 10f);
+            pagePanelRect.offsetMax = new Vector2(-10f, -52f);
+            _pageHost = pagePanelRect;
+
+            BuildTabs();
+            if (_tabButtons.Count > 0) Select(0);
+        }
+
+        private static ScrollRect MakeScroll(Transform parent, out RectTransform content)
+        {
+            var scrollGo = UiFactory.Node("Scroll", parent, out RectTransform scrollRect);
+            UiFactory.Stretch(scrollRect, 6f, 6f);
+            var scroll = scrollGo.AddComponent<ScrollRect>();
+            scroll.horizontal = false;
+            scroll.movementType = ScrollRect.MovementType.Clamped;
+            scroll.scrollSensitivity = 24f;
+
+            var viewportGo = UiFactory.Node("Viewport", scrollGo.transform, out RectTransform viewportRect);
+            UiFactory.Stretch(viewportRect, 0f, 0f);
+            viewportGo.AddComponent<RectMask2D>();
+            scroll.viewport = viewportRect;
+
+            UiFactory.Node("Content", viewportGo.transform, out content);
+            content.anchorMin = new Vector2(0f, 1f);
+            content.anchorMax = new Vector2(1f, 1f);
+            content.pivot = new Vector2(0.5f, 1f);
+            scroll.content = content;
+
+            var layout = content.gameObject.AddComponent<VerticalLayoutGroup>();
+            layout.spacing = 4f;
+            layout.padding = new RectOffset(4, 4, 4, 4);
+            layout.childForceExpandHeight = false;
+            layout.childForceExpandWidth = true;
+            layout.childControlHeight = true;
+            layout.childControlWidth = true;
+
+            var fitter = content.gameObject.AddComponent<ContentSizeFitter>();
+            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            return scroll;
+        }
+
+        private void BuildTabs()
+        {
+            foreach (var feature in _mod.Features)
+            {
+                int index = _pages.Count;
+                var button = UiFactory.FlatButton("Tab_" + feature.Name, _tabList,
+                                                  feature.Name, 34f, () => Select(index));
+                _tabButtons.Add(button);
+                _pages.Add(BuildPage(feature));
+            }
+        }
+
+        private GameObject BuildPage(FeatureHandle feature)
+        {
+            var pageGo = UiFactory.Node("Page_" + feature.Name, _pageHost, out RectTransform pageRect);
+            UiFactory.Stretch(pageRect, 0f, 0f);
+            MakeScroll(pageGo.transform, out RectTransform content);
+
+            var header = UiFactory.Label("Desc", content, feature.Description, 13f, GameTheme.TextDim);
+            header.textWrappingMode = TextWrappingModes.Normal;
+            var headerLayout = header.gameObject.AddComponent<LayoutElement>();
+            headerLayout.minHeight = 34f;
+
+            // Enable toggle, unless this is a pseudo-feature with nothing to switch off.
+            if (feature.CanBeDisabled)
+            {
+                UiFactory.Row(content, "Enabled", "Turn this feature on or off", 30f,
+                              out RectTransform slot);
+                UiFactory.Checkbox(slot, feature.Enabled.Value,
+                                   v => feature.Enabled.Value = v);
+            }
+
+            foreach (var setting in feature.Settings)
+            {
+                AddSettingRow(content, setting);
+            }
+
+            pageGo.SetActive(false);
+            return pageGo;
+        }
+
+        private static void AddSettingRow(Transform content, ModSetting setting)
+        {
+            switch (setting)
+            {
+                case BoolSetting b:
+                {
+                    UiFactory.Row(content, b.Label, b.Tooltip, 30f, out RectTransform slot);
+                    UiFactory.Checkbox(slot, b.Value, v => b.Value = v);
+                    break;
+                }
+                case IntSetting i:
+                {
+                    UiFactory.Row(content, i.Label, i.Tooltip, 30f, out RectTransform slot);
+                    UiFactory.HorizontalSlider(slot, i.Value, i.Min, i.Max, true,
+                                               v => i.Value = Mathf.RoundToInt(v), out _);
+                    break;
+                }
+                case FloatSetting f:
+                {
+                    UiFactory.Row(content, f.Label, f.Tooltip, 30f, out RectTransform slot);
+                    UiFactory.HorizontalSlider(slot, f.Value, f.Min, f.Max, false,
+                                               v => f.Value = v, out _);
+                    break;
+                }
+                case ChoiceSetting c:
+                {
+                    UiFactory.Row(content, c.Label, c.Tooltip, 30f, out RectTransform slot);
+                    BuildChoice(slot, c);
+                    break;
+                }
+                case KeySetting k:
+                {
+                    UiFactory.Row(content, k.Label, k.Tooltip, 30f, out RectTransform slot);
+                    UiFactory.TextBox(slot, k.Value.ToString(), v =>
+                    {
+                        if (System.Enum.TryParse(v, true, out KeyCode parsed)) k.Value = parsed;
+                    });
+                    break;
+                }
+                case StringSetting s:
+                {
+                    UiFactory.Row(content, s.Label, s.Tooltip, 30f, out RectTransform slot);
+                    UiFactory.TextBox(slot, s.Value, v => s.Value = v);
+                    break;
+                }
+            }
+        }
+
+        private static void BuildChoice(Transform slot, ChoiceSetting setting)
+        {
+            var rowGo = UiFactory.Node("Choices", slot, out RectTransform rowRect);
+            UiFactory.Stretch(rowRect, 0f, 0f);
+            var layout = rowGo.AddComponent<HorizontalLayoutGroup>();
+            layout.spacing = 4f;
+            layout.childForceExpandWidth = true;
+            layout.childControlWidth = true;
+            layout.childControlHeight = true;
+
+            var buttons = new List<Image>();
+            for (int i = 0; i < setting.Options.Length; i++)
+            {
+                string option = setting.Options[i];
+                var button = UiFactory.FlatButton("Opt_" + option, rowGo.transform, option, 24f, null);
+                var image = button.targetGraphic as Image;
+                buttons.Add(image);
+                button.onClick.AddListener(() =>
+                {
+                    setting.Value = option;
+                    for (int j = 0; j < buttons.Count; j++)
+                    {
+                        buttons[j].color = setting.Options[j] == setting.Value
+                            ? GameTheme.TabActive : GameTheme.TabIdle;
+                    }
+                });
+            }
+            for (int i = 0; i < buttons.Count; i++)
+            {
+                buttons[i].color = i == setting.Index ? GameTheme.TabActive : GameTheme.TabIdle;
+            }
+        }
+
+        private void Select(int index)
+        {
+            if (index < 0 || index >= _pages.Count) return;
+            _current = index;
+            for (int i = 0; i < _pages.Count; i++)
+            {
+                _pages[i].SetActive(i == index);
+                if (_tabButtons[i].targetGraphic is Image image)
+                {
+                    image.color = i == index ? GameTheme.TabActive : GameTheme.TabIdle;
+                }
+            }
+        }
+    }
+}

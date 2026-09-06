@@ -1,27 +1,63 @@
+using System.Collections.Generic;
+using CkQol.Config;
+
 namespace CkQol.Features
 {
-    /// Placeholder that proves the mod compiled, loaded, and is receiving lifecycle
-    /// callbacks. Delete it once there are real features.
+    /// Placeholder proving the mod loads and the menu round-trips every widget type.
+    /// Delete it once there are real features.
     public class LoadProbe : QolFeatureBase
     {
         public override string Name => "LoadProbe";
 
         public override string Description =>
-            "Logs mod lifecycle events. Diagnostic only, safe to turn off.";
+            "Diagnostic placeholder. Logs lifecycle events and exercises each " +
+            "setting widget so the menu can be checked end to end. Safe to disable.";
+
+        private readonly BoolSetting _verbose =
+            new BoolSetting("Verbose", "Verbose logging", false,
+                            "Also log every frame tick. Noisy - leave off unless debugging.");
+
+        private readonly IntSetting _count =
+            new IntSetting("SampleCount", "Sample int", 5, 0, 20,
+                           "Demonstrates the integer slider.");
+
+        private readonly FloatSetting _scale =
+            new FloatSetting("SampleScale", "Sample float", 1f, 0.1f, 4f,
+                             "Demonstrates the float slider.");
+
+        private readonly ChoiceSetting _mode =
+            new ChoiceSetting("SampleMode", "Sample choice",
+                              new[] { "Off", "Low", "High" }, "Low",
+                              "Demonstrates the choice buttons.");
+
+        private readonly StringSetting _note =
+            new StringSetting("SampleNote", "Sample text", "hello",
+                              "Demonstrates the text field.");
+
+        public override IEnumerable<ModSetting> GetSettings()
+        {
+            yield return _verbose;
+            yield return _count;
+            yield return _scale;
+            yield return _mode;
+            yield return _note;
+        }
 
         public override void Init()
         {
-            Log("initialised");
+            Log($"started (count={_count.Value}, scale={_scale.Value:0.00}, " +
+                $"mode={_mode.Value}, note='{_note.Value}')");
         }
 
-        public override void OnWorldCreated()
-        {
-            Log("client world created");
-        }
+        public override void OnWorldCreated() => Log("client world created");
 
-        public override void OnWorldDestroyed()
+        public override void OnWorldDestroyed() => Log("client world destroyed");
+
+        public override void Shutdown() => Log("stopped");
+
+        public override void Update()
         {
-            Log("client world destroyed");
+            if (_verbose.Value) Log("tick");
         }
     }
 }

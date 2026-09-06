@@ -8,6 +8,7 @@ Targets Core Keeper **1.2.1.5** (Unity 6000.0.59f2).
 ## Install
 
 ```sh
+./check.sh     # compile against the game's assemblies first
 ./install.sh
 ```
 
@@ -35,38 +36,75 @@ log rather than at deploy time.
 This is deliberate: PugMod silently ignores any `.cs` file not listed in the
 manifest, which is indistinguishable from a feature that just does not work.
 
+`check.sh` compiles the source against `CoreKeeper_Data/Managed/` so mistakes
+surface in a couple of seconds instead of as a line in `Player.log` after a full
+game launch. Run it before every install.
+
+## The config menu
+
+Press **F1** in game (rebindable on the General tab). Feature tabs run down the
+left, that feature's settings on the right. Every change applies immediately and
+is saved — there is no apply button and no restart.
+
+Built with uGUI + TextMeshPro rather than IMGUI, specifically so it can use the
+game's own font: Core Keeper's UI is TMP-based, and IMGUI cannot render TMP font
+assets, so an IMGUI menu could never match the game's look.
+
+`GameTheme` finds the font and 9-sliced panel sprites at runtime from assets the
+game has already loaded — PugMod script mods ship source only, so nothing can be
+bundled. Every lookup falls back to a plain colour if the asset is missing.
+Turn on *Log UI assets on open* in the General tab to dump the available fonts
+and sprite names, which is how to retune the styling for a new game version.
+
 ## Adding a feature
 
 Create a class in `src/Features/` extending `QolFeatureBase`:
 
 ```csharp
-namespace CkQol.Features
+public class MyTweak : QolFeatureBase
 {
-    public class MyTweak : QolFeatureBase
-    {
-        public override string Name => "MyTweak";
-        public override string Description => "What it does, shown by the config toggle.";
+    public override string Name => "MyTweak";
+    public override string Description => "What it does, shown at the top of its tab.";
 
-        public override void OnWorldCreated()
-        {
-            Log("world is up");
-        }
+    private readonly FloatSetting _strength =
+        new FloatSetting("Strength", "Strength", 1f, 0f, 5f, "Tooltip text.");
+
+    public override IEnumerable<ModSetting> GetSettings()
+    {
+        yield return _strength;
+    }
+
+    public override void Update()
+    {
+        // Read .Value every time - that is what makes menu edits apply live.
+        DoSomething(_strength.Value);
     }
 }
 ```
 
-Then register it in `CkQolMod.BuildFeatures`:
+Register it in `CkQolMod.BuildFeatures`:
 
 ```csharp
 yield return new Features.MyTweak();
 ```
 
-Every feature gets an on/off toggle under `[Features]` in the mod's config
-automatically, keyed on `Name` — renaming `Name` orphans the user's existing
-setting.
+That is all that is needed. The feature gets its own tab, an Enabled toggle, a
+config section named after `Name`, and a widget per setting.
 
-Features are isolated: one that throws in any lifecycle callback is logged and
-disabled, and the rest keep running.
+Setting types: `BoolSetting`, `IntSetting` and `FloatSetting` (sliders, with
+min/max), `StringSetting`, `ChoiceSetting` (a fixed option list, stored by name
+so reordering options later cannot change anyone's setting), and `KeySetting`.
+
+Two things worth knowing:
+
+- **Read `.Value` at point of use, not at init.** Caching it means menu edits do
+  nothing until restart.
+- **`Name` is the config key.** Renaming it orphans users' existing settings.
+
+Features are isolated. One that throws in any lifecycle callback is logged,
+disabled, and the rest keep running — a broken tweak should not cost you the
+other ten or crash the client. Toggling a feature on mid-session runs its `Init`
+and, if a world is already loaded, the `OnWorldCreated` it missed.
 
 ## API notes
 
