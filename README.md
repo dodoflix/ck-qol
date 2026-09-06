@@ -9,8 +9,19 @@ Targets Core Keeper **1.2.1.5** (Unity 6000.0.59f2).
 ## Features
 
 **Auto Fishing** — casts and hooks for you, and stops baited spots depleting.
-Configurable cast charge, hook press and shoal behaviour. Infinite shoal is
-host-side and does nothing on a server without the mod.
+Casting time sets how far the line lands; Learn casting copies your own charge
+instead. Infinite fish shoal is host-side and does nothing on a server without
+the mod.
+
+**Auto Eat** — eats when hunger passes a threshold, without changing the item you
+have selected. Picks the smallest food that helps, so a cooked dish is not spent
+on a small gap. Scopes are independent: hotbar, main inventory, pouches.
+
+**Auto Summon** — keeps minions up as they expire or die. Three modes: the set you
+summoned by hand, the type you summoned last, or your cap split between the
+summoning weapons on your hotbar. Never summons past the cap, so a change of plan
+fills in as minions expire rather than culling healthy ones. Ctrl+R with a
+summoning weapon in hand toggles it for the session.
 
 ## Install
 
@@ -20,9 +31,13 @@ host-side and does nothing on a server without the mod.
 
 Close the game first: mods are compiled at startup.
 
-Deploys to `CoreKeeper_Data/StreamingAssets/Mods/CkQol/`. Set `CK_GAME_DIR` if
-the install lives elsewhere. Steam wipes `StreamingAssets/` on updates and on
-Verify Integrity — re-run `install.sh` if the mod stops loading.
+Deploys to `CoreKeeper_Data/StreamingAssets/Mods/CkQol/`. Set `CK_GAME_DIR` if the
+install lives elsewhere. Steam wipes `StreamingAssets/` on updates and on Verify
+Integrity — re-run `install.sh` if the mod stops loading.
+
+Config is one JSON per setting under
+`…/Pugstorm/Core Keeper/Steam/<id>/mods/CkQol/`. Deleting that directory resets
+everything to defaults.
 
 ## How it works
 
@@ -32,42 +47,101 @@ in-process at startup. So there is no build step, and mistakes only surface in
 
 `check.sh` closes that gap. It compiles against `CoreKeeper_Data/Managed/`, then
 lints for APIs PugMod's **security verifier** rejects — `System.Reflection` above
-all. A clean compile says nothing about passing the verifier, and the only
-in-game symptom is a bare "Compilation failed".
+all. A clean compile says nothing about passing the verifier, and the only in-game
+symptom is a bare "Compilation failed".
 
-`install.sh` generates `ModManifest.json` from `src/`. PugMod silently ignores
-any `.cs` missing from the manifest.
+`install.sh` generates `ModManifest.json` from `src/`. PugMod silently ignores any
+`.cs` missing from the manifest.
+
+## Using an item without changing the player's selection
+
+All three features do this, and it is the load-bearing trick of the mod.
+
+Eating, summoning and reeling all consume the **equipped** slot — there is no path
+that uses an item from an arbitrary inventory index. But `ClientInput` is writable,
+and the ordering works out:
+
+```
+SimulationSystemGroup
+├─ RunSimulationSystemGroup                       (OrderFirst)
+│    ├─ SendClientInputSystem                     (OrderLast)
+│    └─ our systems                               (UpdateAfter) ← write here
+└─ …BeforePredictedFixedStepSimulationSystemGroup
+     └─ EquipmentSystemGroup
+          ├─ EquipmentBeforeUpdateSystemGroup → SelectedEquipmentChangeSystem  ← reads it
+          └─ EquipmentUpdateSystemGroup       → EquipmentUpdateSystem → *Slot
+```
+
+Writing `ClientInput.equippedSlotIndex` reaches `SelectedEquipmentChangeSystem` on
+the same tick. The player's real selection lives in a client MonoBehaviour that
+`SendClientInputSystem` copies back wholesale every tick, so the override lasts
+exactly as long as it is written and the hotbar never moves.
+
+`PlayerSlots` holds the shared parts. Things learned the hard way:
+
+- **End the press with the slot still overridden.** `EquipmentUpdateSystem` latches a
+  pending second-interact, so dropping the button and the override together lets
+  that latch land a frame later on whatever the player actually holds — firing
+  their weapon.
+- **Pin the aim** while pressing, or summons go to the aim marker, up to twelve
+  tiles away for command-minion weapons.
+- `equippedSlotIndex` is a **byte**, and `SelectedEquipmentChangeSystem` indexes the
+  buffer with it and no bounds check.
+- The inventory is one `ContainedObjectsBuffer`; `InventoryBuffer[0]` is the main
+  inventory and `1..` are pouches. The **hotbar is not a container** but a moving
+  window over those, so scope has to be decided per slot.
+- An open inventory does **not** need to block any of this — the simulation never
+  checks the UI. A held cursor item does.
 
 ## The settings menu
 
 No custom UI: the mod **clones the game's real option rows** and swaps in its own
-behaviour, so navigation, fonts, sounds and controller support come from the
-game.
-
-Gotchas in `Native/`, all found the hard way:
+behaviour, so navigation, fonts, sounds and controller support come from the game.
 
 - Menus are **SpriteRenderer world-space UI** driven by `RadicalMenu`, not uGUI.
-- Rows live under a **container inside the menu**, which carries an offset. A row
-  parented to the menu root gets the right local position and the wrong world
-  position. Clone with `parent: null` to land beside the donor.
+- Rows live under a **container inside the menu**, which carries an offset. Clone
+  with `parent: null` to land beside the donor.
 - `menuOptions` is filled in `Awake` **only**, and option menus are instantiated
   inactive, so it is empty at startup. Read rows with `GetComponentsInChildren`.
 - `UpdatePosition` always lays out, but menus that never auto-position ship
-  `menuEntryVirtualHeight` at zero, stacking every row on one line. Give it a
-  measured pitch.
+  `menuEntryVirtualHeight` at zero, stacking every row on one line.
 - `extraVerticalSpacing` is subtracted before placement, so a clone inherits the
   donor's group gap and lands low.
-- `PugText.Render` treats its argument as a **localization key** unless `localize`
-  is false, and early-outs unless `force: true`.
 - A ranged donor carries prefab-wired per-diamond `ButtonUIElement`s. Swapping the
   script leaves them pointing at a destroyed component, where they win the click
   raycast and do nothing. `QolStepStrip` destroys and rebuilds them.
-- Donors are matched by shape (`isOnOffToggle`, type test), never class name.
 
-Two PugMod bugs worked around in `ModSetting`:
+## The HUD key hint
 
-- `ModConfigEntry`'s **getter** re-reads and re-parses the JSON on every access,
-  so values are cached here rather than read back.
+`GameHints` adds a line to the bottom-right hints by cloning a stock one.
+`InGameButtonHintsUI.hintButtonRows` is a plain public list with no cached index —
+appending is safe, inserting at 0 is not, because the row anchor is read live from
+`buttons[0]`.
+
+Every one of these produced an invisible hint:
+
+- The label is a **child of `textContainer`**, which the stock hints toggle. An
+  active label inside an inactive parent renders nothing.
+- `PugText.Start()` **deactivates its own GameObject** when `renderOnStart` is
+  false, and never sets `startCalled`, so `OnEnable` never re-renders it. Only a
+  successful `Render()` revives it.
+- `PugText` releases its glyphs to the pool when disabled, so text rendered into a
+  disabled object is dropped. Activate first, render second.
+- A cloned `PugText` inherits the donor's `maxWidth`, sized for labels like "Tab",
+  and wraps one word per line.
+- `CalcGameplayUITargetScaleMultiplier()` returns **zero** for roughly the first
+  second in a world, and during any fade. Sampling it once and caching leaves the
+  hint at zero size forever.
+- Never deactivate a sprite's GameObject to hide it — the donor's sprites can be
+  the label's own parent. Disable the renderer.
+
+## PugMod quirks worked around
+
+- `PugDatabase.GetBuffer` and `GetComponent` **do not check the prefab has the
+  component** before fetching it, unlike `TryGetComponent`. Guard with
+  `HasComponent` or they throw on anything that lacks it.
+- `ModConfigEntry`'s **getter** re-reads and re-parses the JSON on every access, so
+  `ModSetting` caches the value and touches the entry only at bind and on write.
 - `ModAPIConfig.Register` writes a new file through `Set()`, which omits
   `description` and `defaultValue`; later runs read that back, so they stay empty
   forever. One extra write on a new file fixes it.
@@ -87,12 +161,13 @@ public class MyTweak : QolFeatureBase
 
     public override IEnumerable<ModSetting> GetSettings() { yield return _strength; }
 
-    public override void Update() => DoSomething(_strength.Value);
+    /// Called on start, on stop, and on every setting change.
+    protected override void Apply() => MyState.Strength = Running ? _strength.Value : 0f;
 }
 ```
 
-Register it in `CkQolMod.BuildFeatures`. It gets a page, an Enabled toggle, a
-config section named after `Name`, and a row per setting.
+Register it in `CkQolMod.BuildFeatures`. It gets a page, an Enabled toggle, a config
+section named after `Name`, and a row per setting.
 
 | setting | row |
 |---|---|
@@ -107,11 +182,21 @@ config section named after `Name`, and a row per setting.
 A feature that throws in any callback is logged, disabled, and the rest keep
 running.
 
+An ECS system reads its settings from a static mirror rather than the feature, so
+it holds no reference and costs one bool test while off. `Apply()` gates on
+`Running`, or editing a setting would restart a disabled feature.
+
+## Known debt
+
+**Three features drive `SecondInteract_HeldDown`.** Priority is ad-hoc: fishing wins
+by player state, eating beats summoning via `AutoEatState.Busy`. That holds for
+three. A fourth consumer should force a real arbiter.
+
 ## Scope
 
 Client-side, `requiredOn: 1`. Other players do not need it. Anything
-server-authoritative — world state, entity spawning, world generation — is out of
-scope, except where a system can run host-side for a listen server.
+server-authoritative is out of scope, except where a system can run host-side for a
+listen server.
 
 ## License
 
