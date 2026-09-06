@@ -38,7 +38,6 @@ namespace CkQol.Native
             public GameObject Root;
             public SpriteRenderer Icon;
             public PugText Text;
-            public PugText[] Shadows;
             public string Shown;
         }
 
@@ -106,7 +105,6 @@ namespace CkQol.Native
             if (row.Shown != data.Text)
             {
                 GameMenu.SetLiteral(row.Text, data.Text);
-                foreach (var shadow in row.Shadows) GameMenu.SetLiteral(shadow, data.Text);
                 row.Shown = data.Text;
             }
 
@@ -114,9 +112,9 @@ namespace CkQol.Native
             row.Icon.enabled = data.Icon != null;
 
             // Every frame, not once at build: the donor is the crafting hover's
-            // ingredient count, which the game tints red for a material you are short
-            // of, and Render rebuilds the glyphs from the style and loses whatever was
-            // put on them.
+            // ingredient count, which the game tints for whether you have enough of a
+            // material, and Render rebuilds the glyphs from the style and loses
+            // whatever was put on them.
             Recolour(row.Text, Color.white);
         }
 
@@ -136,7 +134,6 @@ namespace CkQol.Native
             if (row == null || row.Shown == string.Empty) return;
 
             GameMenu.SetLiteral(row.Text, string.Empty);
-            foreach (var shadow in row.Shadows) GameMenu.SetLiteral(shadow, string.Empty);
             row.Icon.enabled = false;
             row.Shown = string.Empty;
         }
@@ -187,9 +184,6 @@ namespace CkQol.Native
                 UnityEngine.Object.DestroyImmediate(stale);
             }
 
-            var shadows = new List<PugText>();
-            if (element.amountNumberShadow != null) shadows.Add(element.amountNumberShadow);
-            if (element.amountNumberShadow2 != null) shadows.Add(element.amountNumberShadow2);
 
             // The donor's width is sized for the hover window, and PugFont only wraps
             // above zero (PugFont.cs:141). Alignment is forced rather than inherited so
@@ -241,10 +235,8 @@ namespace CkQol.Native
                 Root = clone,
                 Icon = element.SR,
                 Text = element.amountNumber,
-                Shadows = shadows.ToArray()
             };
         }
-
     }
 
     public static class GameStatPanel

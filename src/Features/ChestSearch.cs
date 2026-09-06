@@ -193,8 +193,12 @@ namespace CkQol.Features
 
                 _rows.Add(new SearchRow
                 {
-                    Icon = IconFor(carried ? CarriedIcon : hit.ContainerId),
-                    Text = carried ? "Inventory" : hit.Label ?? NameOf(hit.ContainerId),
+                    Icon = IconFor(carried ? CarriedIcon
+                                 : hit.Ground ? _wanted
+                                 : hit.ContainerId),
+                    Text = carried ? "Inventory"
+                         : hit.Ground ? "Ground"
+                         : hit.Label ?? NameOf(hit.ContainerId),
                     Amount = "x" + Compact(hit.Count),
                 });
             }

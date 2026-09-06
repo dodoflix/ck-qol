@@ -26,6 +26,9 @@ namespace CkQol.Features
         internal int Count;
         internal ObjectID ContainerId;
         internal string Label;
+
+        /// Lying on the floor rather than in anything.
+        internal bool Ground;
     }
 
     /// The item name index, and the scan that answers "who has this".
@@ -226,6 +229,11 @@ namespace CkQol.Features
                         ? em.GetComponentData<ObjectDataCD>(entities[i]).objectID
                         : ObjectID.None,
                     Label = LabelOf(em, entities[i]),
+
+                    // An item on the floor carries its own contents the same way a
+                    // chest does, so the query finds it. PickUpItemCD is what the
+                    // game's own pick-up system matches on to tell them apart.
+                    Ground = em.HasComponent<PickUpItemCD>(entities[i]),
                 });
             }
             entities.Dispose();
