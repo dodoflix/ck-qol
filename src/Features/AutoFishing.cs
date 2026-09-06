@@ -14,10 +14,6 @@ namespace CkQol.Features
             "running out. Cast once and leave it. Pauses while a menu or inventory is " +
             "open, and never touches octopus boss fishing.";
 
-        private readonly BoolSetting _autoReel =
-            new BoolSetting("AutoReel", "Auto reel", true,
-                            "Turn off if another fishing mod does the same job.");
-
         private readonly FloatSetting _castingTime =
             new FloatSetting("CastingTimeSeconds", "Casting time", 0f, 0f, 2f,
                              "How long the throw is charged, which is how far the " +
@@ -42,7 +38,6 @@ namespace CkQol.Features
 
         public override IEnumerable<ModSetting> GetSettings()
         {
-            yield return _autoReel;
             yield return _castingTime;
             yield return _learnCasting;
             yield return _reelHold;
@@ -68,7 +63,7 @@ namespace CkQol.Features
 
             _running = true;
             Push();
-            Log($"started (reel={_autoReel.Value}, cast={_castingTime.Value:0.00}s, " +
+            Log($"started (cast={_castingTime.Value:0.00}s, " +
                 $"learn={_learnCasting.Value}, hold={_reelHold.Value:0.00}s, " +
                 $"shoal={_infiniteShoal.Value})");
         }
@@ -82,7 +77,7 @@ namespace CkQol.Features
 
         private void Push()
         {
-            AutoFishingState.ReelEnabled = _running && _autoReel.Value;
+            AutoFishingState.ReelEnabled = _running;
             AutoFishingState.ShoalEnabled = _running && _infiniteShoal.Value;
             AutoFishingState.CastingTimeSeconds = _castingTime.Value;
             AutoFishingState.LearnEnabled = _learnCasting.Value;
