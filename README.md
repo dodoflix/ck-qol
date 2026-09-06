@@ -186,6 +186,30 @@ An ECS system reads its settings from a static mirror rather than the feature, s
 it holds no reference and costs one bool test while off. `Apply()` gates on
 `Running`, or editing a setting would restart a disabled feature.
 
+### If it drives the player's input
+
+Follow the three existing systems rather than inventing a fourth shape:
+
+```csharp
+[WorldSystemFilter(WorldSystemFilterFlags.ClientSimulation)]
+[UpdateInGroup(typeof(RunSimulationSystemGroup), OrderLast = true)]
+[UpdateAfter(typeof(SendClientInputSystem))]
+public partial class CkQolMyTweakSystem : PugSimulationSystemBase
+```
+
+- `OnUpdate` calls a `Tick()` that returns plainly; `base.OnUpdate()` is called once,
+  not at every guard.
+- Guard cheapest first. The gate that is true almost every frame goes at the top, so
+  an idle frame costs one component read.
+- Call `UseButton.Claim(this)` before touching `ClientInputData`, and do nothing that
+  frame if it refuses.
+- Use `PlayerSlots.Press` / `EndPress` rather than writing the input directly — they
+  carry the release rule that stops a latched press firing the player's weapon.
+- Stop while `Manager.menu.IsAnyMenuActive()` or `PlayerSlots.DragInProgress()`. An
+  open inventory is fine.
+- Throttle anything that walks the inventory or queries entities; those are
+  main-thread sync points, not free reads.
+
 ## Sharing the use button
 
 Every automatic feature drives the same `SecondInteract` bit, and two writing it in
