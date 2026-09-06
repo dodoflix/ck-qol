@@ -93,11 +93,11 @@ namespace CkQol.Native
                     Debug.LogError("[CkQol] could not add the entry to the Options menu");
                     return;
                 }
-                entry.Label = "Core Keeper QoL";
+                entry.Label = "QoL settings";
                 entry.Target = rootMenu;
                 entry.LogState = true;
                 GameMenu.Refresh(optionsMenu);
-                GameMenu.PlaceBelowLast(optionsMenu, entry);
+                entry.Owner = optionsMenu;
 
                 _installed = true;
                 Debug.Log($"[CkQol] added to the game's Options menu after {_attempts} attempt(s)");

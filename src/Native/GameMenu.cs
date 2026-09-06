@@ -272,52 +272,55 @@ namespace CkQol.Native
         /// row sits at its authored prefab position and UpdatePosition does nothing,
         /// so a clone keeps the donor's position and lands on top of it. Spacing is
         /// measured from the existing rows rather than assumed.
-        public static void PlaceBelowLast(RadicalMenu menu, RadicalMenuOption ours)
+        /// Lets the game lay the menu out, after giving it the two inputs it needs.
+        ///
+        /// UpdatePosition does not check autoPositioning - it always positions - but
+        /// menus that never auto-position ship with menuEntryVirtualHeight at zero,
+        /// so every row lands on the same Y. That is why calling it earlier collapsed
+        /// the Settings list onto one line.
+        ///
+        /// Both inputs are derived from the rows, so no correction is applied
+        /// afterwards. UpdatePosition starts at menuEntryStartPositionY + half the
+        /// total height and walks down, which puts the column centre exactly half a
+        /// row below that value - so the start position that reproduces the original
+        /// column is (centre - pitch/2).
+        ///
+        /// Must run once the menu is open - row visibility cannot be read at startup,
+        /// when Manager.sceneHandler is null and everything reports INACTIVE.
+        public static void LayoutWithGame(RadicalMenu menu)
         {
-            if (menu == null || ours == null) return;
+            if (menu == null) return;
 
-            // Positions in child order. The direction the list runs is derived from
-            // them rather than assumed - this is world-space UI and the sign of "down"
-            // is not something to guess at.
             var ys = new List<float>();
-            float x = ours.transform.localPosition.x;
-            float z = ours.transform.localPosition.z;
-
             foreach (var option in RowsOf(menu))
             {
-                if (option == null || option == ours) continue;
-                var local = option.transform.localPosition;
-                ys.Add(local.y);
-                x = local.x;
-                z = local.z;
+                if (option != null && option.gameObject.activeSelf)
+                {
+                    ys.Add(option.transform.localPosition.y);
+                }
             }
+            if (ys.Count < 2) return;
 
-            if (ys.Count == 0) return;
+            ys.Sort();
+            float top = ys[ys.Count - 1];
+            float bottom = ys[0];
 
-            float first = ys[0];
-            float last = ys[ys.Count - 1];
-
-            var sorted = new List<float>(ys);
-            sorted.Sort();
-
+            // Smallest positive gap is the row pitch; rows sharing a Y are ignored.
             float pitch = 0f;
-            for (int i = 1; i < sorted.Count; i++)
+            for (int i = 1; i < ys.Count; i++)
             {
-                float gap = sorted[i] - sorted[i - 1];
+                float gap = ys[i] - ys[i - 1];
                 if (gap > 0.0001f && (pitch <= 0f || gap < pitch)) pitch = gap;
             }
-            if (pitch <= 0f) pitch = Mathf.Abs(menu.menuEntryVirtualHeight);
-            if (pitch <= 0f) pitch = 1f;
+            if (pitch <= 0f) pitch = (top - bottom) / (ys.Count - 1);
+            if (pitch <= 0f) return;
 
-            // Continue past whichever end the list ends on.
-            float y = last <= first ? sorted[0] - pitch : sorted[sorted.Count - 1] + pitch;
+            menu.menuEntryVirtualHeight = pitch;
+            menu.menuEntryStartPositionY = (top + bottom) * 0.5f - pitch * 0.5f;
+            menu.UpdatePosition();
 
-            var placed = new Vector3(x, y, z);
-            ours.transform.localPosition = placed;
-
-            Debug.Log($"[CkQol] placed row at {placed} pitch={pitch} firstY={first} lastY={last} " +
-                      $"minY={sorted[0]} maxY={sorted[sorted.Count - 1]} rows={ys.Count} " +
-                      $"world={ours.transform.position} active={ours.gameObject.activeInHierarchy}");
+            Debug.Log($"[CkQol] laid out via UpdatePosition: rows={ys.Count} pitch={pitch} " +
+                      $"startY={menu.menuEntryStartPositionY}");
         }
 
         /// Stacks rows down a menu we built ourselves, reusing the slot positions the

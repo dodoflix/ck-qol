@@ -14,11 +14,19 @@ namespace CkQol.Native
         public string Label;
         public bool LogState;
 
+        /// Set when this row was appended to a menu that did not have room for it.
+        public RadicalMenu Owner;
+
         /// Called by RadicalMenu.Activate as the menu opens - the only point where
         /// the row's real visibility state can be observed.
         public override void OnParentMenuActivation()
         {
             base.OnParentMenuActivation();
+
+            // Re-space here rather than at install: this is the first moment the
+            // real per-row visibility is known.
+            if (Owner != null) GameMenu.LayoutWithGame(Owner);
+
             if (!LogState) return;
             Debug.Log($"[CkQol] on open: state={GetActiveStateInCurrentScene()} " +
                       $"activeSelf={gameObject.activeSelf} pos={transform.localPosition} " +
