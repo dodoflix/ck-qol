@@ -83,8 +83,10 @@ namespace CkQol.Features
 
             if (Manager.ui.isAnyInventoryShowing || Manager.menu.IsAnyMenuActive()) return;
 
-            // Auto Fishing drives the same button; both writing it in one frame is
-            // undefined, so fishing wins.
+            // Never while fishing. Eating equips the food, and the game leaves the
+            // fishing state as soon as the equipped item is not a rod
+            // (Fishing.cs:255-262), so this would cancel the cast. Auto Fishing also
+            // drives the same button, which alone would make one of them lose.
             var playerState = EntityManager.GetComponentData<PlayerStateCD>(player);
             if (playerState.HasAnyState(PlayerStateEnum.Fishing)) return;
 
