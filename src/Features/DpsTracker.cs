@@ -19,7 +19,7 @@ namespace CkQol.Features
         private const string Detailed = "Detailed";
 
         private readonly ChoiceSetting _mode =
-            new ChoiceSetting("Mode", "Mode", new[] { Basic, Detailed }, Basic,
+            new ChoiceSetting("Mode", "Mode", new[] { Basic, Detailed }, Detailed,
                               "Basic shows one total. Detailed shows a row per source " +
                               "with its icon, and the total under them.");
 
