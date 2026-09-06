@@ -4,45 +4,36 @@ using UnityEngine;
 
 namespace CkQol.Config
 {
-    /// One configurable value, backed by PugMod's config so it persists.
+    /// One configurable value, persisted through PugMod. UI-agnostic: the menu
+    /// inspects the concrete type and builds the right widget.
     ///
-    /// Deliberately UI-agnostic: the menu inspects the concrete type and builds the
-    /// right widget.
-    ///
-    /// The live value is held here, not read back from PugMod. ModConfigEntry's
-    /// getter re-reads and re-parses the JSON file on every access, so a feature
-    /// polling a setting each frame would be reading from disk sixty times a second.
-    /// The entry is touched once at Bind and then only on write, which also keeps the
-    /// value readable from simulation code.
+    /// The value is held here, not read back: ModConfigEntry's getter re-reads and
+    /// re-parses the JSON on every access. The entry is touched at Bind and on write
+    /// only, which also makes the value safe to read from simulation code.
     public abstract class ModSetting
     {
         public string Key { get; protected set; }
         public string Label { get; protected set; }
         public string Tooltip { get; protected set; }
 
-        /// Raised after the value changes, from the menu or from code.
+        /// Raised after the value changes.
         public event Action<ModSetting> Changed;
 
-        /// Registers with PugMod config under [section]. Called once at load.
+        /// Registers under [section]. Called once at load.
         public abstract void Bind(string mod, string section);
 
-        /// Restores the value the setting was constructed with. Raises Changed, so
-        /// menu rows redraw themselves.
+        /// Restores the constructed value. Raises Changed, so rows redraw.
         public abstract void ResetToDefault();
 
         protected void RaiseChanged() => Changed?.Invoke(this);
 
-        /// Registers with PugMod, working around it dropping the metadata.
+        /// Registers, working around PugMod dropping the metadata.
         ///
-        /// ModAPIConfig.Register creates a brand-new file through Set(), which writes
-        /// only mod/section/key/value - the description and defaultValue it was given
-        /// are kept in memory and never reach disk. Every later run then reads that
-        /// incomplete file back, so the fields stay empty forever. Writing once while
-        /// the in-memory record is still the complete one persists them.
-        ///
-        /// Only for a file that does not exist yet: on an existing one the record
-        /// already came from disk, so this would rewrite it with the default and
-        /// throw away whatever the player had set.
+        /// ModAPIConfig.Register writes a new file through Set(), which omits
+        /// description and defaultValue, and later runs read that back - so they stay
+        /// empty forever. One write while the in-memory record is still complete fixes
+        /// it. New files only: rewriting an existing one would discard the player's
+        /// value.
         protected static IConfigEntry<T> Register<T>(string mod, string section,
                                                      string description, string key,
                                                      T defaultValue)
@@ -59,7 +50,7 @@ namespace CkQol.Config
         private readonly bool _default;
         private IConfigEntry<bool> _entry;
 
-        // volatile: read from ECS simulation code, written from the menu.
+        // volatile: read from simulation code, written from the menu.
         private volatile bool _value;
 
         public BoolSetting(string key, string label, bool defaultValue, string tooltip = "")
@@ -213,11 +204,8 @@ namespace CkQol.Config
         public override void ResetToDefault() => Value = _default;
     }
 
-    /// A rebindable key.
-    ///
-    /// Stored as the numeric KeyCode rather than its name: turning a name back into
-    /// the enum needs Enum.Parse, and the game's own input stack is queried by
-    /// KeyCode anyway.
+    /// A rebindable key, stored as the numeric KeyCode: a name would need Enum.Parse
+    /// to read back, and the input stack is queried by KeyCode anyway.
     public class KeySetting : ModSetting
     {
         private readonly KeyCode _default;
@@ -242,7 +230,7 @@ namespace CkQol.Config
             }
         }
 
-        /// Name as the game writes it in its own key hints.
+        /// Name as the game writes it in key hints.
         public string Name =>
             Value == KeyCode.None ? "none" : Rewired.Keyboard.GetKeyName(Value);
 
@@ -253,7 +241,7 @@ namespace CkQol.Config
         public bool IsHeld => Value != KeyCode.None && Keyboard != null &&
                               Keyboard.GetKey(Value);
 
-        /// Null until Rewired has started, which is after mods load.
+        /// Null until Rewired starts, which is after mods load.
         internal static Rewired.Keyboard Keyboard =>
             Rewired.ReInput.isReady ? Rewired.ReInput.controllers.Keyboard : null;
 
@@ -266,8 +254,8 @@ namespace CkQol.Config
         public override void ResetToDefault() => Value = _default;
     }
 
-    /// Pick one of a fixed list. Stored as the option string, not its index, so
-    /// reordering the options later cannot silently change anyone's setting.
+    /// Pick one of a fixed list. Stored by name, not index, so reordering the
+    /// options cannot silently change anyone's setting.
     public class ChoiceSetting : ModSetting
     {
         private readonly string _default;
@@ -295,7 +283,7 @@ namespace CkQol.Config
             }
         }
 
-        /// Falls back to the default rather than storing something not on the list.
+        /// Falls back to the default rather than storing an unlisted value.
         private string Valid(string v) =>
             v != null && Array.IndexOf(Options, v) >= 0 ? v : _default;
 

@@ -7,8 +7,8 @@ using UnityEngine;
 
 namespace CkQol
 {
-    /// Entry point. Builds the feature list, binds their config, installs the mod's
-    /// pages into Core Keeper's own Options menu, and forwards the PugMod lifecycle.
+    /// Entry point: builds the features, binds their config, installs the pages into
+    /// the game's Options menu and forwards the PugMod lifecycle.
     public class CkQolMod : IMod
     {
         public const string ModName = "CkQol";
@@ -64,8 +64,7 @@ namespace CkQol
 
         public void Update()
         {
-            // MenuManager builds the options menus during startup, long after mods
-            // load, so installation waits for them rather than running at Init.
+            // The options menus are built during startup, long after mods load.
             if (!NativeOptions.Installed && NativeOptions.MenusReady)
             {
                 NativeOptions.Install(this);

@@ -5,27 +5,20 @@ using UnityEngine.Events;
 
 namespace CkQol.Native
 {
-    /// Helpers for reusing Core Keeper's own menu objects.
+    /// Helpers for reusing the game's own menu objects.
     ///
-    /// The game's menus are SpriteRenderer-based world-space UI driven by
-    /// RadicalMenu, not uGUI. Rather than imitating that, we clone the game's real
-    /// option rows so the result is the game's widgets, fonts, sounds and
-    /// controller navigation by construction.
+    /// Menus are SpriteRenderer world-space UI driven by RadicalMenu, not uGUI, so
+    /// rows are cloned rather than imitated.
     ///
-    /// Deliberately reflection-free: PugMod's security verifier rejects any mod
-    /// referencing System.Reflection, so fields are copied by name in code. That is
-    /// safe here because RadicalMenuOption and UIelement declare no private
-    /// [SerializeField] members - everything the inspector sets on them is public,
-    /// so nothing is lost when the script is swapped.
+    /// Reflection-free: PugMod's verifier rejects System.Reflection, so fields are
+    /// copied by name. Safe because RadicalMenuOption and UIelement declare no
+    /// private [SerializeField] members.
     public static class GameMenu
     {
         private static Transform _staging;
 
-        /// An inactive parent to instantiate into.
-        ///
-        /// Instantiating an active GameObject runs its Awake and Start immediately,
-        /// and the game's option scripts read and write game preferences there.
-        /// Cloning into an inactive holder defers that until the script is swapped.
+        /// Inactive parent to clone into: an active one runs Awake at once, and the
+        /// stock option scripts write game preferences there.
         private static Transform Staging
         {
             get
@@ -39,8 +32,7 @@ namespace CkQol.Native
             }
         }
 
-        /// Everything the inspector sets on a menu option. All public, so it can be
-        /// carried across a script swap without reflection.
+        /// Everything the inspector sets on a row, carried across the script swap.
         private struct OptionFields
         {
             public List<UIelement> Top, Bottom, Left, Right, Children;
@@ -114,16 +106,11 @@ namespace CkQol.Native
             }
         }
 
-        /// Clones a row and replaces its script with ours, keeping the inspector
-        /// wiring. Returns null rather than throwing so one bad row cannot cost the
-        /// whole menu.
-        /// debugName is passed in rather than read from typeof(T).Name: that call
-        /// compiles to MemberInfo.get_Name, which the security verifier rejects.
-        /// parent defaults to the donor's own parent. Rows live under a container
-        /// inside the menu, not directly under the menu root, and that container
-        /// carries an offset - parenting to the root gave rows the correct local
-        /// position from the layout but the wrong world position, putting them well
-        /// below the visible list.
+        /// Clones a row and swaps in our script, keeping the inspector wiring.
+        ///
+        /// debugName rather than typeof(T).Name: that compiles to
+        /// MemberInfo.get_Name, which the verifier rejects. parent defaults to the
+        /// donor's - rows live under an offset container, not the menu root.
         public static T CloneAndSwap<T>(RadicalMenuOption donor, Transform parent, string debugName)
             where T : RadicalMenuOption
         {
@@ -135,11 +122,9 @@ namespace CkQol.Native
                 var clone = UnityEngine.Object.Instantiate(donor.gameObject, Staging);
                 clone.name = "CkQol_" + debugName;
 
-                // A ranged donor carries one child ButtonUIElement per diamond, wired
-                // in the prefab to call back into the row's script. Swapping the script
-                // leaves those pointing at a destroyed component, and because they sit
-                // in front of the row they win the click raycast and then do nothing -
-                // which is why the diamonds looked dead. QolStepStrip rebuilds them.
+                // A ranged donor's per-diamond ButtonUIElements are prefab-wired to
+                // the script we are about to destroy. Left alone they win the click
+                // raycast and then do nothing; QolStepStrip rebuilds them.
                 foreach (var stale in clone.GetComponentsInChildren<ButtonUIElement>(true))
                 {
                     if (stale != null) UnityEngine.Object.DestroyImmediate(stale.gameObject);
@@ -148,21 +133,14 @@ namespace CkQol.Native
                 var original = clone.GetComponent<RadicalMenuOption>();
                 var fields = OptionFields.From(original);
 
-                // DestroyImmediate: the replacement must exist before the object is
-                // activated; Destroy would not run until the end of the frame.
+                // DestroyImmediate: the replacement must exist before activation.
                 UnityEngine.Object.DestroyImmediate(original);
 
                 var replacement = clone.AddComponent<T>();
                 fields.ApplyTo(replacement);
 
-                // Our rows are always available. Inheriting these from the donor made
-                // visibility depend on which stock row happened to be cloned: once a
-                // row is in menuOptions, Activate hides it whenever
-                // GetActiveStateInCurrentScene is not ACTIVE.
-                // Donor rows use extraVerticalSpacing to open a gap before a group.
-                // UpdatePosition subtracts it before placing the row, so inheriting it
-                // pushed our row far below the list - the layout was placing it
-                // correctly and then shifting it out of view.
+                // Inherited spacing pushes the row out of view; inherited visibility
+                // flags make it depend on which stock row was cloned.
                 replacement.extraVerticalSpacing = 0f;
 
                 replacement.activeInSPStage = true;
@@ -182,19 +160,15 @@ namespace CkQol.Native
             }
         }
 
-        /// Rows are read from the menu's children, not from menuOptions.
-        ///
-        /// RadicalMenu only fills menuOptions in Awake, and MenuManager instantiates
-        /// the option menus inactive - so that list stays empty until the player
-        /// first opens the menu, and searching it finds nothing at startup.
+        /// From children, not menuOptions: that list is filled in Awake, and the
+        /// option menus are instantiated inactive, so it is empty at startup.
         private static RadicalMenuOption[] RowsOf(RadicalMenu menu)
         {
             if (menu == null) return new RadicalMenuOption[0];
             return menu.GetComponentsInChildren<RadicalMenuOption>(true);
         }
 
-        /// An on/off row to clone. Chosen by the option's own isOnOffToggle flag
-        /// rather than by class name, so renamed game options do not break it.
+        /// By isOnOffToggle, not class name, so a renamed game option still matches.
         public static RadicalMenuOption FindToggleDonor(RadicalMenu menu)
         {
             foreach (var option in RowsOf(menu))
@@ -204,9 +178,8 @@ namespace CkQol.Native
             return null;
         }
 
-        /// A volume row, the only stock row whose valueText renders the diamond bar
-        /// glyphs. The on/off rows only ever draw letters, so a bar cloned from one
-        /// comes out as question marks.
+        /// The only stock row whose valueText has the diamond glyphs; others render
+        /// them as question marks.
         public static RadicalMenuOption FindBarDonor(RadicalMenu menu)
         {
             foreach (var option in RowsOf(menu))
@@ -216,11 +189,8 @@ namespace CkQol.Native
             return null;
         }
 
-        /// Any plain row, used as the shape for submenu and back entries.
-        ///
-        /// Prefers a row with no value column. Rows that have one (Language, showing
-        /// "English") offset their label to the left to make room for it, so cloning
-        /// one leaves our entry visibly misaligned against the other submenu rows.
+        /// Shape for submenu and back entries. Prefers a row with no value column:
+        /// rows that have one offset their label to make room.
         public static RadicalMenuOption FindPlainDonor(RadicalMenu menu)
         {
             RadicalMenuOption fallback = null;
@@ -238,11 +208,8 @@ namespace CkQol.Native
 
         /// Re-scans children into menuOptions.
         ///
-        /// Deliberately does NOT call UpdatePosition. RadicalMenu.Activate lays the
-        /// menu out itself every time it is shown; running a second pass afterwards
-        /// collapsed all of the stock rows onto one line. All that is needed is for
-        /// our rows to be in the list before the game's own pass runs - Awake only
-        /// collects them once, and may already have run before we parented ours.
+        /// Does not call UpdatePosition: Activate lays the menu out itself, and a
+        /// second pass collapsed the stock rows onto one line.
         public static void Refresh(RadicalMenu menu)
         {
             if (menu == null) return;
@@ -252,9 +219,8 @@ namespace CkQol.Native
                 if (option != null) option.SetParentMenu(menu);
             }
 
-            // When a menu has autoPositioningOverride populated, the layout pass uses
-            // that curated list and ignores menuOptions entirely - so a row missing
-            // from it renders but never gets a slot, and sits wherever the donor was.
+            // With autoPositioningOverride populated the layout ignores menuOptions,
+            // so a row missing from it renders but never gets a slot.
             var order = menu.autoPositioningOverride;
             if (order != null && order.Count > 0)
             {
@@ -265,33 +231,17 @@ namespace CkQol.Native
             }
         }
 
-        /// PugText.Render treats its argument as a localization key when the text
-        /// object has localize set - the donor rows do, which is why our labels came
-        /// out as "missing: Enabled". Our strings are already literal.
-        /// Places a row one slot below the lowest existing row.
-        ///
-        /// Necessary because the Settings menu has autoPositioning off: every stock
-        /// row sits at its authored prefab position and UpdatePosition does nothing,
-        /// so a clone keeps the donor's position and lands on top of it. Spacing is
-        /// measured from the existing rows rather than assumed.
-        /// Lets the game lay the menu out, after giving it the two inputs it needs.
-        ///
-        /// UpdatePosition does not check autoPositioning - it always positions - but
-        /// menus that never auto-position ship with menuEntryVirtualHeight at zero,
-        /// so every row lands on the same Y. That is why calling it earlier collapsed
-        /// the Settings list onto one line.
-        ///
-        /// Both inputs are derived from the rows, so no correction is applied
-        /// afterwards. UpdatePosition starts at menuEntryStartPositionY + half the
-        /// total height and walks down, which puts the column centre exactly half a
-        /// row below that value - so the start position that reproduces the original
-        /// column is (centre - pitch/2).
-        ///
-        /// Must run once the menu is open - row visibility cannot be read at startup,
-        /// when Manager.sceneHandler is null and everything reports INACTIVE.
         private static readonly Dictionary<RadicalMenu, float> _pitchCache =
             new Dictionary<RadicalMenu, float>();
 
+        /// Lets the game lay the menu out, after supplying the two inputs it needs.
+        ///
+        /// Menus that never auto-position ship menuEntryVirtualHeight at zero, which
+        /// stacks every row on one Y. UpdatePosition starts at menuEntryStartPositionY
+        /// plus half the total and walks down, so the start that reproduces the
+        /// original column is (centre - pitch/2).
+        ///
+        /// Must run with the menu open: row visibility reads INACTIVE at startup.
         public static void LayoutWithGame(RadicalMenu menu)
         {
             if (menu == null) return;
@@ -320,9 +270,8 @@ namespace CkQol.Native
             if (pitch <= 0f) pitch = (top - bottom) / (ys.Count - 1);
             if (pitch <= 0f) return;
 
-            // Measure once. This runs every time the menu opens, and re-measuring an
-            // already-laid-out column feeds its own output back in - the list visibly
-            // compressed a little further on each visit.
+            // Measure once: re-measuring a laid-out column feeds its own output back
+            // in and the list compresses further on every visit.
             if (_pitchCache.TryGetValue(menu, out float cached)) pitch = cached;
             else _pitchCache[menu] = pitch;
 
@@ -339,8 +288,7 @@ namespace CkQol.Native
             menu.UpdatePosition();
         }
 
-        /// Stacks rows down a menu we built ourselves, reusing the slot positions the
-        /// template's own rows occupied so spacing matches the game exactly.
+        /// Stacks rows into the slots the template's own rows occupied.
         public static void PlaceInSlots(RadicalMenu menu, List<Vector3> slots)
         {
             if (menu == null || slots == null || slots.Count == 0) return;
@@ -391,21 +339,19 @@ namespace CkQol.Native
         {
             if (target == null) return;
             target.localize = false;
-            // force: Render(string) early-outs via HasCorrectGlyphs when the string is
-            // unchanged, which skips building the glyphs a cloned row still needs.
+            // force: Render early-outs on an unchanged string, skipping the glyphs a
+            // cloned row still needs. localize false or a literal renders as "missing:".
+
             target.Render(text ?? string.Empty, rewindEffectAnims: true, force: true);
         }
 
-        /// A hover description for a row, or null for no tooltip.
-        ///
-        /// UIMouse.UpdateHoverText already renders these for whatever the mouse has
-        /// selected, menus included - stock rows simply never return one.
+        /// Hover description, or null. UIMouse.UpdateHoverText already renders these
+        /// in menus; stock rows just never return one.
         public static List<TextAndFormatFields> Hover(string text)
         {
             if (string.IsNullOrEmpty(text)) return null;
 
-            // dontLocalize: the render loop drops any entry that is not marked so and
-            // has no translation, and these strings are literals rather than keys.
+            // dontLocalize: untranslated entries without it are dropped.
             return new List<TextAndFormatFields>
             {
                 new TextAndFormatFields { text = text, dontLocalize = true }
@@ -422,9 +368,7 @@ namespace CkQol.Native
             if (option != null) SetLiteral(option.valueText, text);
         }
 
-        /// Clears a donor's leftover value text. A cloned row keeps whatever the
-        /// original had rendered - cloning the Language row left "english" sitting in
-        /// the value column of our submenu entry.
+        /// Clears the donor's leftover value text, which a clone keeps.
         public static void ClearValue(RadicalMenuOption option)
         {
             if (option != null) SetLiteral(option.valueText, string.Empty);

@@ -1,9 +1,6 @@
 #!/bin/bash
-# Deploy the mod into the Core Keeper client's mod directory.
-#
-# The manifest's "files" list is generated from src/ rather than hand-maintained -
-# PugMod silently ignores any .cs that is not listed, which looks exactly like a
-# feature that does not work.
+# Deploy into the client's mod directory. The manifest's file list is generated
+# from src/: PugMod silently ignores any .cs that is not listed.
 set -euo pipefail
 
 MOD_NAME=CkQol

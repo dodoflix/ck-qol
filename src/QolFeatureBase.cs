@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace CkQol
 {
-    /// Default no-op implementations so a feature only overrides what it needs.
+    /// No-op defaults so a feature overrides only what it needs.
     public abstract class QolFeatureBase : IQolFeature
     {
         public abstract string Name { get; }

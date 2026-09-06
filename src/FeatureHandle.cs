@@ -5,26 +5,24 @@ using UnityEngine;
 
 namespace CkQol
 {
-    /// Wraps a feature with its config-backed Enabled toggle and settings.
-    ///
-    /// Owns the running/stopped state so the menu's toggle takes effect immediately:
-    /// flipping it calls Init or Shutdown rather than waiting for a game restart.
+    /// Wraps a feature with its Enabled toggle and settings. Owns the running state,
+    /// so flipping the toggle calls Init or Shutdown at once.
     public class FeatureHandle
     {
         public IQolFeature Feature { get; }
         public BoolSetting Enabled { get; }
         public IReadOnlyList<ModSetting> Settings { get; }
 
-        /// A pseudo-feature (the General tab) has no on/off switch of its own.
+        /// False for a feature with no on/off switch of its own.
         public bool CanBeDisabled { get; }
 
         public string Name => Feature.Name;
         public string Description => Feature.Description;
 
-        /// True while the feature's Init has run and Shutdown has not.
+        /// Init has run and Shutdown has not.
         public bool Running { get; private set; }
 
-        /// Set once a feature has faulted, so we stop calling into it.
+        /// Set once it throws, after which we stop calling into it.
         public bool Faulted { get; private set; }
 
         private bool _worldAlive;
@@ -54,7 +52,7 @@ namespace CkQol
             Enabled.Changed += _ => Apply();
         }
 
-        /// Restores every setting on this feature, including the Enabled toggle.
+        /// Restores every setting, including Enabled.
         public void ResetToDefaults()
         {
             Enabled.ResetToDefault();
@@ -64,7 +62,7 @@ namespace CkQol
             }
         }
 
-        /// Starts or stops the feature to match the Enabled toggle.
+        /// Starts or stops to match the Enabled toggle.
         public void Apply()
         {
             if (Faulted) return;
@@ -76,8 +74,7 @@ namespace CkQol
             {
                 if (!Guard("Init", Feature.Init)) return;
                 Running = true;
-                // A feature switched on mid-session still needs the world callback it
-                // missed, otherwise it sits idle until the next world load.
+                // Switched on mid-session, it still needs the callback it missed.
                 if (_worldAlive) Guard("OnWorldCreated", Feature.OnWorldCreated);
             }
             else
@@ -111,8 +108,7 @@ namespace CkQol
             Running = false;
         }
 
-        /// One misbehaving feature should not take the mod - or the game - down, so
-        /// a throw disables that feature and leaves the rest running.
+        /// A throw disables that feature and leaves the rest running.
         private bool Guard(string stage, Action action)
         {
             try

@@ -4,26 +4,21 @@ using UnityEngine;
 
 namespace CkQol.Native
 {
-    /// Adds the mod's settings to Core Keeper's own Options menu.
-    ///
-    /// One row is appended to Options ("Core Keeper QoL") which opens a list of
-    /// features; each feature opens a page of its settings. Every row is a clone of
-    /// one of the game's real rows, so navigation, sounds, fonts and controller
-    /// support come from the game rather than being imitated.
+    /// Adds the mod's settings to the game's Options menu: one entry opening a list
+    /// of features, each opening a page. Every row is a clone of a real one, so
+    /// navigation, sound and fonts come from the game.
     public static class NativeOptions
     {
         private static bool _installed;
         private static int _attempts;
 
-        /// Menus can appear a frame or two before their rows do, so a single attempt
-        /// at the first opportunity is unreliable. Capped so a genuinely missing
+        /// Menus can appear a frame or two before their rows. Capped so a missing
         /// donor does not retry forever.
         private const int MaxAttempts = 600;
 
         public static bool Installed => _installed || _attempts >= MaxAttempts;
 
-        /// The game's menus are built by MenuManager during startup, long after mods
-        /// load, so installation has to wait for them.
+        /// MenuManager builds these during startup, long after mods load.
         public static bool MenusReady =>
             Manager.menu != null &&
             Manager.menu.optionsMenu != null &&
@@ -38,8 +33,7 @@ namespace CkQol.Native
             {
                 var optionsMenu = Manager.menu.optionsMenu;
 
-                // Donors are searched across several stock pages because no single
-                // page is guaranteed to contain every row shape.
+                // No single page has every row shape.
                 var plainDonor = FirstPlain(optionsMenu, Manager.menu.uiOptionsMenu,
                                             Manager.menu.gameplayOptionsMenu);
                 var toggleDonor = FirstToggle(Manager.menu.uiOptionsMenu,
@@ -105,17 +99,14 @@ namespace CkQol.Native
             }
         }
 
-        /// A fresh page cloned from a stock options page, emptied of its rows, so it
-        /// keeps the page's background, layout metrics and title wiring.
-        /// Slot positions of each page we build, captured from the template before
-        /// its rows are removed. Needed because these menus do not auto-position.
+        /// Slot positions captured from each template before its rows are removed;
+        /// these menus do not auto-position.
         private static readonly System.Collections.Generic.Dictionary<RadicalMenu,
             System.Collections.Generic.List<Vector3>> _slots =
             new System.Collections.Generic.Dictionary<RadicalMenu,
                 System.Collections.Generic.List<Vector3>>();
 
-        /// Container the menu's rows live under. Captured from the template before
-        /// its rows were deleted; falls back to the menu root.
+        /// Container the rows live under, or the menu root.
         private static readonly System.Collections.Generic.Dictionary<RadicalMenu, Transform>
             _rowParents = new System.Collections.Generic.Dictionary<RadicalMenu, Transform>();
 
@@ -130,11 +121,7 @@ namespace CkQol.Native
         {
             if (template == null) return null;
 
-            // Instantiated as a sibling of the template rather than moved to
-            // DontDestroyOnLoad. Menu clicks are a physics raycast
-            // (UIMouse -> Manager.physics.RaycastNonAlloc on the UI layer), and
-            // colliders in the DontDestroyOnLoad scene are not hit by it - the page
-            // rendered and worked by keyboard, but nothing on it could be clicked.
+            // Sibling of the template so it shares the template's scene and parent.
             var clone = UnityEngine.Object.Instantiate(template.gameObject,
                                                        template.transform.parent);
             clone.name = name;
@@ -142,8 +129,7 @@ namespace CkQol.Native
 
             var menu = clone.GetComponent<RadicalMenu>();
 
-            // Record where the template's rows sat before deleting them, so our rows
-            // can occupy the same slots and match the game's spacing exactly.
+            // Where the template's rows sat, so ours match the game's spacing.
             _slots[menu] = GameMenu.CaptureSlots(menu);
 
             var firstRow = clone.GetComponentInChildren<RadicalMenuOption>(true);
@@ -184,8 +170,7 @@ namespace CkQol.Native
                 AddSettingRow(page, setting, toggleDonor, barDonor);
             }
 
-            // Feature pages only. The root page owns no settings of its own, so a
-            // reset there would have nothing to act on.
+            // Feature pages only; the root owns no settings.
             var reset = GameMenu.CloneAndSwap<QolResetOption>(plainDonor, RowParent(page), "Reset");
             if (reset != null) reset.Feature = handle;
 
@@ -199,8 +184,7 @@ namespace CkQol.Native
                                           RadicalMenuOption toggleDonor,
                                           RadicalMenuOption barDonor)
         {
-            // Every row shape is cloned from the on/off donor: it is the only stock
-            // row that carries a value column, which is where the value is shown.
+            // The on/off donor is the only stock row with a value column.
             if (toggleDonor == null) return;
 
             if (setting is BoolSetting b)
@@ -224,10 +208,8 @@ namespace CkQol.Native
                 return;
             }
 
-            // Clone the volume row only when a bar will actually be drawn. Its
-            // valueText is the only one with the diamond glyphs, but it is also
-            // styled differently - a number rendered in it comes out bold and unlike
-            // every other row.
+            // Only clone the volume row when a bar is drawn: it has the diamond
+            // glyphs but renders numbers bold.
             bool drawsBar = QolNumberOption.SegmentsFor(setting) > 0;
             var donor = drawsBar && barDonor != null ? barDonor : toggleDonor;
 

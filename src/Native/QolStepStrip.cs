@@ -3,13 +3,11 @@ using UnityEngine;
 
 namespace CkQol.Native
 {
-    /// One clickable box per diamond, laid over a row's value text.
+    /// One clickable box per diamond, over a row's value text.
     ///
-    /// This is how the game does it: the audio rows carry a child ButtonUIElement
-    /// per step whose UnityEvents call back into the row with a baked index. Those
-    /// are authored in the prefab, and a persistent call's target cannot be
-    /// re-pointed at runtime through any public API - so the strip is rebuilt here
-    /// with a subclass instead. Same mechanism, constructed rather than serialised.
+    /// The audio rows do this with prefab-authored child ButtonUIElements carrying a
+    /// baked index. A persistent call's target cannot be re-pointed at runtime, so
+    /// the strip is rebuilt with a subclass - same mechanism, constructed.
     public class QolStepStrip : MonoBehaviour
     {
         private readonly List<QolStepButton> _buttons = new List<QolStepButton>();
@@ -29,9 +27,8 @@ namespace CkQol.Native
                 var go = new GameObject("CkQolStep" + i);
                 go.SetActive(false);
 
-                // The click raycast is masked to the UI layer. Taking the row's layer
-                // rather than naming one keeps this correct without depending on the
-                // layer index.
+                // The click raycast is masked to the UI layer; take the row's rather
+                // than hardcoding the index.
                 go.layer = row.gameObject.layer;
                 go.transform.SetParent(row.transform, false);
 
@@ -41,11 +38,10 @@ namespace CkQol.Native
                 var button = go.AddComponent<QolStepButton>();
                 button.Row = row;
 
-                // Matches the game's numbering: glyph i is lit when step > i, so the
-                // box under the first diamond carries 1.
+                // Glyph i is lit when step > i, so the first box carries 1.
                 button.Step = i + 1;
 
-                // Hovering a diamond also selects the row, so it highlights as a whole.
+                // Hovering a diamond selects the row too, so it highlights.
                 button.optionToSelectOnHover = row;
 
                 go.SetActive(true);
@@ -53,8 +49,7 @@ namespace CkQol.Native
             }
         }
 
-        /// Follows the value text, which is re-rendered on every change and re-laid
-        /// out when the menu opens or the language changes.
+        /// Follows the value text, re-rendered on every change.
         private void LateUpdate()
         {
             if (_value == null || _buttons.Count == 0) return;
@@ -88,10 +83,8 @@ namespace CkQol.Native
                 Vector3 world = new Vector3(min.x + width * (i + 0.5f), centreY, origin.z);
                 Vector3 local = button.transform.parent.InverseTransformPoint(world);
 
-                // In front of the row's own collider. That box spans the whole row
-                // from the label's left edge to the value's right edge, so it covers
-                // the diamonds too - and UIMouse keeps the nearest hit, so the step
-                // boxes only win if they sit closer to the camera.
+                // In front of the row's own collider, which spans label to value:
+                // UIMouse keeps the nearest hit.
                 local.z -= 0.5f;
 
                 button.transform.localPosition = local;
@@ -101,7 +94,7 @@ namespace CkQol.Native
         }
     }
 
-    /// One diamond's worth of the strip.
+    /// One diamond.
     public class QolStepButton : ButtonUIElement
     {
         public QolNumberOption Row;
@@ -109,8 +102,7 @@ namespace CkQol.Native
 
         protected override void Awake()
         {
-            // ButtonUIElement.Awake walks both sprite lists. A component added at
-            // runtime has no serialised value for them, so they arrive null.
+            // Awake walks both lists; a runtime-added component has them null.
             if (spritesShownUnpressed == null) spritesShownUnpressed = new List<SpriteRenderer>();
             if (spritesShownPressed == null) spritesShownPressed = new List<SpriteRenderer>();
             base.Awake();
@@ -119,9 +111,8 @@ namespace CkQol.Native
         public override void OnSelected()
         {
             base.OnSelected();
-            // No matching OnDeselected: the game's volume rows leave the highlight
-            // alone when a step button is deselected and reset it only when the whole
-            // row loses selection, so moving between diamonds does not flicker.
+            // No OnDeselected: volume rows reset only when the whole row is
+            // deselected, so moving between diamonds does not flicker.
             if (Row != null) Row.PreviewStep(Step);
         }
 

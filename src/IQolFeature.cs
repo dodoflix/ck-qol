@@ -3,30 +3,28 @@ using CkQol.Config;
 
 namespace CkQol
 {
-    /// One self-contained quality-of-life tweak. Add a class extending
-    /// QolFeatureBase and register it in CkQolMod.BuildFeatures; the on/off toggle,
-    /// config persistence, menu tab and crash isolation are wired up for you.
+    /// One self-contained tweak. Extend QolFeatureBase and register it in
+    /// CkQolMod.BuildFeatures; the toggle, persistence, menu page and crash isolation
+    /// are wired up.
     public interface IQolFeature
     {
-        /// Config section name, menu tab label, log prefix. Keep it short and stable -
-        /// renaming it orphans the user's existing settings.
+        /// Config section, menu label and log prefix. Renaming orphans saved
+        /// settings.
         string Name { get; }
 
-        /// Shown at the top of the feature's tab.
+        /// Shown on hover on the root page.
         string Description { get; }
 
         /// Whether this starts enabled on a fresh install.
         bool EnabledByDefault { get; }
 
-        /// Settings to expose in the menu. Return an empty list for none.
         /// Called once at construction, before Bind.
         IEnumerable<ModSetting> GetSettings();
 
-        /// Called when the feature starts - at load if enabled, or the moment the
-        /// user switches it on in the menu.
+        /// At load if enabled, or when switched on.
         void Init();
 
-        /// Client world appeared. Also fired on enable if a world is already loaded.
+        /// Also fired on enable if a world is already loaded.
         void OnWorldCreated();
 
         /// Client world went away.
@@ -35,7 +33,7 @@ namespace CkQol
         /// Per-frame while enabled. Keep it cheap.
         void Update();
 
-        /// Called on disable or mod unload. Undo anything global you touched.
+        /// On disable or unload. Undo anything global.
         void Shutdown();
     }
 }

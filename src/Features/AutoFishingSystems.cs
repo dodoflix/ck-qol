@@ -7,26 +7,16 @@ using PlayerState;
 
 namespace CkQol.Features
 {
-    /// Per-player state for the automatic fishing.
     public struct CkQolAutoReelCD : IComponentData
     {
-        /// Holds the hook press down for Reel hold once it is made.
         public TickTimer ReelTimer;
     }
 
-    /// Fishes for the local player.
+    /// Sets SecondInteract in ClientInputData, the same path a real press takes.
     ///
-    /// Runs after SendClientInputSystem and sets the SecondInteract button in the
-    /// player's ClientInputData, which is the same path a real button press takes -
-    /// so the game's own fishing loop does the work. Nothing is reimplemented here.
-    ///
-    /// That one button does three different jobs depending on the phase, and this
-    /// system drives two of them:
-    ///   casting          - held while castTimer runs, and the elapsed ratio at
-    ///                      release is the cast distance (Fishing.cs:462)
-    ///   hooking a fish   - pressed while fishIsNibbling, which lands it
-    ///   pulling up empty - pressed with the line out and no bite, which is why the
-    ///                      hook press is kept short (Fishing.cs:272)
+    /// That one button does three jobs by phase: held while castTimer runs it charges
+    /// the cast (Fishing.cs:462), pressed on a nibble it hooks, pressed with the line
+    /// out and no bite it pulls up empty (Fishing.cs:272).
     [WorldSystemFilter(WorldSystemFilterFlags.ClientSimulation)]
     [UpdateInGroup(typeof(RunSimulationSystemGroup), OrderLast = true)]
     [UpdateAfter(typeof(SendClientInputSystem))]
@@ -36,14 +26,11 @@ namespace CkQol.Features
         private EntityQuery _networkTimeQuery;
         private EntityQuery _tickRateQuery;
 
-        /// World time the player's own button hold began, or -1 when none is.
+        /// Start of the player's own hold, or -1.
         private double _holdStart = -1d;
 
-        /// Whether the previous frame's button press was ours.
-        ///
-        /// We write the press into the same ClientInputData a real one arrives in, so
-        /// without this the next frame could read our own press back and time it as if
-        /// the player had done it.
+        /// Our press lands in the same field a real one does; without this we would
+        /// read it back next frame and time it as the player's.
         private bool _pressedLastFrame;
 
         protected override void OnCreate()
@@ -72,8 +59,8 @@ namespace CkQol.Features
             AutoFishingState.RaiseShoalCheck();
         }
 
-        /// Drops a half-finished measurement. Walking away mid-hold would otherwise
-        /// time the gap until the next press instead of the press itself.
+        /// Drops a half-finished measurement, which would otherwise time the gap
+        /// until the next press.
         private void Forget()
         {
             _holdStart = -1d;
@@ -99,8 +86,6 @@ namespace CkQol.Features
                 return;
             }
 
-            // A menu or inventory pauses the mod; the learned throw is kept, so
-            // fishing carries on with the same timing when it closes.
             if (Manager.ui.isAnyInventoryShowing || Manager.menu.IsAnyMenuActive())
             {
                 Forget();
@@ -135,12 +120,10 @@ namespace CkQol.Features
 
             double now = World.Time.ElapsedTime;
 
-            // Reeling by hand wins. Without this the mod's own hold would fight the
-            // player's, and neither press would land cleanly.
+            // The player's own press wins; ours would fight it.
             if (!state.ReelTimer.isRunning && !_pressedLastFrame &&
                 input.IsButtonStateSet(CommandInputButtonStateNames.SecondInteract_HeldDown))
             {
-                // Time it, so Learn casting charges for as long as the player does.
                 if (_holdStart < 0d && AutoFishingState.LearnEnabled) _holdStart = now;
 
                 _pressedLastFrame = false;
@@ -150,7 +133,6 @@ namespace CkQol.Features
                 return;
             }
 
-            // Not holding any more: whatever was being timed has ended.
             if (_holdStart >= 0d)
             {
                 AutoFishingState.ReportHold((float)(now - _holdStart));
@@ -159,11 +141,9 @@ namespace CkQol.Features
 
             bool pressing = false;
 
-            // Charging a throw. Fishing.ThrowFishingRod sets the cast distance from
-            // castTimer's elapsed ratio at the moment the button comes up, and Fishing
-            // throws as soon as it is not held - so releasing early is what makes an
-            // automatic throw land at the player's feet. Holding past the game's own
-            // cast timer is harmless: it throws at the full ratio on its own.
+            // Cast distance is castTimer's elapsed ratio when the button comes up,
+            // and the rod throws as soon as it is released - so letting go early lands
+            // the line at the player's feet.
             if (fishState.castTimer.isRunning &&
                 !fishState.castTimer.IsTimerElapsed(tick) &&
                 fishState.castTimer.GetElapsedSeconds(tick, tps) <
@@ -202,29 +182,21 @@ namespace CkQol.Features
 
     /// Stops baited fishing spots from depleting.
     ///
-    /// The game counts catches in the shoal's own ObjectDataCD.amount and destroys the
-    /// shoal once it reaches 3 (half the time) or 6. That counter is only ever bumped
-    /// from Burst-compiled jobs, so there is no managed method to patch - putting the
-    /// counter back to zero afterwards is the only thing a mod can do.
-    ///
-    /// Cost here is per read, not per shoal: the query asks for disabled entities too,
-    /// so it matches every shoal in the explored world, and touching it from the main
-    /// thread blocks on the jobs writing that data. So it reads only in the seconds
-    /// after a bite, when the counter can actually have moved, plus a slow backstop
-    /// for hand-reeling and dedicated servers.
+    /// The game destroys a shoal once ObjectDataCD.amount hits 3 (half the time) or 6,
+    /// and only ever bumps it from Burst jobs - so zeroing it afterwards is the only
+    /// option. Cost is per read, not per shoal: the query includes disabled entities
+    /// and reading it blocks on the jobs writing it, so it reads only just after a
+    /// bite, plus a slow backstop.
     [WorldSystemFilter(WorldSystemFilterFlags.ServerSimulation)]
     [UpdateInGroup(typeof(SimulationSystemGroup))]
     public partial class CkQolInfiniteShoalSystem : PugSimulationSystemBase
     {
-        /// How often to look while a catch is resolving.
         private const double PollSeconds = 0.5;
 
-        /// How long to keep looking after a bite. The signal fires when reeling
-        /// starts; the counter moves when the catch resolves a moment later.
+        /// The signal fires when reeling starts; the counter moves a moment later.
         private const double SweepWindowSeconds = 2.5;
 
-        /// Runs regardless of any signal, for players who reel by hand and for
-        /// dedicated servers where no local client can signal at all.
+        /// For hand reeling and dedicated servers, where nothing signals.
         private const double BackstopSeconds = 15.0;
 
         private double _nextPoll;
@@ -249,9 +221,8 @@ namespace CkQol.Features
 
             _entityHandle = GetEntityTypeHandle();
 
-            // Read-only on purpose. Taking a read-write handle bumps a chunk's change
-            // version even when nothing is stored, which would defeat any later use of
-            // a change filter; the rare reset goes through the EntityManager instead.
+            // Read-only: a read-write handle bumps the chunk's change version even
+            // when nothing is stored. Resets go through the EntityManager.
             _objectDataHandle = GetComponentTypeHandle<ObjectDataCD>(true);
 
             base.OnCreate();
@@ -262,8 +233,8 @@ namespace CkQol.Features
         {
             if (!AutoFishingState.ShoalEnabled)
             {
-                // Zeroed so the tick it comes back on sweeps at once - every catch made
-                // while it was off went unseen.
+                // Sweep at once when it comes back on: catches made while off went
+                // unseen.
                 _sweepUntil = 0d;
                 _nextPoll = 0d;
                 _nextBackstop = 0d;
@@ -272,8 +243,8 @@ namespace CkQol.Features
                 return;
             }
 
-            // Nothing above the sweep may touch a query or the EntityManager: those are
-            // the sync points this is avoiding. Two double compares and a bool are free.
+            // Nothing here may touch a query or the EntityManager unless it sweeps -
+            // those are the sync points being avoided.
             double now = World.Time.ElapsedTime;
 
             if (AutoFishingState.ConsumeShoalCheck())
@@ -305,8 +276,7 @@ namespace CkQol.Features
             _entityHandle.Update(this);
             _objectDataHandle.Update(this);
 
-            // Collected first: SetComponentData is a sync point that can invalidate the
-            // chunk array being walked.
+            // Collected first: SetComponentData can invalidate the chunk array.
             NativeList<Entity> toReset = default;
 
             for (int c = 0; c < chunks.Length; c++)

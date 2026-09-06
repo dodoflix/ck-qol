@@ -4,9 +4,8 @@ using UnityEngine;
 
 namespace CkQol.Native
 {
-    /// Rows follow the shape of the game's own option scripts (see
-    /// RadicalOptionsMenuOption_ScreenShake): label in labelText, current value in
-    /// valueText, OnActivated changes it, skim left/right does the same.
+    /// Rows follow the stock option scripts: label in labelText, value in valueText,
+    /// OnActivated and skim left/right change it.
 
     /// Opens a submenu.
     public class QolSubmenuOption : RadicalPauseMenuOption
@@ -17,8 +16,7 @@ namespace CkQol.Native
         /// Shown on hover. On the root page this is the feature's description.
         public string Tooltip;
 
-        /// Set when this row was appended to a menu that had no room for it, so the
-        /// menu needs re-laying out once it is open.
+        /// Set when the menu needs re-laying out once open.
         public RadicalMenu Owner;
 
         private bool _layoutPending;
@@ -26,9 +24,8 @@ namespace CkQol.Native
         public override void OnParentMenuActivation()
         {
             base.OnParentMenuActivation();
-            // Defer: this fires part way through Activate, before the menu has
-            // finished setting each row active and before Unity has run Start, so
-            // laying out here both misses rows and reads stale labels.
+            // Defer: this fires mid-Activate, before rows are active and before
+            // Start, so laying out here misses rows and reads stale labels.
             _layoutPending = true;
         }
 
@@ -57,12 +54,9 @@ namespace CkQol.Native
             GameMenu.Hover(Tooltip);
     }
 
-    /// Restores every setting on a feature page, after a confirmation.
-    ///
-    /// Uses the game's own confirm dialog rather than a menu of our own, so it looks
-    /// and behaves like the ones the game already shows. Its two option labels are
-    /// the game's localization keys, so they follow the player's language; only the
-    /// question itself is ours, hence localize: false.
+    /// Restores a feature page's settings, behind the game's own confirm dialog.
+    /// The button labels are the game's localization keys; only the question is ours,
+    /// hence localize: false.
     public class QolResetOption : RadicalPauseMenuOption
     {
         public FeatureHandle Feature;
@@ -100,7 +94,7 @@ namespace CkQol.Native
                 ? "Restores every setting on this page, including whether the feature is enabled."
                 : null);
 
-        /// Option 0 is cancel, option 1 is confirm.
+        /// Option 0 cancels, option 1 confirms.
         private void OnAnswered(PopupResponse response)
         {
             if (!response.IsConfirm || Feature == null) return;
@@ -109,8 +103,7 @@ namespace CkQol.Native
         }
     }
 
-    /// Leaves the current menu. Escape already does this, but a visible row matters
-    /// for mouse users who never press it.
+    /// Leaves the menu. Escape does this too, but mouse users need a row.
     public class QolBackOption : RadicalPauseMenuOption
     {
         public string Label = "Back";
@@ -137,8 +130,7 @@ namespace CkQol.Native
         private void Start()
         {
             Refresh();
-            // Redraw when the value moves without this row doing it - a reset, or a
-            // feature changing its own setting.
+            // Redraw when the value moves without this row doing it.
             if (Setting != null) Setting.Changed += _ => Refresh();
         }
 
@@ -171,12 +163,9 @@ namespace CkQol.Native
 
     /// Numeric or multiple-choice row, stepped with left/right.
     ///
-    /// Not built on RadicalOptionsMenuOption_Slider - that class is unused in the
-    /// shipped game, so there is no instance to clone, and its step count and glyphs
-    /// are private with no setter. What looks like a slider in Audio settings is
-    /// text: RadicalOptionsMenuOption_Volume renders eight filled or hollow diamonds
-    /// into valueText and steps the value in eighths. Ranged settings here draw the
-    /// same bar the same way, with a QolStepStrip over it for per-diamond clicking.
+    /// Not RadicalOptionsMenuOption_Slider: nothing instantiates it, and its step
+    /// count and glyphs are private with no setter. The audio "slider" is text -
+    /// RadicalOptionsMenuOption_Volume renders eight diamonds into valueText.
     public class QolNumberOption : RadicalPauseMenuOption
     {
         public IntSetting Int;
@@ -184,20 +173,18 @@ namespace CkQol.Native
         public ChoiceSetting Choice;
         public string Label;
 
-        /// Only rows cloned from a volume row can draw the diamond bar; the on/off
-        /// rows' valueText has no glyph for those characters and renders '?'.
+        /// Only volume clones have the diamond glyphs; others render '?'.
         public bool CanDrawBar;
 
-        /// Diamonds to draw, or zero for a plain numeric or text value.
+        /// Diamonds to draw, or zero for a plain value.
         private int _segments;
 
 
         /// Matches the eight steps the game's volume rows use.
         public const int BarSegments = 8;
 
-        /// How many diamonds a setting is worth, or zero if it should stay numeric.
-        /// A bar cannot show which of twenty values is selected, so wide integer
-        /// ranges are left as text.
+        /// Zero keeps a setting numeric: a bar cannot show which of twenty values is
+        /// selected.
         public static int SegmentsFor(ModSetting setting)
         {
             if (setting is FloatSetting) return BarSegments;
@@ -229,9 +216,8 @@ namespace CkQol.Native
         public override List<TextAndFormatFields> GetHoverDescription() =>
             GameMenu.Hover(Bound != null ? Bound.Tooltip : null);
 
-        /// Clicking the label drops a bar row to its minimum, the way clicking an
-        /// audio row's label mutes it. Rows without a bar have no such anchor, so
-        /// they cycle instead.
+        /// Clicking the label drops a bar row to its minimum, as an audio row mutes.
+        /// Rows without a bar cycle instead.
         public override void OnActivated()
         {
             base.OnActivated();
@@ -263,9 +249,8 @@ namespace CkQol.Native
             return true;
         }
 
-        /// Jumps to the step the pointer clicked. Step 1 is the first diamond, so as
-        /// with the game's volume rows the low end of the range is reachable by
-        /// stepping but not by clicking.
+        /// Step 1 is the first diamond, so as with volume rows the low end is
+        /// reachable by stepping but not by clicking.
         public void SetStep(int step)
         {
             if (_segments <= 0) return;
@@ -283,9 +268,8 @@ namespace CkQol.Native
             PreviewStep(step);
         }
 
-        /// Highlights the diamonds up to the one under the pointer, exactly as
-        /// RadicalOptionsMenuOption_Volume.PreSelectVolume does: the filled/hollow
-        /// characters keep showing the stored value, only the glyph colours change.
+        /// Highlights up to the pointer as PreSelectVolume does: the characters keep
+        /// showing the stored value, only the colours change.
         public void PreviewStep(int step)
         {
             if (_segments <= 0 || valueText == null) return;
@@ -308,8 +292,7 @@ namespace CkQol.Native
             }
         }
 
-        /// Wraps at the ends, so a row can always be changed with one direction and
-        /// activating it cycles - the menu offers no drag interaction.
+        /// Wraps, so one direction can reach every value.
         private void Step(int direction)
         {
             if (Int != null)
@@ -388,12 +371,10 @@ namespace CkQol.Native
 
     /// Text field row.
     ///
-    /// Implements the game's own InputManager.TextInputInterface, so typing,
-    /// backspace, delete, caret movement, paste, IME and the controller on-screen
-    /// keyboard all come from MenuManager.HandleTypingInput. Nothing about text
-    /// entry is re-implemented here, and no donor row is needed - the stock
-    /// RadicalMenuOptionTextInput is not cloned because its Update override skips
-    /// base.Update, so it never sizes a click collider and cannot be clicked.
+    /// Implements InputManager.TextInputInterface, so typing, paste, IME and the
+    /// controller keyboard all come from MenuManager.HandleTypingInput. The stock
+    /// RadicalMenuOptionTextInput is not cloned: its Update override skips
+    /// base.Update, so it never sizes a click collider.
     public class QolTextOption : RadicalPauseMenuOption, InputManager.TextInputInterface
     {
         public StringSetting Setting;
@@ -429,8 +410,7 @@ namespace CkQol.Native
         public override void OnDeselected(bool playEffect = true)
         {
             base.OnDeselected(playEffect);
-            // Clicking another row leaves the field selected but no longer visible as
-            // the active one; commit rather than silently dropping what was typed.
+            // Commit rather than silently dropping what was typed.
             if (_editingActive) Deactivate(commit: true);
         }
 
@@ -447,8 +427,7 @@ namespace CkQol.Native
         {
             if (string.IsNullOrEmpty(input)) return;
 
-            // Input.inputString carries backspace and carriage return alongside real
-            // characters; MenuManager handles those separately.
+            // inputString carries backspace and CR; MenuManager handles those.
             var text = new System.Text.StringBuilder(input.Length);
             foreach (char c in input)
             {
@@ -490,7 +469,7 @@ namespace CkQol.Native
         public override List<TextAndFormatFields> GetHoverDescription() =>
             GameMenu.Hover(Setting != null ? Setting.Tooltip : null);
 
-        /// commit is false when the player backed out with escape.
+        /// commit is false when the player pressed escape.
         public void Deactivate(bool commit)
         {
             _editingActive = false;
@@ -521,12 +500,8 @@ namespace CkQol.Native
         }
     }
 
-    /// Rebindable key row.
-    ///
-    /// The game's own control mapper cannot be reused: it maps Rewired actions, and
-    /// a mod cannot add actions to Rewired's data at runtime. Keys are polled
-    /// directly through Rewired instead, which is the same input stack the game
-    /// reads.
+    /// Rebindable key row. The game's control mapper maps Rewired actions, which a
+    /// mod cannot add at runtime, so keys are polled through Rewired directly.
     public class QolKeybindOption : RadicalPauseMenuOption
     {
         public KeySetting Setting;
@@ -534,8 +509,7 @@ namespace CkQol.Native
 
         private bool _listening;
 
-        /// The keypress that opened the row is still down on the frame Update first
-        /// runs, so binding cannot start until the frame after.
+        /// The keypress that opened the row is still down on the next frame.
         private int _listenFrom;
 
         private void Start()
@@ -600,11 +574,9 @@ namespace CkQol.Native
 
     /// Re-collects a page's rows into menuOptions as it is shown.
     ///
-    /// RadicalMenu.Activate drives selection and collider enabling from menuOptions,
-    /// and fills that list in Awake only. On a menu built by replacing the
-    /// template's rows the list can be stale, leaving rows that render but cannot be
-    /// selected or clicked. OnEnable runs before Activate's loop, so this is the
-    /// right moment to correct it.
+    /// Activate drives selection and colliders from that list but fills it in Awake
+    /// only, so on a rebuilt menu it is stale and rows render without being
+    /// selectable. OnEnable runs before Activate's loop.
     public class QolPageInit : MonoBehaviour
     {
         public RadicalMenu Menu;
@@ -621,9 +593,8 @@ namespace CkQol.Native
 
             GameMenu.Refresh(Menu);
 
-            // Applied here rather than at build time: RadicalMenu.OnEnable re-renders
-            // every descendant PugText when the menu is shown, which overwrote a
-            // title set earlier and left the cloned template's heading.
+            // Not at build time: OnEnable re-renders every descendant PugText, which
+            // overwrote a title set earlier.
             var heading = GameMenu.FindHeading(Menu);
             if (heading != null) GameMenu.SetLiteral(heading, Title);
 
