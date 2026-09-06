@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using CkQol.Config;
 using UnityEngine;
 
@@ -7,19 +6,18 @@ namespace CkQol.Native
 {
     /// Adds the mod's settings to Core Keeper's own Options menu.
     ///
-    /// One row is appended to Options ("Core Keeper QoL"), which opens a menu
-    /// listing the features; each feature opens a page of its settings. Every row
-    /// is a clone of one of the game's real option rows, so navigation, sounds,
-    /// fonts and controller support come from the game rather than being imitated.
+    /// One row is appended to Options ("Core Keeper QoL") which opens a list of
+    /// features; each feature opens a page of its settings. Every row is a clone of
+    /// one of the game's real rows, so navigation, sounds, fonts and controller
+    /// support come from the game rather than being imitated.
     public static class NativeOptions
     {
         private static bool _installed;
-        private static RadicalMenu _rootMenu;
 
         public static bool Installed => _installed;
 
-        /// True once the game's menus exist. They are built by MenuManager during
-        /// startup, well after mods load, so installation has to wait for this.
+        /// The game's menus are built by MenuManager during startup, long after mods
+        /// load, so installation has to wait for them.
         public static bool MenusReady =>
             Manager.menu != null &&
             Manager.menu.optionsMenu != null &&
@@ -28,70 +26,74 @@ namespace CkQol.Native
         public static void Install(CkQolMod mod)
         {
             if (_installed) return;
+            _installed = true; // one attempt; never retry every frame
 
             try
             {
                 var optionsMenu = Manager.menu.optionsMenu;
-                var donorMenu = Manager.menu.uiOptionsMenu;
 
-                // Donor rows: a submenu-opening row from Options, plus a toggle and a
-                // slider from the UI options page. Picked by type-name shape rather
-                // than a specific game option class, which would break on any update
-                // that renames or reorders those options.
-                var submenuDonor = GameMenu.FindDonor(optionsMenu, "Options", "Pause");
-                var toggleDonor = GameMenu.FindDonor(donorMenu, "Toggle");
-                var sliderDonor = GameMenu.FindDonor(donorMenu, "Slider");
+                // Donors are searched across several stock pages because no single
+                // page is guaranteed to contain every row shape.
+                var plainDonor = FirstPlain(optionsMenu, Manager.menu.uiOptionsMenu,
+                                            Manager.menu.gameplayOptionsMenu);
+                var toggleDonor = FirstToggle(Manager.menu.uiOptionsMenu,
+                                              Manager.menu.gameplayOptionsMenu,
+                                              Manager.menu.videoOptionsMenu);
+                var sliderDonor = FirstSlider(Manager.menu.audioOptionsMenu,
+                                              Manager.menu.uiOptionsMenu,
+                                              Manager.menu.videoOptionsMenu);
 
-                if (submenuDonor == null)
+                Debug.Log($"[CkQol] donors: plain={(plainDonor != null)} " +
+                          $"toggle={(toggleDonor != null)} slider={(sliderDonor != null)}");
+
+                if (plainDonor == null)
                 {
-                    Debug.LogError("[CkQol] no donor row in the Options menu, cannot add the tab");
-                    _installed = true; // do not retry every frame
+                    Debug.LogError("[CkQol] no plain row to clone, cannot add the options entry");
                     return;
                 }
-                Debug.Log($"[CkQol] donors: submenu='{submenuDonor.GetType().Name}' " +
-                          $"toggle='{toggleDonor?.GetType().Name ?? "none"}' " +
-                          $"slider='{sliderDonor?.GetType().Name ?? "none"}'");
 
-                _rootMenu = BuildMenu(donorMenu, "CkQolRootMenu");
+                var rootMenu = BuildMenu(Manager.menu.uiOptionsMenu, "CkQolRootMenu");
+                if (rootMenu == null) return;
 
-                // Feature list: one submenu row per feature.
                 foreach (var handle in mod.Features)
                 {
-                    var page = BuildFeaturePage(donorMenu, handle, submenuDonor, toggleDonor, sliderDonor);
+                    var page = BuildFeaturePage(handle, plainDonor, toggleDonor, sliderDonor);
                     if (page == null) continue;
 
-                    var row = GameMenu.CloneOption<QolSubmenuOption>(submenuDonor, _rootMenu.transform);
+                    var row = GameMenu.CloneAndSwap<QolSubmenuOption>(plainDonor, rootMenu.transform);
                     if (row == null) continue;
                     row.Label = handle.Name;
                     row.Target = page;
                 }
-                AddBack(submenuDonor, _rootMenu);
-                GameMenu.Refresh(_rootMenu);
 
-                // Finally the entry in the game's own Options menu.
-                var entry = GameMenu.CloneOption<QolSubmenuOption>(submenuDonor, optionsMenu.transform);
-                if (entry != null)
+                AddBack(plainDonor, rootMenu);
+                GameMenu.Refresh(rootMenu);
+
+                var entry = GameMenu.CloneAndSwap<QolSubmenuOption>(plainDonor, optionsMenu.transform);
+                if (entry == null)
                 {
-                    entry.Label = "Core Keeper QoL";
-                    entry.Target = _rootMenu;
-                    GameMenu.Refresh(optionsMenu);
+                    Debug.LogError("[CkQol] could not add the entry to the Options menu");
+                    return;
                 }
+                entry.Label = "Core Keeper QoL";
+                entry.Target = rootMenu;
+                GameMenu.Refresh(optionsMenu);
 
-                _installed = true;
                 Debug.Log("[CkQol] added to the game's Options menu");
             }
             catch (Exception e)
             {
-                _installed = true;
                 Debug.LogError("[CkQol] failed to install into the Options menu");
                 Debug.LogException(e);
             }
         }
 
-        /// A fresh menu cloned from an existing options page, emptied of its rows.
-        /// Cloning keeps the page's background, layout metrics and title wiring.
+        /// A fresh page cloned from a stock options page, emptied of its rows, so it
+        /// keeps the page's background, layout metrics and title wiring.
         private static RadicalMenu BuildMenu(RadicalMenu template, string name)
         {
+            if (template == null) return null;
+
             var clone = UnityEngine.Object.Instantiate(template.gameObject);
             clone.name = name;
             clone.SetActive(false);
@@ -106,16 +108,17 @@ namespace CkQol.Native
             return menu;
         }
 
-        private static RadicalMenu BuildFeaturePage(RadicalMenu template, FeatureHandle handle,
-                                                    RadicalMenuOption submenuDonor,
+        private static RadicalMenu BuildFeaturePage(FeatureHandle handle,
+                                                    RadicalMenuOption plainDonor,
                                                     RadicalMenuOption toggleDonor,
-                                                    RadicalMenuOption sliderDonor)
+                                                    RadicalOptionsMenuOption_Slider sliderDonor)
         {
-            var page = BuildMenu(template, "CkQolPage_" + handle.Name);
+            var page = BuildMenu(Manager.menu.uiOptionsMenu, "CkQolPage_" + handle.Name);
+            if (page == null) return null;
 
             if (handle.CanBeDisabled && toggleDonor != null)
             {
-                var row = GameMenu.CloneOption<QolToggleOption>(toggleDonor, page.transform);
+                var row = GameMenu.CloneAndSwap<QolToggleOption>(toggleDonor, page.transform);
                 if (row != null)
                 {
                     row.Label = "Enabled";
@@ -128,55 +131,77 @@ namespace CkQol.Native
                 AddSettingRow(page, setting, toggleDonor, sliderDonor);
             }
 
-            AddBack(submenuDonor, page);
+            AddBack(plainDonor, page);
             GameMenu.Refresh(page);
             return page;
         }
 
         private static void AddSettingRow(RadicalMenu page, ModSetting setting,
                                           RadicalMenuOption toggleDonor,
-                                          RadicalMenuOption sliderDonor)
+                                          RadicalOptionsMenuOption_Slider sliderDonor)
         {
-            switch (setting)
+            if (setting is BoolSetting b)
             {
-                case BoolSetting b when toggleDonor != null:
-                {
-                    var row = GameMenu.CloneOption<QolToggleOption>(toggleDonor, page.transform);
-                    if (row != null) { row.Label = b.Label; row.Setting = b; }
-                    break;
-                }
-                case IntSetting i when sliderDonor != null:
-                {
-                    var row = GameMenu.CloneOption<QolSliderOption>(sliderDonor, page.transform);
-                    if (row != null) { row.Label = i.Label; row.IntSetting = i; }
-                    break;
-                }
-                case FloatSetting f when sliderDonor != null:
-                {
-                    var row = GameMenu.CloneOption<QolSliderOption>(sliderDonor, page.transform);
-                    if (row != null) { row.Label = f.Label; row.FloatSetting = f; }
-                    break;
-                }
-                case ChoiceSetting c when sliderDonor != null:
-                {
-                    var row = GameMenu.CloneOption<QolChoiceOption>(sliderDonor, page.transform);
-                    if (row != null) { row.Label = c.Label; row.Setting = c; }
-                    break;
-                }
-                default:
-                    // Text and key settings have no native row yet; they stay editable
-                    // in the config file rather than being shown as something they
-                    // are not.
-                    Debug.Log($"[CkQol] '{setting.Label}' ({setting.GetType().Name}) has no native row, " +
-                              "edit it in the config file");
-                    break;
+                if (toggleDonor == null) return;
+                var row = GameMenu.CloneAndSwap<QolToggleOption>(toggleDonor, page.transform);
+                if (row != null) { row.Label = b.Label; row.Setting = b; }
+                return;
+            }
+
+            if (sliderDonor == null) return;
+
+            var slider = GameMenu.CloneSlider(sliderDonor, page.transform);
+            if (slider == null) return;
+
+            var binding = slider.gameObject.AddComponent<QolSliderBinding>();
+            binding.Slider = slider;
+
+            if (setting is IntSetting i) { binding.Label = i.Label; binding.Int = i; }
+            else if (setting is FloatSetting f) { binding.Label = f.Label; binding.Float = f; }
+            else if (setting is ChoiceSetting c) { binding.Label = c.Label; binding.Choice = c; }
+            else
+            {
+                // Text and key settings have no native row; they stay editable in the
+                // config file rather than being shown as something they are not.
+                UnityEngine.Object.DestroyImmediate(slider.gameObject);
+                Debug.Log($"[CkQol] '{setting.Label}' has no native row, edit it in the config file");
             }
         }
 
         private static void AddBack(RadicalMenuOption donor, RadicalMenu menu)
         {
-            var back = GameMenu.CloneOption<QolBackOption>(donor, menu.transform);
+            var back = GameMenu.CloneAndSwap<QolBackOption>(donor, menu.transform);
             if (back != null) back.Label = "Back";
+        }
+
+        private static RadicalMenuOption FirstPlain(params RadicalMenu[] menus)
+        {
+            foreach (var menu in menus)
+            {
+                var found = GameMenu.FindPlainDonor(menu);
+                if (found != null) return found;
+            }
+            return null;
+        }
+
+        private static RadicalMenuOption FirstToggle(params RadicalMenu[] menus)
+        {
+            foreach (var menu in menus)
+            {
+                var found = GameMenu.FindToggleDonor(menu);
+                if (found != null) return found;
+            }
+            return null;
+        }
+
+        private static RadicalOptionsMenuOption_Slider FirstSlider(params RadicalMenu[] menus)
+        {
+            foreach (var menu in menus)
+            {
+                var found = GameMenu.FindSliderDonor(menu);
+                if (found != null) return found;
+            }
+            return null;
         }
     }
 }

@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.Reflection;
 using UnityEngine;
+using UnityEngine.Events;
 
 namespace CkQol.Native
 {
@@ -9,17 +9,23 @@ namespace CkQol.Native
     ///
     /// The game's menus are SpriteRenderer-based world-space UI driven by
     /// RadicalMenu, not uGUI. Rather than imitating that, we clone the game's real
-    /// option rows and swap in our own behaviour, so the result is the game's
-    /// widgets, fonts, sounds and controller navigation by construction.
+    /// option rows so the result is the game's widgets, fonts, sounds and
+    /// controller navigation by construction.
+    ///
+    /// Deliberately reflection-free: PugMod's security verifier rejects any mod
+    /// referencing System.Reflection, so fields are copied by name in code. That is
+    /// safe here because RadicalMenuOption and UIelement declare no private
+    /// [SerializeField] members - everything the inspector sets on them is public,
+    /// so nothing is lost when the script is swapped.
     public static class GameMenu
     {
         private static Transform _staging;
 
         /// An inactive parent to instantiate into.
         ///
-        /// Instantiating an active GameObject runs its Awake immediately, and the
-        /// game's option components read game settings in Awake. Cloning into an
-        /// inactive holder defers that until after the component has been swapped.
+        /// Instantiating an active GameObject runs its Awake and Start immediately,
+        /// and the game's option scripts read and write game preferences there.
+        /// Cloning into an inactive holder defers that until the script is swapped.
         private static Transform Staging
         {
             get
@@ -33,107 +39,177 @@ namespace CkQol.Native
             }
         }
 
-        /// Clones an option row and replaces its script with TNew, keeping every
-        /// serialized reference (label text, sprite renderers, markers) intact.
-        /// Returns null rather than throwing so one bad row cannot lose the menu.
-        public static TNew CloneOption<TNew>(Component source, Transform parent)
-            where TNew : MonoBehaviour
+        /// Everything the inspector sets on a menu option. All public, so it can be
+        /// carried across a script swap without reflection.
+        private struct OptionFields
         {
-            if (source == null)
+            public List<UIelement> Top, Bottom, Left, Right, Children;
+            public bool SelectFirstEnabled, InvokeSelectionEvents;
+            public UnityEvent OnSelectedEvent, OnDeselectedEvent;
+
+            public float ExtraVerticalSpacing;
+            public bool ActiveInSPStage, ActiveInTitle, ActiveInDebugOnly, ForceDeactive;
+            public bool VisibleButNotSelectable, HandleNavigationInternally;
+            public bool CanBeActivated, IsOnOffToggle;
+            public PlatformFlags ActiveInPlatforms;
+            public StorefrontFlags ActiveInStoreFronts;
+            public PugText LabelText, ValueText;
+            public List<SelectionListener> SelectionListeners;
+            public string SelectionListenerSourceTag;
+
+            public static OptionFields From(RadicalMenuOption o) => new OptionFields
             {
-                Debug.LogError("[CkQol] cannot clone a null option");
-                return null;
+                Top = o.topUIElements,
+                Bottom = o.bottomUIElements,
+                Left = o.leftUIElements,
+                Right = o.rightUIElements,
+                Children = o.childElements,
+                SelectFirstEnabled = o.selectFirstEnabledElementInList,
+                InvokeSelectionEvents = o.invokeSelectionEvents,
+                OnSelectedEvent = o.onElementSelectedEvent,
+                OnDeselectedEvent = o.onElementDeselectedEvent,
+                ExtraVerticalSpacing = o.extraVerticalSpacing,
+                ActiveInSPStage = o.activeInSPStage,
+                ActiveInTitle = o.activeInTitle,
+                ActiveInDebugOnly = o.activeInDebugOnly,
+                ForceDeactive = o.forceDeactive,
+                VisibleButNotSelectable = o.visibleButNotSelectableWhenInactive,
+                HandleNavigationInternally = o.handleNavigationInternally,
+                CanBeActivated = o.canBeActivated,
+                IsOnOffToggle = o.isOnOffToggle,
+                ActiveInPlatforms = o.activeInPlatforms,
+                ActiveInStoreFronts = o.activeInStoreFronts,
+                LabelText = o.labelText,
+                ValueText = o.valueText,
+                SelectionListeners = o.selectionListeners,
+                SelectionListenerSourceTag = o.selectionListenerSourceTag,
+            };
+
+            public void ApplyTo(RadicalMenuOption o)
+            {
+                o.topUIElements = Top;
+                o.bottomUIElements = Bottom;
+                o.leftUIElements = Left;
+                o.rightUIElements = Right;
+                o.childElements = Children;
+                o.selectFirstEnabledElementInList = SelectFirstEnabled;
+                o.invokeSelectionEvents = InvokeSelectionEvents;
+                o.onElementSelectedEvent = OnSelectedEvent;
+                o.onElementDeselectedEvent = OnDeselectedEvent;
+                o.extraVerticalSpacing = ExtraVerticalSpacing;
+                o.activeInSPStage = ActiveInSPStage;
+                o.activeInTitle = ActiveInTitle;
+                o.activeInDebugOnly = ActiveInDebugOnly;
+                o.forceDeactive = ForceDeactive;
+                o.visibleButNotSelectableWhenInactive = VisibleButNotSelectable;
+                o.handleNavigationInternally = HandleNavigationInternally;
+                o.canBeActivated = CanBeActivated;
+                o.isOnOffToggle = IsOnOffToggle;
+                o.activeInPlatforms = ActiveInPlatforms;
+                o.activeInStoreFronts = ActiveInStoreFronts;
+                o.labelText = LabelText;
+                o.valueText = ValueText;
+                o.selectionListeners = SelectionListeners;
+                o.selectionListenerSourceTag = SelectionListenerSourceTag;
             }
+        }
+
+        /// Clones a row and replaces its script with ours, keeping the inspector
+        /// wiring. Returns null rather than throwing so one bad row cannot cost the
+        /// whole menu.
+        public static T CloneAndSwap<T>(RadicalMenuOption donor, Transform parent)
+            where T : RadicalMenuOption
+        {
+            if (donor == null) return null;
 
             try
             {
-                var clone = UnityEngine.Object.Instantiate(source.gameObject, Staging);
-                clone.name = "CkQol_" + typeof(TNew).Name;
+                var clone = UnityEngine.Object.Instantiate(donor.gameObject, Staging);
+                clone.name = "CkQol_" + typeof(T).Name;
 
-                var original = clone.GetComponent(source.GetType());
-                var saved = CaptureFields(original);
+                var original = clone.GetComponent<RadicalMenuOption>();
+                var fields = OptionFields.From(original);
 
                 // DestroyImmediate: the replacement must exist before the object is
-                // activated, and Destroy would not run until end of frame.
+                // activated; Destroy would not run until the end of the frame.
                 UnityEngine.Object.DestroyImmediate(original);
 
-                var replacement = clone.AddComponent<TNew>();
-                RestoreFields(replacement, saved);
+                var replacement = clone.AddComponent<T>();
+                fields.ApplyTo(replacement);
 
                 clone.transform.SetParent(parent, false);
                 return replacement;
             }
             catch (Exception e)
             {
-                Debug.LogError($"[CkQol] failed cloning {source.GetType().Name} -> {typeof(TNew).Name}");
+                Debug.LogError($"[CkQol] failed to clone a row as {typeof(T).Name}");
                 Debug.LogException(e);
                 return null;
             }
         }
 
-        /// Public instance fields declared on the component's own base chain. Only
-        /// fields both types share are restored, so swapping to a different subclass
-        /// keeps the inherited wiring and drops what does not apply.
-        private static Dictionary<string, object> CaptureFields(Component component)
+        /// Clones a row and keeps its script. Used for sliders, which hold private
+        /// [SerializeField] visual references that a script swap would discard.
+        public static RadicalOptionsMenuOption_Slider CloneSlider(
+            RadicalOptionsMenuOption_Slider donor, Transform parent)
         {
-            var values = new Dictionary<string, object>();
-            if (component == null) return values;
+            if (donor == null) return null;
 
-            for (Type t = component.GetType(); t != null && t != typeof(MonoBehaviour); t = t.BaseType)
+            try
             {
-                foreach (var field in t.GetFields(BindingFlags.Public | BindingFlags.Instance |
-                                                  BindingFlags.DeclaredOnly))
-                {
-                    if (!values.ContainsKey(field.Name))
-                    {
-                        values[field.Name] = field.GetValue(component);
-                    }
-                }
+                var clone = UnityEngine.Object.Instantiate(donor.gameObject, Staging);
+                clone.name = "CkQol_Slider";
+                clone.transform.SetParent(parent, false);
+                return clone.GetComponent<RadicalOptionsMenuOption_Slider>();
             }
-            return values;
-        }
-
-        private static void RestoreFields(Component component, Dictionary<string, object> values)
-        {
-            for (Type t = component.GetType(); t != null && t != typeof(MonoBehaviour); t = t.BaseType)
+            catch (Exception e)
             {
-                foreach (var field in t.GetFields(BindingFlags.Public | BindingFlags.Instance |
-                                                  BindingFlags.DeclaredOnly))
-                {
-                    if (values.TryGetValue(field.Name, out object value) && value != null)
-                    {
-                        try { field.SetValue(component, value); }
-                        catch (Exception) { /* type changed between subclasses, skip */ }
-                    }
-                }
+                Debug.LogError("[CkQol] failed to clone a slider row");
+                Debug.LogException(e);
+                return null;
             }
         }
 
-        /// Finds the first option in a menu whose component type name contains the
-        /// given fragment. Used to pick a donor row of the right shape (a toggle, a
-        /// slider) without hardcoding a specific game option class, which would be
-        /// far more brittle across updates.
-        public static RadicalMenuOption FindDonor(RadicalMenu menu, params string[] typeFragments)
+        /// An on/off row to clone. Chosen by the option's own isOnOffToggle flag
+        /// rather than by class name, so renamed game options do not break it.
+        public static RadicalMenuOption FindToggleDonor(RadicalMenu menu)
         {
             if (menu == null || menu.menuOptions == null) return null;
-
-            foreach (var fragment in typeFragments)
+            foreach (var option in menu.menuOptions)
             {
-                foreach (var option in menu.menuOptions)
+                if (option != null && option.isOnOffToggle && option.valueText != null) return option;
+            }
+            return null;
+        }
+
+        public static RadicalOptionsMenuOption_Slider FindSliderDonor(RadicalMenu menu)
+        {
+            if (menu == null || menu.menuOptions == null) return null;
+            foreach (var option in menu.menuOptions)
+            {
+                var slider = option as RadicalOptionsMenuOption_Slider;
+                if (slider != null) return slider;
+            }
+            return null;
+        }
+
+        /// Any plain row, used as the shape for submenu and back entries.
+        public static RadicalMenuOption FindPlainDonor(RadicalMenu menu)
+        {
+            if (menu == null || menu.menuOptions == null) return null;
+            foreach (var option in menu.menuOptions)
+            {
+                if (option != null && !option.isOnOffToggle &&
+                    !(option is RadicalOptionsMenuOption_Slider) && option.labelText != null)
                 {
-                    if (option == null) continue;
-                    if (option.GetType().Name.IndexOf(fragment, StringComparison.OrdinalIgnoreCase) >= 0)
-                    {
-                        return option;
-                    }
+                    return option;
                 }
             }
             return null;
         }
 
         /// Re-scans children into menuOptions and re-lays them out. RadicalMenu only
-        /// collects its options in Awake, so anything added later is invisible to it
-        /// until this runs.
+        /// collects options in Awake, so anything added later is invisible until this.
         public static void Refresh(RadicalMenu menu)
         {
             if (menu == null) return;
@@ -147,14 +223,12 @@ namespace CkQol.Native
 
         public static void SetLabel(RadicalMenuOption option, string text)
         {
-            if (option == null || option.labelText == null) return;
-            option.labelText.Render(text);
+            if (option != null && option.labelText != null) option.labelText.Render(text);
         }
 
         public static void SetValue(RadicalMenuOption option, string text)
         {
-            if (option == null || option.valueText == null) return;
-            option.valueText.Render(text);
+            if (option != null && option.valueText != null) option.valueText.Render(text);
         }
     }
 }

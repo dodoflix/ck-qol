@@ -1,151 +1,133 @@
-using System;
 using CkQol.Config;
 using UnityEngine;
 
 namespace CkQol.Native
 {
-    /// Opens a submenu. Used for the mod's entry in the game's Options menu and for
-    /// each feature's entry in the mod's own menu.
-    public class QolSubmenuOption : RadicalMenuOption
+    /// Rows follow the shape of the game's own option scripts (see
+    /// RadicalOptionsMenuOption_ScreenShake): label in labelText, current value in
+    /// valueText, OnActivated flips it, skim left/right does the same.
+
+    /// Opens a submenu.
+    public class QolSubmenuOption : RadicalPauseMenuOption
     {
         public RadicalMenu Target;
         public string Label;
+
+        private void Start() => GameMenu.SetLabel(this, Label);
 
         public override void OnActivated()
         {
             base.OnActivated();
             if (Target != null) Manager.menu.PushMenu(Target);
         }
-
-        protected override void Awake()
-        {
-            base.Awake();
-            GameMenu.SetLabel(this, Label);
-        }
     }
 
-    /// Leaves the current menu. RadicalMenu handles back/escape itself, but a
-    /// visible row matters for controller and mouse users who never press escape.
-    public class QolBackOption : RadicalMenuOption
+    /// Leaves the current menu. Escape already does this, but a visible row matters
+    /// for mouse users who never press it.
+    public class QolBackOption : RadicalPauseMenuOption
     {
         public string Label = "Back";
+
+        private void Start() => GameMenu.SetLabel(this, Label);
 
         public override void OnActivated()
         {
             base.OnActivated();
             Manager.menu.PopMenu();
         }
-
-        protected override void Awake()
-        {
-            base.Awake();
-            GameMenu.SetLabel(this, Label);
-        }
     }
 
     /// On/off row bound to a BoolSetting.
-    ///
-    /// Derives from the game's own toggle so the tick sprites and selection marker
-    /// keep working; only the backing store changes.
-    public class QolToggleOption : RadicalMenuOption_Toggle
+    public class QolToggleOption : RadicalPauseMenuOption
     {
         public BoolSetting Setting;
         public string Label;
+
+        private void Start() => Refresh();
 
         public override bool IsOn() => Setting != null && Setting.Value;
 
         public override void OnActivated()
         {
-            if (Setting != null) Setting.Value = !Setting.Value;
             base.OnActivated();
+            if (Setting != null) Setting.Value = !Setting.Value;
             Refresh();
         }
 
-        protected override void Awake()
+        public override bool OnSkimLeft()
         {
-            base.Awake();
-            Refresh();
+            OnActivated();
+            return true;
         }
+
+        public override bool OnSkimRight() => OnSkimLeft();
 
         private void Refresh()
         {
             GameMenu.SetLabel(this, Label);
-            isOn = IsOn();
+            GameMenu.SetValue(this, IsOn() ? "on" : "off");
         }
     }
 
-    /// Numeric row bound to an Int or Float setting, using the game's own slider.
-    public class QolSliderOption : RadicalOptionsMenuOption_Slider
+    /// Drives a cloned game slider from one of our settings.
+    ///
+    /// A companion component rather than a subclass: the slider holds private
+    /// [SerializeField] visual references, so replacing its script would discard
+    /// them and leave a slider that cannot draw itself.
+    public class QolSliderBinding : MonoBehaviour
     {
-        public IntSetting IntSetting;
-        public FloatSetting FloatSetting;
+        public RadicalOptionsMenuOption_Slider Slider;
         public string Label;
+        public IntSetting Int;
+        public FloatSetting Float;
+        public ChoiceSetting Choice;
 
-        protected override void Awake()
+        private void Start()
         {
-            base.Awake();
-            GameMenu.SetLabel(this, Label);
+            if (Slider == null) return;
+            GameMenu.SetLabel(Slider, Label);
 
-            if (IntSetting != null)
+            if (Int != null)
             {
-                SetValueRange(IntSetting.Min, IntSetting.Max);
-                SetValue(IntSetting.Value);
+                Slider.SetValueRange(Int.Min, Int.Max);
+                Slider.SetValue(Int.Value);
             }
-            else if (FloatSetting != null)
+            else if (Float != null)
             {
-                SetValueRange(FloatSetting.Min, FloatSetting.Max);
-                SetValue(FloatSetting.Value);
+                Slider.SetValueRange(Float.Min, Float.Max);
+                Slider.SetValue(Float.Value);
+            }
+            else if (Choice != null)
+            {
+                Slider.SetValueRange(0f, Mathf.Max(0f, Choice.Options.Length - 1));
+                Slider.SetValue(Choice.Index);
+                GameMenu.SetValue(Slider, Choice.Value);
             }
 
-            ValueChanged += OnSliderChanged;
+            Slider.ValueChanged += OnChanged;
         }
 
         private void OnDestroy()
         {
-            ValueChanged -= OnSliderChanged;
+            if (Slider != null) Slider.ValueChanged -= OnChanged;
         }
 
-        private void OnSliderChanged(float value, int step)
+        private void OnChanged(float value, int step)
         {
-            if (IntSetting != null) IntSetting.Value = Mathf.RoundToInt(value);
-            else if (FloatSetting != null) FloatSetting.Value = value;
-        }
-    }
-
-    /// Pick-one row. Rendered as a slider over the option indices because the game
-    /// has no dedicated multi-choice row, and a slider already supports left/right
-    /// skim on a controller.
-    public class QolChoiceOption : RadicalOptionsMenuOption_Slider
-    {
-        public ChoiceSetting Setting;
-        public string Label;
-
-        protected override void Awake()
-        {
-            base.Awake();
-            GameMenu.SetLabel(this, Label);
-
-            if (Setting != null)
+            if (Int != null)
             {
-                SetValueRange(0f, Mathf.Max(0f, Setting.Options.Length - 1));
-                SetValue(Setting.Index);
-                GameMenu.SetValue(this, Setting.Value);
+                Int.Value = Mathf.RoundToInt(value);
             }
-
-            ValueChanged += OnSliderChanged;
-        }
-
-        private void OnDestroy()
-        {
-            ValueChanged -= OnSliderChanged;
-        }
-
-        private void OnSliderChanged(float value, int step)
-        {
-            if (Setting == null) return;
-            int index = Mathf.Clamp(Mathf.RoundToInt(value), 0, Setting.Options.Length - 1);
-            Setting.Value = Setting.Options[index];
-            GameMenu.SetValue(this, Setting.Value);
+            else if (Float != null)
+            {
+                Float.Value = value;
+            }
+            else if (Choice != null && Choice.Options.Length > 0)
+            {
+                int index = Mathf.Clamp(Mathf.RoundToInt(value), 0, Choice.Options.Length - 1);
+                Choice.Value = Choice.Options[index];
+                GameMenu.SetValue(Slider, Choice.Value);
+            }
         }
     }
 }

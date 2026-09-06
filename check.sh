@@ -48,3 +48,21 @@ dotnet build "$WORK/check.csproj" -v q --nologo 2>&1 \
   | grep -E "error CS|warning CS|Build succeeded" \
   | sed "s|$REPO/||" \
   | sort -u
+
+# PugMod runs a security verifier on the compiled assembly and refuses to load
+# anything touching these. A clean compile says nothing about passing it, so the
+# first sign is otherwise "a mod failed to load: Compilation failed" in game.
+echo
+banned=0
+for pattern in 'System\.Reflection' '\bGetType()' 'typeof([A-Za-z.]*)\.\(Get\|Invoke\)' \
+               'System\.Diagnostics\.Process' 'DllImport'; do
+  # strip comment lines - a doc comment naming the rule is not a violation
+  if grep -rnE "$pattern" "$REPO/src" 2>/dev/null | grep -vE ':[0-9]+:[[:space:]]*(//|\*)'; then
+    banned=1
+  fi
+done
+if [ "$banned" = 1 ]; then
+  echo "^^ these are rejected by PugMod's security verifier - the mod will not load" >&2
+  exit 1
+fi
+echo "security lint: clean"
