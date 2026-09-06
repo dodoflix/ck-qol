@@ -176,6 +176,12 @@ Every one of these produced an invisible hint:
   hint at zero size forever.
 - Never deactivate a sprite's GameObject to hide it — the donor's sprites can be
   the label's own parent. Disable the renderer.
+- **Blank a clone's leftover text after activating it, not in staging.** A render
+  made while the object is disabled is dropped, so the donor's own words come back
+  the moment the row is switched on — as a stuck ingredient list in two panels
+  before this was understood. `SetLiteral` forces, which a fresh clone needs once;
+  everything after should render unforced and let `PugText` early-out, or a count
+  rebuilds its glyphs every time the name beside it changes and flickers.
 
 ## The stat panel
 

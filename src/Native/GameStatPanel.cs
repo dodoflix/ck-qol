@@ -187,12 +187,6 @@ namespace CkQol.Native
                 text.style.verticalAlignment = PugTextStyle.VerticalAlignment.center;
             }
 
-            // Everything the ingredient row draws that a stat row does not: the material
-            // name, and the "also in a chest nearby" icon and count.
-            Silence(element.text);
-            Silence(element.chestAmountNumber);
-            Silence(element.chestAmountNumberShadow);
-            Silence(element.chestAmountNumberShadow2);
             if (element.chestIcon != null) element.chestIcon.enabled = false;
 
             // The donor carries wherever the hover window last placed it.
@@ -215,6 +209,16 @@ namespace CkQol.Native
             clone.transform.localPosition = Vector3.zero;
             clone.SetActive(true);
 
+            // Everything the ingredient row draws that a stat row does not - the
+            // material name, and the "also in a chest nearby" icon and count - and
+            // only now the clone is active. PugText drops a render made while its
+            // object is disabled, so blanking in staging is thrown away and the
+            // donor's own text comes back the moment the row is switched on.
+            foreach (var text in clone.GetComponentsInChildren<PugText>(true))
+            {
+                GameMenu.SetLiteral(text, string.Empty);
+            }
+
             return new PanelRow
             {
                 Root = clone,
@@ -224,12 +228,6 @@ namespace CkQol.Native
             };
         }
 
-        private static void Silence(PugText text)
-        {
-            // Rendered empty rather than deactivated: these share parents with the parts
-            // of the row that stay.
-            if (text != null) GameMenu.SetLiteral(text, string.Empty);
-        }
     }
 
     public static class GameStatPanel
