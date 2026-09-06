@@ -13,7 +13,6 @@ namespace CkQol.Native
         private readonly List<QolStepButton> _buttons = new List<QolStepButton>();
         private PugText _value;
         private Rect _placed;
-        private bool _logged;
 
         public static void Build(QolNumberOption row, int steps)
         {
@@ -67,13 +66,6 @@ namespace CkQol.Native
 
             float height = max.y - min.y;
             float centreY = (min.y + max.y) * 0.5f;
-
-            if (!_logged)
-            {
-                _logged = true;
-                Debug.Log($"[CkQol] step strip on '{name}': boxes={_buttons.Count} " +
-                          $"width={width:0.###} height={height:0.###} layer={gameObject.layer}");
-            }
 
             for (int i = 0; i < _buttons.Count; i++)
             {

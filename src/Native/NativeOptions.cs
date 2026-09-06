@@ -44,12 +44,6 @@ namespace CkQol.Native
                                         Manager.menu.uiOptionsMenu,
                                         Manager.menu.gameplayOptionsMenu);
 
-                if (plainDonor != null || _attempts == MaxAttempts)
-                {
-                    Debug.Log($"[CkQol] donors: plain={(plainDonor != null)} " +
-                              $"toggle={(toggleDonor != null)} bar={(barDonor != null)}");
-                }
-
                 if (plainDonor == null)
                 {
                     if (_attempts >= MaxAttempts)

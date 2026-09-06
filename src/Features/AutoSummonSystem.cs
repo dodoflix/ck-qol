@@ -196,7 +196,6 @@ namespace CkQol.Features
                 }
 
                 Say(armed ? "Auto summon on" : "Auto summon off");
-                UnityEngine.Debug.Log($"[CkQol/Auto Summon] armed={armed}");
             }
             _toggleHeld = down;
         }

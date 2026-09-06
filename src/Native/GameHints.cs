@@ -14,42 +14,37 @@ namespace CkQol.Native
 
         public Func<bool> Visible;
 
-        /// Given the hint's icon renderer, sets a sprite on it or leaves it null.
+        /// Sets a sprite on the hint's icon, or nulls it for no icon. Called every
+        /// update while visible, so an implementation that costs anything should cache.
         public Action<SpriteRenderer> Icon;
 
         private PugText _text;
         private PugText[] _otherTexts;
-        private SpriteRenderer[] _sprites;
+        private SpriteRenderer[] _otherSprites;
+        private SpriteRenderer _icon;
 
-        /// A stock hint in the same row, whose scale is mirrored.
+        /// A stock hint in the same row, whose scale is mirrored. Simpler than
+        /// recomputing it, and cannot disagree with the hints beside it.
         private IngameButtonHint _sibling;
 
-        /// The donor's icon renderer, kept for our own sprite.
-        private SpriteRenderer _icon;
         private bool _active;
         private bool _initialized;
-        private int _reports;
-        private float _nextReport;
         private string _shown;
 
         public override bool isButtonActive => _active;
 
-        internal void Bind(PugText text, PugText[] otherTexts, SpriteRenderer[] sprites,
+        internal void Bind(PugText text, PugText[] otherTexts, SpriteRenderer[] otherSprites,
                            IngameButtonHint sibling, SpriteRenderer icon)
         {
             _text = text;
             _otherTexts = otherTexts;
-            _sprites = sprites;
+            _otherSprites = otherSprites;
             _sibling = sibling;
             _icon = icon;
         }
 
         public override void UpdateVisuals()
         {
-            // Mirrored from a stock hint rather than read from
-            // Manager.ui.CalcGameplayUITargetScaleMultiplier(): that call returns zero
-            // for this component, while the hints beside it are scaled correctly. The
-            // sibling is the value we actually want anyway.
             transform.localScale = _sibling != null
                 ? _sibling.transform.localScale
                 : Manager.ui.CalcGameplayUITargetScaleMultiplier();
@@ -57,76 +52,67 @@ namespace CkQol.Native
             bool visible = Visible != null && Visible() &&
                            !Manager.ui.isAnyInventoryShowing && !Manager.ui.isShowingMap;
 
-            // Activation first: PugText releases its glyphs to the pool when disabled
-            // (PugText.cs:307-308), so text rendered into a disabled object is dropped
-            // and comes back blank.
-            if (visible != _active || !_initialized)
+            if (visible != _active || !_initialized) Show(visible);
+
+            if (visible)
             {
-                // The whole chain, not just the label: it is a child of textContainer,
-                // which every stock hint toggles (HonkButton.cs:40) and which the donor
-                // was not showing when it was cloned. An active child inside an
-                // inactive parent renders nothing.
-                for (var at = _text != null ? _text.transform : null;
-                     at != null && at != transform;
-                     at = at.parent)
+                if (_icon != null)
                 {
-                    at.gameObject.SetActive(visible);
+                    Icon?.Invoke(_icon);
+                    _icon.enabled = _icon.sprite != null;
                 }
 
-                // Renderers are disabled rather than their GameObjects deactivated: the
-                // donor's sprites can be the label's own parent or the hint root, and
-                // deactivating those takes the label down with them.
-                foreach (var sprite in _sprites)
+                if (_text != null)
                 {
-                    if (sprite != null && sprite != _icon) sprite.enabled = false;
+                    string label = Label != null ? Label() : string.Empty;
+                    if (label != _shown)
+                    {
+                        GameMenu.SetLiteral(_text, label);
+                        _shown = label;
+                    }
                 }
-                if (_icon != null && !visible) _icon.enabled = false;
-
-                foreach (var text in _otherTexts)
-                {
-                    if (text != null) GameMenu.SetLiteral(text, string.Empty);
-                }
-
-                // Re-render on the way back in: the glyphs were freed on the way out.
-                _shown = null;
-                _active = visible;
-                _initialized = true;
-            }
-
-            if (visible && _icon != null)
-            {
-                _icon.sprite = null;
-                Icon?.Invoke(_icon);
-                _icon.enabled = _icon.sprite != null;
-            }
-
-            if (visible && _text != null)
-            {
-                string label = Label != null ? Label() : string.Empty;
-                if (label != _shown)
-                {
-                    GameMenu.SetLiteral(_text, label);
-                    _shown = label;
-                }
-            }
-
-            if (visible && Time.unscaledTime >= _nextReport && _reports < 5)
-            {
-                _reports++;
-                _nextReport = Time.unscaledTime + 2f;
-                Debug.Log($"[CkQol] hint scale={transform.localScale} " +
-                          $"sibling={(_sibling != null ? _sibling.transform.localScale.ToString() : "none")} " +
-                          $"local={transform.localPosition} label='{_shown}' " +
-                          $"glyphs={(_text != null ? _text.glyphs.Count : -1)} " +
-                          $"textActive={(_text != null && _text.gameObject.activeInHierarchy)} " +
-                          $"rootActive={gameObject.activeInHierarchy}");
             }
 
             base.LateUpdate();
         }
 
-        // The hint is not interactive; the base class would otherwise treat it as a
-        // clickable UI element.
+        private void Show(bool visible)
+        {
+            // The label's whole parent chain, not just the label: it is a child of
+            // textContainer, which every stock hint toggles (HonkButton.cs:40) and which
+            // the donor was not showing when cloned. An active child inside an inactive
+            // parent renders nothing.
+            for (var at = _text != null ? _text.transform : null;
+                 at != null && at != transform;
+                 at = at.parent)
+            {
+                at.gameObject.SetActive(visible);
+            }
+
+            // Renderers are disabled rather than their GameObjects deactivated: the
+            // donor's sprites can be the label's own parent or the hint root, and
+            // deactivating those takes the label down with them.
+            foreach (var sprite in _otherSprites)
+            {
+                if (sprite != null) sprite.enabled = false;
+            }
+            if (_icon != null && !visible) _icon.enabled = false;
+
+            // The donor's own wording, blanked rather than hidden for the same reason.
+            foreach (var text in _otherTexts)
+            {
+                if (text != null) GameMenu.SetLiteral(text, string.Empty);
+            }
+
+            // Re-render on the way back in: PugText releases its glyphs to the pool when
+            // disabled (PugText.cs:307-308), so the old ones are gone.
+            _shown = null;
+            _active = visible;
+            _initialized = true;
+        }
+
+        // Not interactive; the base class would otherwise treat it as a clickable UI
+        // element.
         public override void OnSelected() { }
         public override void OnDeselected(bool playEffect = true) { }
         public override void OnLeftClicked(bool mod1, bool mod2) { }
@@ -135,32 +121,32 @@ namespace CkQol.Native
 
     public static class GameHints
     {
-        /// Adds a hint beside the game's own, cloned from one of them so it inherits
-        /// the font, scale and placement. Returns null while the HUD does not exist
-        /// yet, so callers should keep trying.
+        /// Adds a hint beside the game's own, cloned from one of them so it inherits the
+        /// font, scale and placement. Returns null while the HUD does not exist yet, so
+        /// callers should keep trying.
         ///
-        /// The key glyph sprites are bound to Rewired actions, which a mod cannot add,
-        /// so the icon is hidden and the key is spelled out in the label instead.
+        /// Appended, never inserted: the row's anchor is read live from buttons[0]
+        /// (InGameButtonHintsUI.cs:40), so taking that position would move the whole row.
         public static CkQolHint Install(Func<string> label, Func<bool> visible)
         {
             var hintsUI = UnityEngine.Object.FindFirstObjectByType<InGameButtonHintsUI>();
             if (hintsUI == null || hintsUI.hintButtonRows == null) return null;
 
+            IngameButtonHint donor = null;
             InGameButtonHintsUI.InGameHintButtons row = null;
+
             foreach (var candidate in hintsUI.hintButtonRows)
             {
-                if (candidate != null && candidate.buttons != null && candidate.buttons.Count > 0)
+                if (candidate == null || candidate.buttons == null) continue;
+
+                foreach (var button in candidate.buttons)
                 {
+                    if (button == null) continue;
+                    donor = button;
                     row = candidate;
                     break;
                 }
-            }
-            if (row == null) return null;
-
-            IngameButtonHint donor = null;
-            foreach (var candidate in row.buttons)
-            {
-                if (candidate != null) { donor = candidate; break; }
+                if (donor != null) break;
             }
             if (donor == null) return null;
 
@@ -178,45 +164,43 @@ namespace CkQol.Native
                 if (texts.Length == 0)
                 {
                     UnityEngine.Object.DestroyImmediate(clone);
+                    Debug.LogError("[CkQol] hint donor has no text to use as a label");
                     return null;
                 }
 
-                // Everything except the one label: the donor's own wording and its
-                // key glyph, neither of which means anything here.
-                var sprites = clone.GetComponentsInChildren<SpriteRenderer>(true);
+                // texts[0] is the label; the rest is the donor's own wording. The donor's
+                // width is sized for labels like "Tab", and PugFont only wraps when
+                // maxWidth is above zero (PugFont.cs:141).
+                var otherTexts = new PugText[texts.Length - 1];
+                for (int i = 1; i < texts.Length; i++) otherTexts[i - 1] = texts[i];
+                foreach (var text in texts) text.maxWidth = 0f;
 
-                // The donor's own icon, reused for ours. Its sibling Flare is the
-                // light-up animation and stays off.
+                // The donor's icon is reused for ours; everything else it draws, such as
+                // the light-up Flare, stays off.
                 SpriteRenderer icon = null;
+                var sprites = clone.GetComponentsInChildren<SpriteRenderer>(true);
+                int others = 0;
                 foreach (var sprite in sprites)
                 {
-                    if (sprite != null && sprite.name == "Icon") { icon = sprite; break; }
+                    if (icon == null && sprite != null && sprite.name == "Icon") icon = sprite;
+                    else others++;
                 }
-                var others = new PugText[texts.Length - 1];
-                for (int i = 1; i < texts.Length; i++) others[i - 1] = texts[i];
 
-                // The donor's width is sized for labels like "Tab", and PugFont only
-                // wraps when maxWidth is above zero (PugFont.cs:141).
-                texts[0].maxWidth = 0f;
-                foreach (var other in others) other.maxWidth = 0f;
+                var otherSprites = new SpriteRenderer[others];
+                int at = 0;
+                foreach (var sprite in sprites)
+                {
+                    if (sprite != icon) otherSprites[at++] = sprite;
+                }
 
                 var hint = clone.AddComponent<CkQolHint>();
-                hint.Bind(texts[0], others, sprites, donor, icon);
+                hint.Bind(texts[0], otherTexts, otherSprites, donor, icon);
                 hint.Label = label;
                 hint.Visible = visible;
 
                 clone.transform.SetParent(donor.transform.parent, false);
                 clone.SetActive(true);
                 row.buttons.Add(hint);
-
-                var report = new System.Text.StringBuilder();
-                report.Append("[CkQol] hint donor '").Append(donor.name)
-                      .Append("' texts=").Append(texts.Length)
-                      .Append(" sprites=").Append(sprites.Length)
-                      .Append(" icon=").Append(icon != null ? icon.name : "none").Append(" |");
-                foreach (var text in texts) report.Append(" T:").Append(Path(text.transform, clone.transform));
-                foreach (var sprite in sprites) report.Append(" S:").Append(Path(sprite.transform, clone.transform));
-                Debug.Log(report.ToString());
 
                 Debug.Log("[CkQol] added a key hint to the HUD");
                 return hint;
@@ -227,18 +211,6 @@ namespace CkQol.Native
                 Debug.LogException(e);
                 return null;
             }
-        }
-
-        /// Hierarchy path of a child relative to the hint root, for the one-off
-        /// structure log - the donor's layout is authored, not visible in code.
-        private static string Path(Transform child, Transform root)
-        {
-            string path = child.name;
-            for (var at = child.parent; at != null && at != root; at = at.parent)
-            {
-                path = at.name + "/" + path;
-            }
-            return path;
         }
 
         /// Instantiating into an active parent would run the donor's Awake, which reads

@@ -94,15 +94,24 @@ namespace CkQol.Features
             return $"{key} Summon {(AutoSummonState.Armed ? "on" : "off")}";
         }
 
+        private ObjectID _iconFor = ObjectID.None;
+        private int _iconVariation;
+
         /// The equipped weapon's own icon, the way the secondary-use hint shows the
-        /// held item (UseWeaponSecondaryButton.CheckAndUpdateSprite).
+        /// held item (UseWeaponSecondaryButton.CheckAndUpdateSprite) - including the
+        /// cache, since this is called every update and the gradient map is not free.
         private void HintIcon(SpriteRenderer renderer)
         {
             var player = Manager.main != null ? Manager.main.player : null;
             var slot = player != null ? player.GetEquippedSlot() : null;
-            if (slot == null) return;
+            var objectData = slot != null ? slot.objectData : default;
 
-            var objectData = slot.objectData;
+            if (objectData.objectID == _iconFor && objectData.variation == _iconVariation) return;
+
+            _iconFor = objectData.objectID;
+            _iconVariation = objectData.variation;
+            renderer.sprite = null;
+
             if (objectData.objectID == ObjectID.None) return;
 
             var over = Manager.ui.itemOverridesTable.GetIconOverride(objectData, getSmallIcon: false);

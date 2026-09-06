@@ -597,14 +597,6 @@ namespace CkQol.Native
             // overwrote a title set earlier.
             var heading = GameMenu.FindHeading(Menu);
             if (heading != null) GameMenu.SetLiteral(heading, Title);
-
-            int selectable = 0;
-            foreach (var row in Menu.menuOptions)
-            {
-                if (row != null && row.IsSelectionEnabled()) selectable++;
-            }
-            Debug.Log($"[CkQol] page '{Title}': rows={Menu.menuOptions.Count} " +
-                      $"selectable={selectable} heading={(heading != null ? "found" : "missing")}");
         }
     }
 }
