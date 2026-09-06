@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using CkQol.Config;
 using UnityEngine;
 
@@ -101,14 +102,12 @@ namespace CkQol.Native
 
         /// Slot positions captured from each template before its rows are removed;
         /// these menus do not auto-position.
-        private static readonly System.Collections.Generic.Dictionary<RadicalMenu,
-            System.Collections.Generic.List<Vector3>> _slots =
-            new System.Collections.Generic.Dictionary<RadicalMenu,
-                System.Collections.Generic.List<Vector3>>();
+        private static readonly Dictionary<RadicalMenu, List<Vector3>> _slots =
+            new Dictionary<RadicalMenu, List<Vector3>>();
 
         /// Container the rows live under, or the menu root.
-        private static readonly System.Collections.Generic.Dictionary<RadicalMenu, Transform>
-            _rowParents = new System.Collections.Generic.Dictionary<RadicalMenu, Transform>();
+        private static readonly Dictionary<RadicalMenu, Transform> _rowParents =
+            new Dictionary<RadicalMenu, Transform>();
 
         private static Transform RowParent(RadicalMenu menu)
         {

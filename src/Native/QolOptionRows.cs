@@ -75,7 +75,7 @@ namespace CkQol.Native
 
             Manager.menu.centerPopUpText.StartNewDisplaySequence(
                 "Reset " + Feature.Name + " settings to their defaults?",
-                options: new System.Collections.Generic.List<string> { "cancelDialogue", "confirm" },
+                options: new List<string> { "cancelDialogue", "confirm" },
                 optionsCallback: OnAnswered,
                 localize: false,
                 menuInputCooldown: true,

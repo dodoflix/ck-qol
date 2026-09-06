@@ -69,10 +69,17 @@ namespace CkQol.Features
 
         protected override void OnUpdate()
         {
+            Tick();
+            base.OnUpdate();
+        }
+
+        /// Split out so the guards can return plainly rather than each repeating the
+        /// base call.
+        private void Tick()
+        {
             if (!AutoFishingState.ReelEnabled || _playerQuery.IsEmpty)
             {
                 Forget();
-                base.OnUpdate();
                 return;
             }
 
@@ -82,14 +89,12 @@ namespace CkQol.Features
             if (slot.slotType != EquipmentSlotType.FishingRodSlot)
             {
                 Forget();
-                base.OnUpdate();
                 return;
             }
 
             if (Manager.ui.isAnyInventoryShowing || Manager.menu.IsAnyMenuActive())
             {
                 Forget();
-                base.OnUpdate();
                 return;
             }
 
@@ -97,7 +102,6 @@ namespace CkQol.Features
             if (!playerState.HasAnyState(PlayerStateEnum.Fishing))
             {
                 Forget();
-                base.OnUpdate();
                 return;
             }
 
@@ -129,7 +133,6 @@ namespace CkQol.Features
                 _pressedLastFrame = false;
                 inputData = UnsafeUtility.As<ClientInput, ClientInputData>(ref input);
                 EntityManager.SetComponentData(player, inputData);
-                base.OnUpdate();
                 return;
             }
 
@@ -175,8 +178,6 @@ namespace CkQol.Features
             inputData = UnsafeUtility.As<ClientInput, ClientInputData>(ref input);
             EntityManager.SetComponentData(player, inputData);
             EntityManager.SetComponentData(player, state);
-
-            base.OnUpdate();
         }
     }
 
@@ -231,6 +232,12 @@ namespace CkQol.Features
 
         protected override void OnUpdate()
         {
+            Tick();
+            base.OnUpdate();
+        }
+
+        private void Tick()
+        {
             if (!AutoFishingState.ShoalEnabled)
             {
                 // Sweep at once when it comes back on: catches made while off went
@@ -238,8 +245,6 @@ namespace CkQol.Features
                 _sweepUntil = 0d;
                 _nextPoll = 0d;
                 _nextBackstop = 0d;
-
-                base.OnUpdate();
                 return;
             }
 
@@ -259,8 +264,6 @@ namespace CkQol.Features
                 _nextBackstop = now + BackstopSeconds;
                 ResetDepletedShoals();
             }
-
-            base.OnUpdate();
         }
 
         private void ResetDepletedShoals()

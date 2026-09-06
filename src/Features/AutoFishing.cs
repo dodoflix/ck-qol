@@ -44,41 +44,23 @@ namespace CkQol.Features
             yield return _infiniteShoal;
         }
 
-        /// Settings stay editable while the feature is off; without this the change
-        /// handler would restart the systems.
-        private bool _running;
-
-        private bool _subscribed;
-
         public override void Init()
         {
-            if (!_subscribed)
-            {
-                _subscribed = true;
-                foreach (var setting in GetSettings())
-                {
-                    setting.Changed += _ => Push();
-                }
-            }
-
-            _running = true;
-            Push();
-            Log($"started (cast={_castingTime.Value:0.00}s, " +
-                $"learn={_learnCasting.Value}, hold={_reelHold.Value:0.00}s, " +
-                $"shoal={_infiniteShoal.Value})");
+            base.Init();
+            Log($"started (cast={_castingTime.Value:0.00}s, learn={_learnCasting.Value}, " +
+                $"hold={_reelHold.Value:0.00}s, shoal={_infiniteShoal.Value})");
         }
 
         public override void Shutdown()
         {
-            _running = false;
-            Push();
+            base.Shutdown();
             Log("stopped");
         }
 
-        private void Push()
+        protected override void Apply()
         {
-            AutoFishingState.ReelEnabled = _running;
-            AutoFishingState.ShoalEnabled = _running && _infiniteShoal.Value;
+            AutoFishingState.ReelEnabled = Running;
+            AutoFishingState.ShoalEnabled = Running && _infiniteShoal.Value;
             AutoFishingState.CastingTimeSeconds = _castingTime.Value;
             AutoFishingState.LearnEnabled = _learnCasting.Value;
             AutoFishingState.ReelHoldSeconds = _reelHold.Value;

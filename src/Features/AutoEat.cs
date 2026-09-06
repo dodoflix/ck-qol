@@ -49,25 +49,9 @@ namespace CkQol.Features
             yield return _usePouches;
         }
 
-        /// Settings stay editable while the feature is off; without this the change
-        /// handler would restart the system.
-        private bool _running;
-
-        private bool _subscribed;
-
         public override void Init()
         {
-            if (!_subscribed)
-            {
-                _subscribed = true;
-                foreach (var setting in GetSettings())
-                {
-                    setting.Changed += _ => Push();
-                }
-            }
-
-            _running = true;
-            Push();
+            base.Init();
             Log($"started (threshold={AutoEatState.Threshold}, cooked={_eatCooked.Value}, " +
                 $"hotbar={_useHotbar.Value}, inventory={_useInventory.Value}, " +
                 $"pouches={_usePouches.Value})");
@@ -75,14 +59,13 @@ namespace CkQol.Features
 
         public override void Shutdown()
         {
-            _running = false;
-            Push();
+            base.Shutdown();
             Log("stopped");
         }
 
-        private void Push()
+        protected override void Apply()
         {
-            AutoEatState.Enabled = _running;
+            AutoEatState.Enabled = Running;
             AutoEatState.Threshold = _threshold.Value == Starving ? 25 : 75;
             AutoEatState.AllowCooked = _eatCooked.Value;
             AutoEatState.UseHotbar = _useHotbar.Value;
