@@ -95,6 +95,7 @@ namespace CkQol.Native
                 }
                 entry.Label = "Core Keeper QoL";
                 entry.Target = rootMenu;
+                entry.LogState = true;
                 GameMenu.Refresh(optionsMenu);
                 GameMenu.PlaceBelowLast(optionsMenu, entry);
 

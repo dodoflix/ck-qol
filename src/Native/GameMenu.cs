@@ -139,6 +139,16 @@ namespace CkQol.Native
                 var replacement = clone.AddComponent<T>();
                 fields.ApplyTo(replacement);
 
+                // Our rows are always available. Inheriting these from the donor made
+                // visibility depend on which stock row happened to be cloned: once a
+                // row is in menuOptions, Activate hides it whenever
+                // GetActiveStateInCurrentScene is not ACTIVE.
+                replacement.activeInSPStage = true;
+                replacement.activeInTitle = true;
+                replacement.activeInDebugOnly = false;
+                replacement.forceDeactive = false;
+                replacement.canBeActivated = true;
+
                 clone.transform.SetParent(parent, false);
                 return replacement;
             }

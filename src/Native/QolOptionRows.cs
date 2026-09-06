@@ -12,6 +12,18 @@ namespace CkQol.Native
     {
         public RadicalMenu Target;
         public string Label;
+        public bool LogState;
+
+        /// Called by RadicalMenu.Activate as the menu opens - the only point where
+        /// the row's real visibility state can be observed.
+        public override void OnParentMenuActivation()
+        {
+            base.OnParentMenuActivation();
+            if (!LogState) return;
+            Debug.Log($"[CkQol] on open: state={GetActiveStateInCurrentScene()} " +
+                      $"activeSelf={gameObject.activeSelf} pos={transform.localPosition} " +
+                      $"label='{(labelText != null ? labelText.GetText() : "null")}'");
+        }
 
         private void Start()
         {
