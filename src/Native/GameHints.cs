@@ -36,7 +36,6 @@ namespace CkQol.Native
         private bool _active;
         private bool _initialized;
         private string _shown;
-        private Color _tint = Color.white;
 
         /// Where the donor put the icon, and whether it has been moved for the current
         /// label width.
@@ -69,11 +68,11 @@ namespace CkQol.Native
 
             if (visible)
             {
-                // Re-applied rather than set on change: rendering the label rebuilds its
-                // glyphs from the style, losing any colour put on them.
+                // Applied every frame rather than on change. Render rebuilds the glyphs
+                // from the style, losing any colour on them, and does not always have
+                // them ready on the frame it is called - so a one-shot recolour can run
+                // over an empty list and never retry.
                 Color tint = Tint != null ? Tint() : Color.white;
-                bool retint = tint != _tint;
-                _tint = tint;
 
                 if (_text != null)
                 {
@@ -91,10 +90,9 @@ namespace CkQol.Native
                         }
                         _shown = label;
                         _placed = false;
-                        retint = true;
                     }
 
-                    if (retint) Recolour(_text, tint);
+                    Recolour(_text, tint);
                 }
 
                 if (_icon != null)
@@ -153,7 +151,6 @@ namespace CkQol.Native
             // disabled (PugText.cs:307-308), so the old ones are gone.
             _shown = null;
             _placed = false;
-            _tint = Color.clear;
             _active = visible;
             _initialized = true;
         }
