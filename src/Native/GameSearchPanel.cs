@@ -44,11 +44,10 @@ namespace CkQol.Native
         private const int MaxLength = 24;
 
         /// What fits a row between the icon and the count column.
-        private const int RowCharacters = 15;
+        private const int RowCharacters = 10;
 
-        /// The box is narrower than a row: it has the icon and the clear button
-        /// beside it.
-        private const int InputCharacters = 15;
+        /// The box has the icon and the clear button beside it.
+        private const int InputCharacters = 10;
 
         /// Characters a second the highlighted row scrolls by when its name is too
         /// long to show at once.
