@@ -26,6 +26,14 @@ TEAL = (116, 204, 192)
 TEXT = (238, 234, 246)
 DIM = (150, 144, 176)
 
+SCALE_BLUE = (110, 180, 226)
+FIN = (74, 140, 196)
+DEMON = (178, 74, 92)
+HORN = (120, 44, 60)
+STEEL = (196, 202, 220)
+STEEL_LIT = (238, 242, 252)
+GRIP = (120, 92, 60)
+
 TILE = 26
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -88,13 +96,13 @@ def plate(glyph):
     return img.resize(((TILE + 1) * SCALE, (TILE + 1) * SCALE), Image.NEAREST)
 
 
-def rod(d, x, y):
-    """Auto Fishing: a hook on a line."""
-    d.line([(x + 13, y + 5), (x + 13, y + 15)], fill=DIM)
-    for px, py in ((13, 16), (13, 17), (14, 18), (15, 18), (16, 17), (16, 16), (16, 15)):
-        d.point((x + px, y + py), fill=GOLD)
-    d.point((x + 15, y + 13), fill=GOLD)
-    d.point((x + 16, y + 14), fill=GOLD)
+def fish(d, x, y):
+    """Auto Fishing."""
+    d.polygon([(x + 9, y + 10), (x + 12, y + 5), (x + 15, y + 10)], fill=FIN)
+    d.polygon([(x + 16, y + 13), (x + 22, y + 7), (x + 22, y + 19)], fill=FIN)
+    d.ellipse([(x + 4, y + 9), (x + 18, y + 18)], fill=SCALE_BLUE)
+    d.point((x + 8, y + 12), fill=DEEP)
+    d.line([(x + 5, y + 14), (x + 6, y + 14)], fill=FIN)
 
 
 def food(d, x, y):
@@ -105,26 +113,30 @@ def food(d, x, y):
     d.ellipse([(x + 14, y + 5), (x + 19, y + 9)], fill=(110, 176, 96))
 
 
-def minion(d, x, y):
-    """Auto Summon: a small conjured thing."""
-    d.ellipse([(x + 7, y + 8), (x + 19, y + 19)], fill=TEAL)
-    d.rectangle([(x + 10, y + 12), (x + 11, y + 14)], fill=DEEP)
-    d.rectangle([(x + 15, y + 12), (x + 16, y + 14)], fill=DEEP)
-    for dx in (8, 13, 18):
-        d.point((x + dx, y + 21), fill=TEAL)
+def demon(d, x, y):
+    """Auto Summon."""
+    d.polygon([(x + 8, y + 9), (x + 6, y + 3), (x + 11, y + 7)], fill=HORN)
+    d.polygon([(x + 18, y + 9), (x + 20, y + 3), (x + 15, y + 7)], fill=HORN)
+    d.ellipse([(x + 6, y + 7), (x + 20, y + 20)], fill=DEMON)
+    d.polygon([(x + 9, y + 12), (x + 12, y + 13), (x + 9, y + 15)], fill=GOLD)
+    d.polygon([(x + 17, y + 12), (x + 14, y + 13), (x + 17, y + 15)], fill=GOLD)
+    d.line([(x + 10, y + 17), (x + 16, y + 17)], fill=HORN)
 
 
-def meter(d, x, y):
-    """DPS Tracker: rising bars."""
-    for i, h in enumerate((5, 9, 14)):
-        bx = x + 7 + i * 5
-        d.rectangle([(bx, y + 20 - h), (bx + 3, y + 20)], fill=GOLD)
+def sword(d, x, y):
+    """DPS Tracker."""
+    d.polygon([(x + 13, y + 3), (x + 16, y + 7), (x + 16, y + 16), (x + 10, y + 16),
+               (x + 10, y + 7)], fill=STEEL)
+    d.line([(x + 12, y + 7), (x + 12, y + 15)], fill=STEEL_LIT)
+    d.rectangle([(x + 7, y + 16), (x + 19, y + 18)], fill=GOLD)
+    d.rectangle([(x + 12, y + 19), (x + 14, y + 23)], fill=GRIP)
+    d.rectangle([(x + 11, y + 23), (x + 15, y + 24)], fill=GOLD)
 
 
 def main():
     img = ground()
 
-    glyphs = (rod, food, minion, meter)
+    glyphs = (fish, food, demon, sword)
     size = (TILE + 1) * SCALE
     gap = 32
     left = (W - (len(glyphs) * size + (len(glyphs) - 1) * gap)) // 2
