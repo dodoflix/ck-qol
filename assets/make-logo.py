@@ -183,14 +183,27 @@ def plate(glyph):
     for x, y in ((2, 2), (last - 2, 2)):
         d.point((x, y), fill=GOLD_DIM)
 
-    glyph(d, 2, 2)
+    # Drawn on its own layer and cropped to its ink, so what gets centred is the
+    # sprite itself rather than the coordinates it happens to be written in.
+    art = Image.new("RGBA", (size * 2, size * 2), (0, 0, 0, 0))
+    glyph(ImageDraw.Draw(art), 0, 0)
+    art = art.crop(art.getbbox())
+    assert max(art.size) == ART, f"sprite is {art.size}, long axis must be {ART}"
+
+    img.paste(art, ((size - art.width) // 2, (size - art.height) // 2), art)
     return img
+
+
+# Every sprite is drawn to the same 20px long axis. Left to their own devices
+# they came out between 16 and 22, which reads as four icons at four sizes even
+# though each one is centred.
+ART = 20
 
 
 def fish(d, x, y):
     """Auto Fishing."""
     d.polygon([(x + 9, y + 10), (x + 12, y + 5), (x + 15, y + 10)], fill=FIN)
-    d.polygon([(x + 16, y + 13), (x + 22, y + 7), (x + 22, y + 19)], fill=FIN)
+    d.polygon([(x + 16, y + 13), (x + 23, y + 7), (x + 23, y + 19)], fill=FIN)
     d.ellipse([(x + 4, y + 9), (x + 18, y + 18)], fill=SCALE_BLUE)
     d.point((x + 8, y + 12), fill=DEEP)
     d.line([(x + 5, y + 14), (x + 6, y + 14)], fill=FIN)
@@ -198,30 +211,30 @@ def fish(d, x, y):
 
 def food(d, x, y):
     """Auto Eat: a berry with a leaf."""
-    d.ellipse([(x + 7, y + 9), (x + 19, y + 20)], fill=(206, 84, 92))
-    d.ellipse([(x + 9, y + 11), (x + 12, y + 14)], fill=(238, 150, 150))
-    d.line([(x + 13, y + 6), (x + 13, y + 10)], fill=(120, 92, 60))
-    d.ellipse([(x + 14, y + 5), (x + 19, y + 9)], fill=(110, 176, 96))
+    d.ellipse([(x + 5, y + 7), (x + 21, y + 22)], fill=(206, 84, 92))
+    d.ellipse([(x + 8, y + 10), (x + 12, y + 14)], fill=(238, 150, 150))
+    d.line([(x + 13, y + 4), (x + 13, y + 9)], fill=(120, 92, 60))
+    d.ellipse([(x + 14, y + 3), (x + 20, y + 8)], fill=(110, 176, 96))
 
 
 def demon(d, x, y):
     """Auto Summon."""
-    d.polygon([(x + 8, y + 9), (x + 6, y + 3), (x + 11, y + 7)], fill=HORN)
-    d.polygon([(x + 18, y + 9), (x + 20, y + 3), (x + 15, y + 7)], fill=HORN)
-    d.ellipse([(x + 6, y + 7), (x + 20, y + 20)], fill=DEMON)
-    d.polygon([(x + 9, y + 12), (x + 12, y + 13), (x + 9, y + 15)], fill=GOLD)
-    d.polygon([(x + 17, y + 12), (x + 14, y + 13), (x + 17, y + 15)], fill=GOLD)
-    d.line([(x + 10, y + 17), (x + 16, y + 17)], fill=HORN)
+    d.polygon([(x + 7, y + 9), (x + 5, y + 2), (x + 11, y + 7)], fill=HORN)
+    d.polygon([(x + 19, y + 9), (x + 21, y + 2), (x + 15, y + 7)], fill=HORN)
+    d.ellipse([(x + 5, y + 6), (x + 21, y + 21)], fill=DEMON)
+    d.polygon([(x + 9, y + 12), (x + 12, y + 13), (x + 9, y + 16)], fill=GOLD)
+    d.polygon([(x + 17, y + 12), (x + 14, y + 13), (x + 17, y + 16)], fill=GOLD)
+    d.line([(x + 10, y + 18), (x + 16, y + 18)], fill=HORN)
 
 
 def sword(d, x, y):
     """DPS Tracker."""
-    d.polygon([(x + 13, y + 3), (x + 16, y + 7), (x + 16, y + 16), (x + 10, y + 16),
-               (x + 10, y + 7)], fill=STEEL)
-    d.line([(x + 12, y + 7), (x + 12, y + 15)], fill=STEEL_LIT)
+    d.polygon([(x + 13, y + 4), (x + 16, y + 8), (x + 16, y + 16), (x + 10, y + 16),
+               (x + 10, y + 8)], fill=STEEL)
+    d.line([(x + 12, y + 8), (x + 12, y + 15)], fill=STEEL_LIT)
     d.rectangle([(x + 7, y + 16), (x + 19, y + 18)], fill=GOLD)
-    d.rectangle([(x + 12, y + 19), (x + 14, y + 23)], fill=GRIP)
-    d.rectangle([(x + 11, y + 23), (x + 15, y + 24)], fill=GOLD)
+    d.rectangle([(x + 12, y + 19), (x + 14, y + 22)], fill=GRIP)
+    d.rectangle([(x + 11, y + 22), (x + 15, y + 23)], fill=GOLD)
 
 
 def divider(d, cx, y, half=44):
