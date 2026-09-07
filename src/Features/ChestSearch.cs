@@ -142,22 +142,24 @@ namespace CkQol.Features
                    !ui.isUpgradeForgeUIShowing &&
                    !ui.isSellUIShowing &&
                    !ui.isBuyUIShowing &&
-                   !AtStation(ui);
+                   !AtStation();
         }
 
         /// A crafting window that belongs to something in the world rather than to the
         /// player.
         ///
-        /// isCraftingUIShowing is no use on its own: GetActiveCraftingUI returns
-        /// simpleCraftingUIContainer first (UIManager.cs:400), and that is the crafting
-        /// list the inventory itself comes with - so it is showing for a plain Tab, and
-        /// testing it hid the panel entirely. Everything else it can return is a
-        /// station: a cooking pot, a furnace, an extractor, a boss statue.
-        private static bool AtStation(UIManager ui)
+        /// Which handler is active, not which window is up. The UI side cannot answer
+        /// this: a workbench draws through the same simpleCraftingUIContainer the
+        /// inventory's own recipe list uses, so telling them apart by window shows the
+        /// panel over every station. This is the test the game makes itself
+        /// (CraftingUIBase.cs:142).
+        private static bool AtStation()
         {
-            var crafting = ui.activeCraftingUI;
-            return crafting != null && crafting.isShowing &&
-                   !ReferenceEquals(crafting, ui.simpleCraftingUIContainer);
+            var player = Manager.main != null ? Manager.main.player : null;
+            if (player == null) return false;
+
+            return player.activeCraftingHandler != null &&
+                   player.activeCraftingHandler != player.playerCraftingHandler;
         }
 
         /// Names to offer for what has been typed so far, or nothing while it is
