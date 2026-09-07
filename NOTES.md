@@ -97,6 +97,14 @@ Every one of these produced an invisible hint:
   hint at zero size forever.
 - Never deactivate a sprite's GameObject to hide it — the donor's sprites can be
   the label's own parent. Disable the renderer.
+- **Destroy the donor's glyphs on a fresh clone** — `GameMenu.DropStrayGlyphs`.
+  `PugText.glyphs` is `[NonSerialized]` (`:108`), so `Instantiate` copies the donor's
+  live glyph objects as children while the clone's list comes up empty. Everything
+  that clears or recolours text walks that list — `Clear` (`:789`), `Render`, our own
+  tint — so the copies are unreachable, and they sit there showing the donor's words
+  in the donor's colours for as long as the clone lives. They are only there when the
+  donor had text at clone time, which for the crafting hover means only while the
+  player was hovering a recipe: the same bug looks intermittent and unfixable at once.
 - **Set `renderOnStart`, `keepEnabledOnStart` and `freeResourcesOnDisable` on every
   cloned `PugText`** — `GameMenu.KeepRendered`. The prefabs ship all three off, and
   together they make a toggled clone keep the donor's words for good: hiding it

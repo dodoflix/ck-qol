@@ -128,9 +128,22 @@ namespace CkQol.Features
             Rescan();
         }
 
-        private bool PanelVisible() =>
-            ChestSearchState.Enabled &&
-            Manager.ui != null && Manager.ui.isPlayerInventoryShowing;
+        /// Only the inventory on its own. Opening a chest, a crafting station, the
+        /// forge or a shop shows the player inventory beside it (UIManager.cs:265), and
+        /// the panel takes the space that window wants.
+        private bool PanelVisible()
+        {
+            var ui = Manager.ui;
+            if (!ChestSearchState.Enabled || ui == null) return false;
+
+            return ui.isPlayerInventoryShowing &&
+                   !ui.isChestInventoryUIShowing &&
+                   !ui.isCraftingUIShowing &&
+                   !ui.isSalvageAndRepairUIShowing &&
+                   !ui.isUpgradeForgeUIShowing &&
+                   !ui.isSellUIShowing &&
+                   !ui.isBuyUIShowing;
+        }
 
         /// Names to offer for what has been typed so far, or nothing while it is
         /// too short to be worth a list.
