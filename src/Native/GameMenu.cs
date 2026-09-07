@@ -345,6 +345,36 @@ namespace CkQol.Native
             target.Render(text ?? string.Empty, rewindEffectAnims: true, force: true);
         }
 
+        /// Destroys the donor's own glyphs off a fresh clone.
+        ///
+        /// `PugText.glyphs` is `[NonSerialized]` (PugText.cs:108), so Instantiate copies
+        /// the donor's live glyph objects as plain children while the clone's list comes
+        /// up empty. Every path that clears or recolours text walks that list - Clear
+        /// (:789), Render, our own Tint - so those copies are unreachable: they sit on
+        /// the panel showing the donor's last words, in the donor's colours, for as long
+        /// as the clone lives, and no amount of blanking touches them.
+        ///
+        /// Only there when the donor had text at the moment it was cloned, which for the
+        /// crafting hover means only when the player was hovering a recipe. That is what
+        /// made the stuck ingredient row come and go.
+        ///
+        /// `keep` is for sprites that are not glyphs but do sit under a text.
+        public static void DropStrayGlyphs(GameObject clone, params SpriteRenderer[] keep)
+        {
+            if (clone == null) return;
+
+            foreach (var text in clone.GetComponentsInChildren<PugText>(true))
+            {
+                foreach (var sprite in text.GetComponentsInChildren<SpriteRenderer>(true))
+                {
+                    if (sprite == null || sprite.gameObject == text.gameObject) continue;
+                    if (keep != null && System.Array.IndexOf(keep, sprite) >= 0) continue;
+
+                    UnityEngine.Object.DestroyImmediate(sprite.gameObject);
+                }
+            }
+        }
+
         /// Makes a cloned text survive being hidden and shown.
         ///
         /// Three defaults on the game's own prefabs conspire against a clone that gets

@@ -524,6 +524,8 @@ namespace CkQol.Native
                 UnityEngine.Object.DestroyImmediate(stale);
             }
 
+            GameMenu.DropStrayGlyphs(clone, element.SR, element.chestIcon);
+
             foreach (var text in clone.GetComponentsInChildren<PugText>(true))
             {
                 text.maxWidth = 0f;
@@ -790,6 +792,8 @@ namespace CkQol.Native
                 var box = UnityEngine.Object.Instantiate(field.gameObject, GameMenu.Staging);
                 box.name = "CkQolSearchBox";
 
+                GameMenu.DropStrayGlyphs(box);
+
                 // Read off the clone's own script before destroying it: it names the
                 // two texts and the caret, which are otherwise indistinguishable
                 // among the children.
@@ -951,6 +955,8 @@ namespace CkQol.Native
 
             var clone = UnityEngine.Object.Instantiate(style.gameObject, GameMenu.Staging);
             clone.name = "CkQolSearchClear";
+
+            GameMenu.DropStrayGlyphs(clone);
 
             var pug = clone.GetComponent<PugText>();
             pug.maxWidth = 0f;

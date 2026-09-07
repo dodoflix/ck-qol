@@ -171,6 +171,8 @@ namespace CkQol.Native
                 UnityEngine.Object.DestroyImmediate(stale);
             }
 
+            GameMenu.DropStrayGlyphs(clone, element.SR, element.chestIcon);
+
 
             // The donor's width is sized for the hover window, and PugFont only wraps
             // above zero (PugFont.cs:141). Alignment is forced rather than inherited so
