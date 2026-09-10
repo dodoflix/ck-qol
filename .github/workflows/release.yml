@@ -49,15 +49,15 @@ jobs:
             echo 'CHANGELOG_EOF'
           } >> "$GITHUB_OUTPUT"
 
-      # No compile step: check.sh builds against the game's own assemblies in
+      # No compile step: scripts/check.sh builds against the game's own assemblies in
       # CoreKeeper_Data/Managed, which a runner does not have. PugMod ships
       # source and compiles it in-process at startup, so there is nothing to
-      # build here either - run ./check.sh locally before tagging.
+      # build here either - run ./scripts/check.sh locally before tagging.
       # ModManifest.json has to sit at the root of the zip, not under a folder -
       # that is how the game's own mod downloads are laid out.
       - name: Package
         run: |
-          ./package.sh dist/CkQol
+          ./scripts/package.sh dist/CkQol
           cd dist/CkQol && zip -qr "../CkQol-${{ steps.tag.outputs.version }}.zip" .
 
       - name: GitHub release

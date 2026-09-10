@@ -25,4 +25,4 @@ jobs:
             echo "MODIO_TOKEN or MODIO_MOD_ID is not set." >&2
             exit 1
           fi
-          ./modio-page.sh
+          ./scripts/modio-page.sh

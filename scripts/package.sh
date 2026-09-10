@@ -3,12 +3,12 @@
 # Used by install.sh for a local deploy and by the release workflow for the
 # mod.io upload, so the two cannot drift.
 #
-# usage: ./package.sh <destination-dir>
+# usage: ./scripts/package.sh <destination-dir>
 set -euo pipefail
 
 MOD_NAME=CkQol
 MOD_GUID=com.dodo.ckqol
-REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 DEST="${1:-}"
 [ -n "$DEST" ] || { echo "usage: $0 <destination-dir>" >&2; exit 1; }

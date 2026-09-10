@@ -1,7 +1,7 @@
 # Screenshots
 
 Every `.png` / `.jpg` here becomes a gallery image on the mod.io page, pushed by
-`modio-page.sh` on each release. Removing one from this folder removes it from the
+`scripts/modio-page.sh` on each release. Removing one from this folder removes it from the
 page.
 
 - **1920x1080** is what the store shows them at; 512x288 is the floor and 8MB the

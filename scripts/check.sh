@@ -3,7 +3,7 @@
 # without this a typo first shows up in Player.log. Uses a throwaway csproj.
 set -euo pipefail
 
-REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 GAME="${CK_GAME_DIR:-$HOME/.local/share/Steam/steamapps/common/Core Keeper}"
 MANAGED="$GAME/CoreKeeper_Data/Managed"
 

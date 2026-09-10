@@ -30,14 +30,14 @@ count, and outlined in the world in a colour for how much is in there.
 ## Install
 
 ```sh
-./check.sh && ./install.sh
+./scripts/check.sh && ./scripts/install.sh
 ```
 
 Close the game first — mods are compiled at startup.
 
 Installs to `CoreKeeper_Data/StreamingAssets/Mods/CkQol/`; set `CK_GAME_DIR` if the
 game lives elsewhere. Steam wipes that folder on updates and on Verify Integrity, so
-re-run `install.sh` if the mod stops loading.
+re-run `scripts/install.sh` if the mod stops loading.
 
 Settings are saved under `…/Pugstorm/Core Keeper/Steam/<id>/mods/CkQol/`. Delete that
 folder to reset everything.
@@ -47,7 +47,7 @@ folder to reset everything.
 Tagging is the trigger:
 
 ```sh
-./check.sh                       # CI has no game assemblies, so it cannot compile
+./scripts/check.sh                # CI has no game assemblies, so it cannot compile
 git tag -a v1.0.0 -m "what changed"
 git push origin v1.0.0
 ```
@@ -62,9 +62,19 @@ gallery, one file per image.
 
 ## Development
 
-`check.sh` compiles against the game's assemblies and lints for the APIs PugMod's
-security verifier rejects — worth running, because a mod that fails either only says
-"Compilation failed" in `Player.log`, hours of guessing later.
+`scripts/check.sh` compiles against the game's assemblies and lints for the APIs
+PugMod's security verifier rejects — worth running, because a mod that fails either
+only says "Compilation failed" in `Player.log`, hours of guessing later.
+
+`scripts/dump.sh` unpacks the game into a gitignored `dump/` — decompiled assemblies,
+the GameObject hierarchies as text trees, and every sprite as a PNG. So looking up how
+a system is declared, what sits on an object before cloning it, or which icon a name
+refers to is a grep or an image viewer rather than another ILSpy run. Run it once, and
+again after a game update; each stage skips what is already current. `dump.sh code
+<name>` and `dump.sh assets` run one stage on its own.
+
+The shipped build has no MonoBehaviour typetrees, so the trees carry component class
+names but not their serialized values.
 
 To add a feature, write a class in `src/Features/` extending `QolFeatureBase` and
 register it in `CkQolMod.BuildFeatures`. It gets a settings page for free.

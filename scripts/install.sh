@@ -3,7 +3,7 @@
 set -euo pipefail
 
 MOD_NAME=CkQol
-REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 GAME="${CK_GAME_DIR:-$HOME/.local/share/Steam/steamapps/common/Core Keeper}"
 DEST="$GAME/CoreKeeper_Data/StreamingAssets/Mods/$MOD_NAME"
@@ -16,7 +16,7 @@ if pgrep -f 'CoreKeeper\.exe' >/dev/null; then
   exit 1
 fi
 
-"$REPO/package.sh" "$DEST"
+"$REPO/scripts/package.sh" "$DEST"
 
 echo
 echo "installed to: $DEST"

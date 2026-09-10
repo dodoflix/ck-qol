@@ -8,12 +8,12 @@ PugMod ships **C# source**, not a DLL: the game carries Roslyn and compiles mods
 in-process at startup. So there is no build step, and mistakes only surface in
 `Player.log` after a full launch.
 
-`check.sh` closes that gap. It compiles against `CoreKeeper_Data/Managed/`, then
+`scripts/check.sh` closes that gap. It compiles against `CoreKeeper_Data/Managed/`, then
 lints for APIs PugMod's **security verifier** rejects — `System.Reflection` above
 all. A clean compile says nothing about passing the verifier, and the only in-game
 symptom is a bare "Compilation failed".
 
-`install.sh` generates `ModManifest.json` from `src/`. PugMod silently ignores any
+`scripts/install.sh` generates `ModManifest.json` from `src/`. PugMod silently ignores any
 `.cs` missing from the manifest.
 
 ## Using an item without changing the player's selection
@@ -340,7 +340,7 @@ listen server.
 
 ## Publishing
 
-`modio-page.sh` owns the mod.io page — summary, description, logo and tags — so the
+`scripts/modio-page.sh` owns the mod.io page — summary, description, logo and tags — so the
 store copy is generated from `assets/` rather than edited in a web form and then left
 to drift. Core Keeper is game `5289` and the mod is `6363554`.
 

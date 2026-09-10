@@ -3,9 +3,9 @@
 # release workflow runs it on every tag, so the store page is generated from
 # source rather than edited in a web form and then forgotten.
 #
-#   MODIO_TOKEN=<write-scoped PAT> ./modio-page.sh                  # create, hidden
-#   MODIO_TOKEN=... MODIO_MOD_ID=6363554 ./modio-page.sh            # update
-#   MODIO_TOKEN=... MODIO_MOD_ID=6363554 MODIO_VISIBLE=1 ./modio-page.sh
+#   MODIO_TOKEN=<write-scoped PAT> ./scripts/modio-page.sh                  # create, hidden
+#   MODIO_TOKEN=... MODIO_MOD_ID=6363554 ./scripts/modio-page.sh            # update
+#   MODIO_TOKEN=... MODIO_MOD_ID=6363554 MODIO_VISIBLE=1 ./scripts/modio-page.sh
 #
 # The token needs the write scope. A read-only one fails with error_ref 11139;
 # mint one at https://mod.io/me/access. The api.mod.io host is retired and
@@ -13,7 +13,7 @@
 set -euo pipefail
 
 GAME_ID=5289
-REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 API="https://g-$GAME_ID.modapi.io/v1/games/$GAME_ID/mods"
 
 : "${MODIO_TOKEN:?set MODIO_TOKEN to a write-scoped mod.io access token}"
