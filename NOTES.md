@@ -380,9 +380,10 @@ tags are whatever the uploader set. To change them, or to bump the version tag a
 update, run the uploader again with that file ID in its config. It needs a running Steam
 client on an account that owns the game, which is why a runner cannot do it.
 
-The workflow step is skipped unless `STEAM_USERNAME`, `STEAM_PASSWORD` and
-`STEAM_CONFIG_VDF` are set. The last is a `config.vdf` from a machine where steamcmd has
-logged in with Steam Guard, base64 encoded. It shares the guid `com.dodo.ckqol` with the
+The workflow step is skipped unless `STEAM_USERNAME` and `STEAM_CONFIG_VDF` are set. The
+latter is a `config.vdf` from a machine where steamcmd has logged in with Steam Guard,
+base64 encoded; its cached login token replaces the password. When the token expires, log
+in again and replace the secret. It shares the guid `com.dodo.ckqol` with the
 mod.io build, so a player subscribed to both gets a conflict.
 
 **Pulling a release** takes three things, none of which the workflow does:

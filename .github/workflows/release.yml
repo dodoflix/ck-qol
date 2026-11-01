@@ -117,18 +117,17 @@ jobs:
 
       # Pushes the new files to the existing Workshop item. steamcmd cannot set tags, so
       # title, description, images and tags stay as the SDK uploader created them (NOTES.md).
-      # STEAM_CONFIG_VDF is a logged-in steamcmd config.vdf, base64 encoded, so Steam Guard
-      # is not asked for on the runner.
+      # STEAM_CONFIG_VDF is a logged-in steamcmd config.vdf, base64 encoded. It carries the
+      # login token, so no password is needed and Steam Guard is not asked for.
       - name: Update the Steam Workshop item
         env:
           STEAM_USERNAME: ${{ secrets.STEAM_USERNAME }}
-          STEAM_PASSWORD: ${{ secrets.STEAM_PASSWORD }}
           STEAM_CONFIG_VDF: ${{ secrets.STEAM_CONFIG_VDF }}
           NOTES: ${{ steps.tag.outputs.notes }}
           WORKSHOP_ID: "3831291687"
         run: |
-          if [ -z "$STEAM_USERNAME" ] || [ -z "$STEAM_PASSWORD" ] || [ -z "$STEAM_CONFIG_VDF" ]; then
-            echo "STEAM_USERNAME, STEAM_PASSWORD or STEAM_CONFIG_VDF is not set - skipping the Workshop update." >&2
+          if [ -z "$STEAM_USERNAME" ] || [ -z "$STEAM_CONFIG_VDF" ]; then
+            echo "STEAM_USERNAME or STEAM_CONFIG_VDF is not set - skipping the Workshop update." >&2
             exit 0
           fi
 
@@ -151,7 +150,7 @@ jobs:
           PY
 
           set -o pipefail
-          ~/Steam/steamcmd.sh +login "$STEAM_USERNAME" "$STEAM_PASSWORD" \
+          ~/Steam/steamcmd.sh +login "$STEAM_USERNAME" \
             +workshop_build_item "$PWD/workshop.vdf" +quit | tee steamcmd.log
           if grep -q -i -E 'error|failed' steamcmd.log; then
             echo "steamcmd reported a failure, see the log above." >&2
