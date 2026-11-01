@@ -1,0 +1,23 @@
+Client-side quality-of-life tweaks for Core Keeper, bundled as one mod. Everything is optional and configurable from the game's own menu, under [b]Settings > QoL settings[/b].
+
+[h2]Auto Fishing[/h2]
+Casts and hooks for you, and stops baited spots depleting. Casting time sets how far the line lands, or Learn casting copies your own charge instead. Infinite fish shoal is host-side and does nothing on a server without the mod.
+
+[h2]Auto Eat[/h2]
+Eats when hunger passes a threshold you choose, without changing the item you have selected. Picks the smallest food that helps, so a cooked dish is not spent on a small gap. Hotbar, main inventory and pouches can each be switched on or off.
+
+[h2]Auto Summon[/h2]
+Keeps minions up as they expire or die. Three modes: the set you summoned by hand, the type you summoned last, or your cap split between the summoning weapons on your hotbar. Never summons past the cap, so a change of plan fills in as minions expire rather than culling healthy ones. Ctrl+R with a summoning weapon in hand toggles it for the session.
+
+[h2]DPS Tracker[/h2]
+Your damage per second, under the minion counter, while you are dealing any. Detailed mode breaks it down by source, each with its icon. Burning and acid get a row of their own, because the game does not record who applied a condition.
+
+[h2]Chest Search[/h2]
+Find an item in the containers around you without opening each one. Click the box beside the inventory, start typing, pick a name from the suggestions, and every nearby chest, station, pouch and dropped stack holding it is listed with a count. Each one is outlined in the world with the count floating over it, coloured by how much is in there. The search stays live once picked, so the containers keep being pointed at while you walk to them with the inventory closed.
+
+[h2]Notes[/h2]
+[list]
+[*] Client-side only. Other players do not need it, and it changes nothing server-authoritative.
+[*] Every feature is on out of the box and has its own Enabled toggle, so anything you do not want is one click away. Settings are saved per profile.
+[*] Source, and an account of how it works, at [url=https://github.com/dodoflix/ck-qol]github.com/dodoflix/ck-qol[/url].
+[/list]

@@ -369,6 +369,22 @@ job is safe: the GitHub release uses `--clobber` and the mod.io steps are writes
 the same values. `workflow_dispatch` takes an existing tag, for a run that cannot be
 re-run.
 
+### Steam Workshop
+
+The item is `3831291687`. It was created once with the SDK's own `PugModUploader`
+(CoreKeeperModSDK repo), because that sets the tags the game filters on - `Script`, a
+category, `Client` or `Server`, and the game version as `x.y.z` - and steamcmd's item file
+has no field for them. The release workflow only replaces the content and change note
+with steamcmd, so the title, description (`assets/workshop-description.txt`), images and
+tags are whatever the uploader set. To change them, or to bump the version tag after a game
+update, run the uploader again with that file ID in its config. It needs a running Steam
+client on an account that owns the game, which is why a runner cannot do it.
+
+The workflow step is skipped unless `STEAM_USERNAME`, `STEAM_PASSWORD` and
+`STEAM_CONFIG_VDF` are set. The last is a `config.vdf` from a machine where steamcmd has
+logged in with Steam Guard, base64 encoded. It shares the guid `com.dodo.ckqol` with the
+mod.io build, so a player subscribed to both gets a conflict.
+
 **Pulling a release** takes three things, none of which the workflow does:
 
 - `gh release delete v1.2.3 --cleanup-tag` removes the GitHub release, its zip and the
