@@ -8,7 +8,7 @@ need it.
 Settings live in the game's own menu: **Settings → QoL settings**. Every feature is
 on out of the box and has an Enabled toggle to switch it off.
 
-Targets Core Keeper **1.2.1.5**.
+Targets Core Keeper **1.3.0**.
 
 ## Features
 

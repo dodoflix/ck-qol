@@ -26,7 +26,7 @@ SUMMARY="Client-side quality of life: auto fishing, auto eat, auto summon, a DPS
 
 # Must be tags the game defines - GET /games/5289 lists them under tag_options.
 # Bump the version tag when the mod is verified against a newer build.
-TAGS=("1.2.1.5" "Quality of Life" "Client" "Script")
+TAGS=("1.3.0" "Quality of Life" "Client" "Script")
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
