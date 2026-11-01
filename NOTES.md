@@ -8,13 +8,14 @@ PugMod ships **C# source**, not a DLL: the game carries Roslyn and compiles mods
 in-process at startup. So there is no build step, and mistakes only surface in
 `Player.log` after a full launch.
 
-`scripts/check.sh` closes that gap. It compiles against `CoreKeeper_Data/Managed/`, then
-lints for APIs PugMod's **security verifier** rejects — `System.Reflection` above
+`dotnet build` closes that gap. `CkQol.csproj` compiles `src/` against `CoreKeeper_Data/Managed/`,
+then lints for APIs PugMod's **security verifier** rejects — `System.Reflection` above
 all. A clean compile says nothing about passing the verifier, and the only in-game
 symptom is a bare "Compilation failed".
 
-`scripts/install.sh` generates `ModManifest.json` from `src/`. PugMod silently ignores any
-`.cs` missing from the manifest.
+The `Install` and `Package` targets generate `ModManifest.json` from `src/`. PugMod silently
+ignores any `.cs` missing from the manifest. Both run the same `Stage` target, so a local
+deploy and the release zip cannot drift.
 
 ## Using an item without changing the player's selection
 
@@ -342,7 +343,8 @@ listen server.
 
 `scripts/modio-page.sh` owns the mod.io page — summary, description, logo and tags — so the
 store copy is generated from `assets/` rather than edited in a web form and then left
-to drift. Core Keeper is game `5289` and the mod is `6363554`.
+to drift. Core Keeper is game `5289` and the mod is `6363554`. It is bash, curl, python3 and zip,
+and only the workflows run it, on the Ubuntu runner; it is not part of a local build.
 
 - `api.mod.io` is retired and answers error 11001; everything uses `g-5289.modapi.io`.
 - A read-only token fails writes with 11139, which reads like a permissions bug on the

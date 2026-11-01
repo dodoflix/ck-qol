@@ -6,7 +6,7 @@ class names come out. The same stripping makes a normal read of a MonoBehaviour
 throw ("Expected to read N bytes, but only read M"), so m_Script is taken from the
 raw bytes instead.
 
-Run through scripts/dump.sh, which supplies the interpreter and UnityPy.
+Run through tools/dump, which supplies the interpreter and UnityPy.
 """
 import os, struct, sys, UnityPy
 

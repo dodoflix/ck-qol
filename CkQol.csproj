@@ -1,0 +1,143 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- PugMod compiles src/ in-process at startup, so this project exists only to catch mistakes before
+       a launch: dotnet build compiles against the game's assemblies and lints for APIs the security
+       verifier rejects. -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <GameDir Condition="'$(GameDir)' == '' and '$(CK_GAME_DIR)' != ''">$(CK_GAME_DIR)</GameDir>
+    <GameDir Condition="'$(GameDir)' == '' and $([MSBuild]::IsOSPlatform('Windows'))">$(MSBuildProgramFiles32)\Steam\steamapps\common\Core Keeper</GameDir>
+    <GameDir Condition="'$(GameDir)' == ''">$(HOME)/.local/share/Steam/steamapps/common/Core Keeper</GameDir>
+    <Managed>$(GameDir)/CoreKeeper_Data/Managed</Managed>
+    <ModName>CkQol</ModName>
+    <ModGuid>com.dodo.ckqol</ModGuid>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="src/**/*.cs" />
+    <GameAssembly Include="UnityEngine.CoreModule;UnityEngine.PhysicsModule;UnityEngine;UnityEngine.InputLegacyModule;
+                           PugMod.SDK.Runtime;PugMod.SDK;Pug.Other;Pug.Base;Rewired_Core;
+                           Unity.Entities;Unity.Mathematics;Unity.Collections;Unity.NetCode;
+                           Unity.Burst;Unity.Transforms;Unity.Networking.Transport;
+                           Pug.ECS.Components;Pug.ECS.Extensions;Pug.Objects;PugProperties;
+                           Outlines.Components;PugSprite;Interaction;Interaction.Components" />
+  </ItemGroup>
+
+  <!-- Unity's mscorlib and netstandard must not be referenced: they shadow the SDK's core libraries and
+       every predefined type fails to resolve. -->
+  <Target Name="GameRefs" BeforeTargets="ResolveAssemblyReferences">
+    <Error Condition="!Exists('$(Managed)')" Text="Game assemblies not found at $(Managed). Set CK_GAME_DIR to override." />
+    <ItemGroup>
+      <Reference Include="$(Managed)/%(GameAssembly.Identity).dll" Condition="Exists('$(Managed)/%(GameAssembly.Identity).dll')" Private="false" />
+    </ItemGroup>
+  </Target>
+
+  <!-- The verifier refuses anything touching these, and the only in-game symptom is "a mod failed to
+       load: Compilation failed". Comment lines are skipped: a doc comment naming the rule is not a violation. -->
+  <UsingTask TaskName="SecurityLint" TaskFactory="RoslynCodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)/Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <Files ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="true" />
+    </ParameterGroup>
+    <Task>
+      <Using Namespace="System.IO" />
+      <Using Namespace="System.Linq" />
+      <Using Namespace="System.Text.RegularExpressions" />
+      <Code Type="Fragment" Language="cs"><![CDATA[
+        var rules = new[] { @"System\.Reflection", @"\.GetType\(", @"typeof\([^)]*\)\.[A-Za-z]",
+                            @"System\.Diagnostics\.Process", @"DllImport", @"Assembly\." }
+            .Select(r => new Regex(r)).ToArray();
+        foreach (var file in Files)
+        {
+            var path = file.GetMetadata("FullPath");
+            var lines = File.ReadAllLines(path);
+            for (int i = 0; i < lines.Length; i++)
+            {
+                var text = lines[i].TrimStart();
+                if (text.StartsWith("//") || text.StartsWith("*")) continue;
+                foreach (var rule in rules)
+                    if (rule.IsMatch(lines[i]))
+                        Log.LogError(null, null, null, path, i + 1, 0, 0, 0,
+                            "rejected by PugMod's security verifier, the mod will not load (" + rule + ")");
+            }
+        }
+        if (!Log.HasLoggedErrors) Log.LogMessage(Microsoft.Build.Framework.MessageImportance.High, "security lint: clean");
+      ]]></Code>
+    </Task>
+  </UsingTask>
+
+  <Target Name="Lint">
+    <SecurityLint Files="@(Compile)" />
+  </Target>
+  <Target Name="LintAfterCompile" AfterTargets="CoreCompile" DependsOnTargets="Lint" />
+
+  <!-- requiredOn 1 is Client, 2 is Server in PugMod's ModExistsOn flags. PugMod silently ignores any .cs
+       missing from the manifest, so it lists every file under src/. -->
+  <UsingTask TaskName="WriteManifest" TaskFactory="RoslynCodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)/Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <Dest Required="true" />
+      <Guid Required="true" />
+      <Name Required="true" />
+    </ParameterGroup>
+    <Task>
+      <Using Namespace="System.IO" />
+      <Using Namespace="System.Linq" />
+      <Using Namespace="System.Text" />
+      <Code Type="Fragment" Language="cs"><![CDATA[
+        var root = Path.GetFullPath(Dest).TrimEnd('/', '\\');
+        var files = Directory.GetFiles(Path.Combine(root, "src"), "*.cs", SearchOption.AllDirectories)
+            .Select(f => f.Substring(root.Length + 1).Replace('\\', '/'))
+            .OrderBy(f => f, StringComparer.Ordinal).ToArray();
+        var json = new StringBuilder();
+        json.Append("{\n");
+        json.Append("  \"guid\": \"" + Guid + "\",\n");
+        json.Append("  \"name\": \"" + Name + "\",\n");
+        json.Append("  \"displayName\": \"Core Keeper QoL\",\n");
+        json.Append("  \"skipSafetyChecks\": false,\n");
+        json.Append("  \"disableScripts\": false,\n");
+        json.Append("  \"accessesExtraAssemblies\": true,\n");
+        json.Append("  \"disableHarmonyPatching\": false,\n");
+        json.Append("  \"requiredOn\": 1,\n");
+        json.Append("  \"files\": [\n");
+        json.Append(string.Join(",\n", files.Select(f => "    {\n      \"path\": \"" + f + "\",\n      \"guid\": \"\"\n    }")));
+        json.Append("\n  ],\n");
+        json.Append("  \"dependencies\": []\n");
+        json.Append("}");
+        File.WriteAllText(Path.Combine(Dest, "ModManifest.json"), json.ToString());
+        Log.LogMessage(Microsoft.Build.Framework.MessageImportance.High, files.Length + " source file(s)");
+      ]]></Code>
+    </Task>
+  </UsingTask>
+
+  <Target Name="Stage">
+    <RemoveDir Directories="$(StageDir)" />
+    <ItemGroup>
+      <ModSource Include="src/**/*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(ModSource)" DestinationFiles="@(ModSource->'$(StageDir)/%(Identity)')" />
+    <WriteManifest Dest="$(StageDir)" Guid="$(ModGuid)" Name="$(ModName)" />
+  </Target>
+
+  <!-- dotnet build -t:Install : compile, lint, and deploy into the client's mod directory. -->
+  <Target Name="Install" DependsOnTargets="Build">
+    <Error Condition="!Exists('$(GameDir)')" Text="Core Keeper not found at $(GameDir). Set CK_GAME_DIR to override." />
+    <MSBuild Projects="$(MSBuildProjectFullPath)" Targets="Stage" Properties="StageDir=$(GameDir)/CoreKeeper_Data/StreamingAssets/Mods/$(ModName)" />
+    <Message Importance="high" Text="installed to $(GameDir)/CoreKeeper_Data/StreamingAssets/Mods/$(ModName). Launch the game and look for [CkQol] in Player.log." />
+  </Target>
+
+  <!-- dotnet build -t:Package -p:ReleaseTag=v1.2.3 : the zip the game's own mod downloads look like, with
+       ModManifest.json at its root. No compile: a runner has no game assemblies. -->
+  <Target Name="Package" DependsOnTargets="Lint">
+    <Error Condition="'$(ReleaseTag)' == ''" Text="Pass the version as -p:ReleaseTag=v1.2.3." />
+    <PropertyGroup>
+      <Stage>$(MSBuildProjectDirectory)/$(IntermediateOutputPath)package</Stage>
+      <ZipFile>$(MSBuildProjectDirectory)/dist/$(ModName)-$(ReleaseTag.TrimStart('v')).zip</ZipFile>
+    </PropertyGroup>
+    <MSBuild Projects="$(MSBuildProjectFullPath)" Targets="Stage" Properties="StageDir=$(Stage)" />
+    <MakeDir Directories="$(MSBuildProjectDirectory)/dist" />
+    <Delete Files="$(ZipFile)" />
+    <ZipDirectory SourceDirectory="$(Stage)" DestinationFile="$(ZipFile)" />
+    <Message Importance="high" Text="$(ZipFile)" />
+  </Target>
+</Project>
