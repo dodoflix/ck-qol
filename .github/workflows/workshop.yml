@@ -13,9 +13,8 @@ jobs:
   workshop:
     runs-on: ubuntu-latest
     steps:
+      # The script comes from the branch the workflow runs on; the zip and notes from the release.
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.tag }}
 
       - name: Update the Steam Workshop item
         env:
