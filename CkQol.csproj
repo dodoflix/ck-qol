@@ -68,7 +68,10 @@
   </UsingTask>
 
   <Target Name="Lint">
-    <SecurityLint Files="@(Compile)" />
+    <ItemGroup>
+      <LintSource Include="src/**/*.cs" />
+    </ItemGroup>
+    <SecurityLint Files="@(LintSource)" />
   </Target>
   <Target Name="LintAfterCompile" AfterTargets="CoreCompile" DependsOnTargets="Lint" />
 
