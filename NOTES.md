@@ -380,10 +380,16 @@ tags are whatever the uploader set. To change them, or to bump the version tag a
 update, run the uploader again with that file ID in its config. It needs a running Steam
 client on an account that owns the game, which is why a runner cannot do it.
 
-The workflow step is skipped unless `STEAM_USERNAME` and `STEAM_CONFIG_VDF` are set. The
-latter is a `config.vdf` from a machine where steamcmd has logged in with Steam Guard,
-base64 encoded; its cached login token replaces the password. When the token expires, log
-in again and replace the secret. It shares the guid `com.dodo.ckqol` with the
+`scripts/workshop.sh` does the update and is skipped unless `STEAM_USERNAME` and
+`STEAM_CONFIG_VDF` are set. The latter is a `config.vdf` from a machine where steamcmd has
+logged in with Steam Guard, base64 encoded; its cached login token replaces the password.
+Do not upload the whole file: it is over the 48 KB secret limit and holds the desktop
+client's logins too. `Software > Valve > Steam` with only `ConnectCache` (the account's
+entry, keyed `crc32(account name)` in hex plus `1`), `Accounts` and `MTBF` is enough; without
+`MTBF` steamcmd answers "Cached credentials not found". When the token expires, log in
+again and replace the secret. The Workshop workflow re-runs just this step for an existing
+tag, because the whole Release workflow would upload to mod.io twice. The mod.io build
+shares the guid `com.dodo.ckqol` with the
 mod.io build, so a player subscribed to both gets a conflict.
 
 **Pulling a release** takes three things, none of which the workflow does:

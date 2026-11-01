@@ -115,44 +115,11 @@ jobs:
           fi
           echo "uploaded version ${{ steps.tag.outputs.version }} to mod.io"
 
-      # Pushes the new files to the existing Workshop item. steamcmd cannot set tags, so
-      # title, description, images and tags stay as the SDK uploader created them (NOTES.md).
-      # STEAM_CONFIG_VDF is a logged-in steamcmd config.vdf, base64 encoded. It carries the
-      # login token, so no password is needed and Steam Guard is not asked for.
+      # Last, so a Workshop failure cannot stop the GitHub and mod.io uploads. If it fails,
+      # re-run only this part with the Workshop workflow.
       - name: Update the Steam Workshop item
         env:
           STEAM_USERNAME: ${{ secrets.STEAM_USERNAME }}
           STEAM_CONFIG_VDF: ${{ secrets.STEAM_CONFIG_VDF }}
           NOTES: ${{ steps.tag.outputs.notes }}
-          WORKSHOP_ID: "3831291687"
-        run: |
-          if [ -z "$STEAM_USERNAME" ] || [ -z "$STEAM_CONFIG_VDF" ]; then
-            echo "STEAM_USERNAME or STEAM_CONFIG_VDF is not set - skipping the Workshop update." >&2
-            exit 0
-          fi
-
-          sudo apt-get install -qq -y lib32gcc-s1
-          mkdir -p ~/Steam/config
-          curl -sSL https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz | tar xz -C ~/Steam
-          printf '%s' "$STEAM_CONFIG_VDF" | base64 -d > ~/Steam/config/config.vdf
-
-          unzip -q "dist/CkQol-${{ steps.tag.outputs.version }}.zip" -d workshop-content
-          python3 - <<'PY'
-          import os
-          notes = os.environ["NOTES"].replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
-          open("workshop.vdf", "w").write(
-              '"workshopitem"\n{\n'
-              '"appid" "1621690"\n'
-              f'"publishedfileid" "{os.environ["WORKSHOP_ID"]}"\n'
-              f'"contentfolder" "{os.getcwd()}/workshop-content"\n'
-              f'"changenote" "{notes}"\n'
-              '}\n')
-          PY
-
-          set -o pipefail
-          ~/Steam/steamcmd.sh +login "$STEAM_USERNAME" \
-            +workshop_build_item "$PWD/workshop.vdf" +quit | tee steamcmd.log
-          if grep -q -i -E 'error|failed' steamcmd.log; then
-            echo "steamcmd reported a failure, see the log above." >&2
-            exit 1
-          fi
+        run: ./scripts/workshop.sh "dist/CkQol-${{ steps.tag.outputs.version }}.zip"

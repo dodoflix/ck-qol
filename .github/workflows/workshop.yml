@@ -1,0 +1,28 @@
+name: Workshop
+
+# Re-runs only the Steam Workshop update of a release that already exists, for when that
+# step failed: running the whole Release workflow again would upload to mod.io twice.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag
+        required: true
+
+jobs:
+  workshop:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Update the Steam Workshop item
+        env:
+          GH_TOKEN: ${{ github.token }}
+          STEAM_USERNAME: ${{ secrets.STEAM_USERNAME }}
+          STEAM_CONFIG_VDF: ${{ secrets.STEAM_CONFIG_VDF }}
+        run: |
+          gh release download "${{ inputs.tag }}" --pattern '*.zip' --dir dist
+          export NOTES="$(gh release view "${{ inputs.tag }}" --json body --jq .body)"
+          ./scripts/workshop.sh dist/CkQol-*.zip
