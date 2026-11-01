@@ -9,7 +9,7 @@ in-process at startup. So there is no build step, and mistakes only surface in
 `Player.log` after a full launch.
 
 `dotnet build` closes that gap. `CkQol.csproj` compiles `src/` against `CoreKeeper_Data/Managed/`,
-then lints for APIs PugMod's **security verifier** rejects — `System.Reflection` above
+then lints for APIs PugMod's **security verifier** rejects - `System.Reflection` above
 all. A clean compile says nothing about passing the verifier, and the only in-game
 symptom is a bare "Compilation failed".
 
@@ -19,9 +19,9 @@ deploy and the release zip cannot drift.
 
 ## Using an item without changing the player's selection
 
-All three features do this, and it is the load-bearing trick of the mod.
+Auto Eat, Auto Summon and Auto Fishing all do this, and it is the load-bearing trick of the mod.
 
-Eating, summoning and reeling all consume the **equipped** slot — there is no path
+Eating, summoning and reeling all consume the **equipped** slot - there is no path
 that uses an item from an arbitrary inventory index. But `ClientInput` is writable,
 and the ordering works out:
 
@@ -30,7 +30,7 @@ SimulationSystemGroup
 ├─ RunSimulationSystemGroup                       (OrderFirst)
 │    ├─ SendClientInputSystem                     (OrderLast)
 │    └─ our systems                               (UpdateAfter) ← write here
-└─ …BeforePredictedFixedStepSimulationSystemGroup
+└─ ...BeforePredictedFixedStepSimulationSystemGroup
      └─ EquipmentSystemGroup
           ├─ EquipmentBeforeUpdateSystemGroup → SelectedEquipmentChangeSystem  ← reads it
           └─ EquipmentUpdateSystemGroup       → EquipmentUpdateSystem → *Slot
@@ -45,7 +45,7 @@ exactly as long as it is written and the hotbar never moves.
 
 - **End the press with the slot still overridden.** `EquipmentUpdateSystem` latches a
   pending second-interact, so dropping the button and the override together lets
-  that latch land a frame later on whatever the player actually holds — firing
+  that latch land a frame later on whatever the player actually holds - firing
   their weapon.
 - **Pin the aim** while pressing, or summons go to the aim marker, up to twelve
   tiles away for command-minion weapons.
@@ -54,7 +54,7 @@ exactly as long as it is written and the hotbar never moves.
 - The inventory is one `ContainedObjectsBuffer`; `InventoryBuffer[0]` is the main
   inventory and `1..` are pouches. The **hotbar is not a container** but a moving
   window over those, so scope has to be decided per slot.
-- An open inventory does **not** need to block any of this — the simulation never
+- An open inventory does **not** need to block any of this - the simulation never
   checks the UI. A held cursor item does.
 
 ## The settings menu
@@ -78,7 +78,7 @@ behaviour, so navigation, fonts, sounds and controller support come from the gam
 ## The HUD key hint
 
 `GameHints` adds a line to the bottom-right hints by cloning a stock one.
-`InGameButtonHintsUI.hintButtonRows` is a plain public list with no cached index —
+`InGameButtonHintsUI.hintButtonRows` is a plain public list with no cached index -
 appending is safe, inserting at 0 is not, because the row anchor is read live from
 `buttons[0]`.
 
@@ -96,22 +96,22 @@ Every one of these produced an invisible hint:
 - `CalcGameplayUITargetScaleMultiplier()` returns **zero** for roughly the first
   second in a world, and during any fade. Sampling it once and caching leaves the
   hint at zero size forever.
-- Never deactivate a sprite's GameObject to hide it — the donor's sprites can be
+- Never deactivate a sprite's GameObject to hide it - the donor's sprites can be
   the label's own parent. Disable the renderer.
-- **Destroy the donor's glyphs on a fresh clone** — `GameMenu.DropStrayGlyphs`.
+- **Destroy the donor's glyphs on a fresh clone** - `GameMenu.DropStrayGlyphs`.
   `PugText.glyphs` is `[NonSerialized]` (`:108`), so `Instantiate` copies the donor's
   live glyph objects as children while the clone's list comes up empty. Everything
-  that clears or recolours text walks that list — `Clear` (`:789`), `Render`, our own
-  tint — so the copies are unreachable, and they sit there showing the donor's words
+  that clears or recolours text walks that list - `Clear` (`:789`), `Render`, our own
+  tint - so the copies are unreachable, and they sit there showing the donor's words
   in the donor's colours for as long as the clone lives. They are only there when the
   donor had text at clone time, which for the crafting hover means only while the
   player was hovering a recipe: the same bug looks intermittent and unfixable at once.
 - **Set `renderOnStart`, `keepEnabledOnStart` and `freeResourcesOnDisable` on every
-  cloned `PugText`** — `GameMenu.KeepRendered`. The prefabs ship all three off, and
+  cloned `PugText`** - `GameMenu.KeepRendered`. The prefabs ship all three off, and
   together they make a toggled clone keep the donor's words for good: hiding it
   leaves the glyphs on screen instead of returning them to the pool (`:305`),
   `OnEnable` never redraws because `startCalled` was never set (`:287`, `:273`), and
-  a blank written meanwhile still records `textString` — so `HasCorrectGlyphs`
+  a blank written meanwhile still records `textString` - so `HasCorrectGlyphs`
   matches against glyphs nobody drew (`:666`) and every later write early-outs. This
   is the stuck ingredient row, and it took three attempts to find because blanking
   after activation fixes the first open and nothing after it.
@@ -123,7 +123,7 @@ Every one of these produced an invisible hint:
 ## The stat panel
 
 `GameStatPanel` stacks icon-and-number rows under the minion counter, cloned from the
-hover window's ingredient row — `HoverRequiredMaterialUIElement` is five public fields
+hover window's ingredient row - `HoverRequiredMaterialUIElement` is five public fields
 and no logic, and is already an icon beside a number.
 
 The HUD has no anchoring helper and no screen-corner maths anywhere: every widget
@@ -140,13 +140,13 @@ client. Only the damage-number UI throws the attacker away
 
 `PlayLocalEffectEventSystem` de-duplicates each replicated event against the client's
 own predicted copy and records what it played in `LocalEffectEventBuffer`. Reading that
-buffer, ordered after that system, gives the de-duplicated stream for free — and it is
+buffer, ordered after that system, gives the de-duplicated stream for free - and it is
 ten deep where the replicated ring it comes from is three.
 
 An attacker is the player's if walking `OwnerReferenceCD.owner` reaches them, which is
 what the server itself does in `EntityUtility.GetOwnerInfo`. The row is named by the
-first thing in that chain the player carries a weapon for — `SecondaryUseCD.minionToSpawn`
-for a staff, `RangeWeaponCD.projectileID` for a gun — so an explosion owned by a
+first thing in that chain the player carries a weapon for - `SecondaryUseCD.minionToSpawn`
+for a staff, `RangeWeaponCD.projectileID` for a gun - so an explosion owned by a
 projectile owned by the player lands on the gun that fired it. Only the player's own
 swing, where they *are* the attacker, uses the item in hand.
 
@@ -167,7 +167,7 @@ Three things it cannot see:
 Chest contents are already on the client: `ContainedObjectsBuffer` is
 `PrefabType = All`, `SendMask = AllClients`, `SendToOwner = All`. Nothing has to be
 opened and no request is sent. The vanilla client does a superset of this every
-frame — `CraftingHandler` reads every nearby chest to grey out recipes, and records
+frame - `CraftingHandler` reads every nearby chest to grey out recipes, and records
 which one holds a material.
 
 Containers are found with a plain entity query over `ContainedObjectsBuffer` +
@@ -187,12 +187,12 @@ Two things bound it:
 `amount` in a slot is a stack count only for something stackable; on a weapon or a
 piece of armour it is the **durability**, which read as four hundred iron swords in
 one chest until those were counted one per slot. An item lying on the floor carries
-its contents the same way a container does and the query finds it too — the
+its contents the same way a container does and the query finds it too - the
 game's own pick-up system tells them apart by `PickUpItemCD`, so this does.
 
 Pointing at a container reuses the outline the game rings the interactable you are
-standing next to with — `OutlineController.SetColor` plus `SpriteObject.outlineColor`,
-which is what `EntityMonoBehaviour.UpdateOutline` writes — and floats the count over
+standing next to with - `OutlineController.SetColor` plus `SpriteObject.outlineColor`,
+which is what `EntityMonoBehaviour.UpdateOutline` writes - and floats the count over
 it as a `CombatText`. Two things about that:
 
 - **Re-apply the colour every frame.** The game drives the outline of whatever is
@@ -207,13 +207,13 @@ it as a `CombatText`. Two things about that:
 
 Suggestions start at the first character. They cost one keystroke, not one frame:
 a walk of the nearby containers to learn what is in stock, then up to four passes
-over the name index — nearby-and-prefix, nearby, prefix, the rest — each stopping
+over the name index - nearby-and-prefix, nearby, prefix, the rest - each stopping
 at eight results. So the first letter offers what you already own before anything
 else, and a single letter is no more expensive than three.
 
-Item names go through `PugText.ProcessText("Items/" + property, …)` rather than
+Item names go through `PugText.ProcessText("Items/" + property, ...)` rather than
 I2.Loc directly, which is not among the assemblies the mod compiles against. A
-missing term comes back as `missing: …` rather than null, and that is the test for
+missing term comes back as `missing: ...` rather than null, and that is the test for
 whether an `ObjectID` is a real named item.
 
 ## Typing in the world
@@ -228,7 +228,7 @@ Four things differ outside a menu:
 - Pair it with `Manager.input.DisableInput()` / `EnableInput()`, or the player walks
   while typing. The pause menu has already frozen them, so the settings row skips it.
 - `DisableInput` stops **every** player key, including the one that closes the
-  inventory, so focus is taken by clicking the box rather than automatically — a
+  inventory, so focus is taken by clicking the box rather than automatically - a
   panel that grabs input on open would trap the player in it. Without it the
   inventory shortcuts still fire while typing, and an `f` in a search locks a slot.
 - It also stops the click that selects a UI element, so the panel hit-tests its own
@@ -309,7 +309,7 @@ public partial class CkQolMyTweakSystem : PugSimulationSystemBase
   an idle frame costs one component read.
 - Call `UseButton.Claim(this)` before touching `ClientInputData`, and do nothing that
   frame if it refuses.
-- Use `PlayerSlots.Press` / `EndPress` rather than writing the input directly — they
+- Use `PlayerSlots.Press` / `EndPress` rather than writing the input directly - they
   carry the release rule that stops a latched press firing the player's weapon.
 - Stop while `Manager.menu.IsAnyMenuActive()` or `PlayerSlots.DragInProgress()`. An
   open inventory is fine.
@@ -323,7 +323,7 @@ one frame is undefined. `UseButton` arbitrates: a feature calls `Claim(this)` be
 touching the input and does nothing that frame if it returns false.
 
 A claim is first come, and held only while it keeps being re-asserted. A holder that
-stops asking — feature switched off, world gone, or simply finished — loses it on the
+stops asking - feature switched off, world gone, or simply finished - loses it on the
 next frame, so a claim cannot leak and no cleanup path can forget to release one.
 Holds last as long as a press, so a waiting feature waits a fraction of a second.
 
@@ -341,7 +341,7 @@ listen server.
 
 ## Publishing
 
-`scripts/modio-page.sh` owns the mod.io page — summary, description, logo and tags — so the
+`scripts/modio-page.sh` owns the mod.io page - summary, description, logo and tags - so the
 store copy is generated from `assets/` rather than edited in a web form and then left
 to drift. Core Keeper is game `5289` and the mod is `6363554`. It is bash, curl, python3 and zip,
 and only the workflows run it, on the Ubuntu runner; it is not part of a local build.
@@ -350,20 +350,20 @@ and only the workflows run it, on the Ubuntu runner; it is not part of a local b
 - A read-only token fails writes with 11139, which reads like a permissions bug on the
   mod rather than on the token.
 - Tags must be ones the game defines (`GET /games/5289` lists them under
-  `tag_options`), and are added and removed rather than replaced — otherwise last
+  `tag_options`), and are added and removed rather than replaced - otherwise last
   release's game-version tag stays on the page forever. That version is a constant in
   the script and needs bumping when the mod is verified against a newer build.
 - The tag endpoints answer 13006 to a multipart body: urlencoded only.
 - Gallery images go up as **one zip** on the media endpoint, and come off by filename
   through `DELETE /media`. Uploading never replaces, so the sync is add-and-remove
-  like the tags — and it matches on filename alone, so a shot edited in place under
+  like the tags - and it matches on filename alone, so a shot edited in place under
   the same name is treated as already there. Rename it to push a new one.
 - `ModManifest.json` goes at the **root** of the zip. The game unpacks a download
   flat, so a wrapping folder installs a mod it then cannot find.
 
 The release is not atomic, and the page is updated before the file. A transient
 `curl: (56)` on the logo upload took the run down under `set -e` with the copy already
-saying the new version and the store still serving the old one — that upload is
+saying the new version and the store still serving the old one - that upload is
 retried now, but the shape of the failure stands for any step. Re-running the failed
 job is safe: the GitHub release uses `--clobber` and the mod.io steps are writes of
 the same values. `workflow_dispatch` takes an existing tag, for a run that cannot be
@@ -397,7 +397,7 @@ mod.io build, so a player subscribed to both gets a conflict.
 - `gh release delete v1.2.3 --cleanup-tag` removes the GitHub release, its zip and the
   tag. The commits stay, so the tag can be recreated on the same one.
 - The mod.io file has to go by hand, from the mod's Files page. Nothing here deletes
-  one, deliberately — a store rollback while people are downloading is not a thing to
+  one, deliberately - a store rollback while people are downloading is not a thing to
   automate.
 - Ship the fix under a **new patch number**. A yanked version is still in someone's
   install and in mod.io's history, so reusing it means two different builds answering
