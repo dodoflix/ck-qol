@@ -42,7 +42,9 @@ open("workshop.vdf", "w").write(
 PY
 
 ~/Steam/steamcmd.sh +login "$STEAM_USERNAME" +workshop_build_item "$PWD/workshop.vdf" +quit | tee steamcmd.log
-if grep -q -i -E 'error|failed' steamcmd.log; then
-  echo "steamcmd reported a failure, see the log above." >&2
+# steamcmd exits 0 after a failed login, and prints harmless "failed to load" localisation
+# warnings on a fresh install, so the update's own success line is what counts.
+if ! sed 's/\x1b\[[0-9;]*m//g' steamcmd.log | grep -q 'Committing update\.\.\.Success\.'; then
+  echo "the Workshop update did not report success, see the log above." >&2
   exit 1
 fi
