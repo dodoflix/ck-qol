@@ -267,11 +267,13 @@ namespace CkQol.Features
                 return true;
             }
 
-            if (!weapon.spawnRandomProjectile) return false;
+            if (!weapon.spawnRandomProjectile && !weapon.secondaryProjectileBasedOnCondition) return false;
+            if (!weapon.alternativeProjectiles.IsCreated) return false;
 
-            for (int i = 0; i < weapon.randomProjectiles.Length; i++)
+            ref var alternatives = ref weapon.alternativeProjectiles.Value;
+            for (int i = 0; i < alternatives.Length; i++)
             {
-                if (weapon.randomProjectiles[i] == spawned) return true;
+                if (alternatives[i].objectID == spawned) return true;
             }
             return false;
         }

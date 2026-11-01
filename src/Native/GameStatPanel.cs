@@ -238,11 +238,11 @@ namespace CkQol.Native
             var anchor = UnityEngine.Object.FindFirstObjectByType<MinionCountUI>();
             if (anchor == null || anchor.container == null) return null;
 
-            var mouse = Manager.ui != null ? Manager.ui.mouse : null;
-            if (mouse == null || mouse.hoverMaterials == null) return null;
+            var tooltip = Manager.ui != null && Manager.ui.mouse != null ? Manager.ui.mouse.slotHoverTooltip : null;
+            if (tooltip == null || tooltip.hoverMaterials == null) return null;
 
             HoverRequiredMaterialUIElement donor = null;
-            foreach (var candidate in mouse.hoverMaterials)
+            foreach (var candidate in tooltip.hoverMaterials)
             {
                 if (candidate == null) continue;
                 donor = candidate;

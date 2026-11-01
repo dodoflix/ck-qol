@@ -691,6 +691,8 @@ namespace CkQol.Native
             _caret = Mathf.Clamp(_caret + n, 0, _typed.Length);
         }
 
+        public int GetMarkerPosition() => Mathf.Clamp(_caret, 0, _typed.Length);
+
         public void RemoveCharAtMarker()
         {
             if (_caret >= _typed.Length) return;
@@ -755,11 +757,11 @@ namespace CkQol.Native
             var ui = Manager.ui;
             if (ui == null || ui.playerInventoryUI == null) return null;
 
-            var mouse = ui.mouse;
-            if (mouse == null || mouse.hoverMaterials == null) return null;
+            var tooltip = ui.mouse != null ? ui.mouse.slotHoverTooltip : null;
+            if (tooltip == null || tooltip.hoverMaterials == null) return null;
 
             HoverRequiredMaterialUIElement donor = null;
-            foreach (var candidate in mouse.hoverMaterials)
+            foreach (var candidate in tooltip.hoverMaterials)
             {
                 if (candidate == null) continue;
                 donor = candidate;

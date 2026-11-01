@@ -448,6 +448,8 @@ namespace CkQol.Native
             Refresh();
         }
 
+        public int GetMarkerPosition() => Mathf.Clamp(_caret, 0, _editing.Length);
+
         public void RemoveCharAtMarker()
         {
             if (_caret >= _editing.Length) return;

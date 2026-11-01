@@ -323,18 +323,19 @@ namespace CkQol.Features
             if (interactable != null)
             {
                 Paint(interactable.optionalOutlineController, tint);
-                if (interactable.additionalOutlineControllers != null)
+                if (interactable.subInteractingData == null) return;
+                foreach (var sub in interactable.subInteractingData)
                 {
-                    foreach (var extra in interactable.additionalOutlineControllers)
+                    if (sub.optionalOutlineControllers != null)
                     {
-                        Paint(extra, tint);
+                        foreach (var extra in sub.optionalOutlineControllers) Paint(extra, tint);
                     }
-                }
 
-                if (interactable.spriteObjects == null) return;
-                foreach (var sprite in interactable.spriteObjects)
-                {
-                    if (sprite != null) sprite.outlineColor = tint;
+                    if (sub.optionalSpriteObjectOutlines == null) continue;
+                    foreach (var sprite in sub.optionalSpriteObjectOutlines)
+                    {
+                        if (sprite != null) sprite.outlineColor = tint;
+                    }
                 }
                 return;
             }
@@ -365,7 +366,7 @@ namespace CkQol.Features
         {
             for (int i = 0; i < _lit.Count; i++)
             {
-                if (_lit[i].Mono != null) _lit[i].Mono.UpdateOutline(OutlineType.None);
+                if (_lit[i].Mono != null) _lit[i].Mono.UpdateOutline(OutlineType.None, 0);
             }
             _lit.Clear();
         }
